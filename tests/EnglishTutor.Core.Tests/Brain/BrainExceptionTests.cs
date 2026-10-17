@@ -27,4 +27,18 @@ public sealed class BrainExceptionTests
         create.Should().Throw<ArgumentException>()
             .WithMessage("Use BrainException.InvalidOutput(rejection, rawText) for InvalidOutput.*");
     }
+
+    // US-003 — review S3: guard of the public contract the adapters call (US-004/US-006)
+    [Theory]
+    [InlineData("rejection")]
+    [InlineData("rawText")]
+    public void InvalidOutput_WithNullArgument_ThrowsArgumentNullException(string nullArgument)
+    {
+        var rejection = nullArgument == "rejection" ? null : TutorReplyRejections.MissingReply();
+        var rawText = nullArgument == "rawText" ? null : "no tags here";
+
+        var create = () => BrainException.InvalidOutput(rejection!, rawText!);
+
+        create.Should().Throw<ArgumentNullException>().Which.ParamName.Should().Be(nullArgument);
+    }
 }
