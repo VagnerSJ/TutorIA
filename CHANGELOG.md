@@ -16,5 +16,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: rejeição de respostas inválidas com motivo curto e mensagem que diz o que faltou e o que se espera, base da retentativa (RN-BRAIN04) (US-002).
 - Added: validação de conteúdo no Core (`TutorReplyValidator`: reply com pergunta final, no máximo 2 correções) e `FeedbackFormatter` com as linhas de feedback (US-002).
 - Added: projeto `EnglishTutor.Infrastructure.Tests` com fixtures de exemplo da resposta do professor; ADR-005 (regras de conteúdo no Core, formato na Infrastructure) (US-002).
+- Added: contrato do cérebro no Core (`ITutorBrain`, `BrainRequest`, `BrainMessage`, `BrainException` com `BrainErrorKind`) e `TutorReply.RawFallback` (US-003).
+- Added: `ConversationService` dono do histórico: mensagem padrão do turno (RN-CONV02), janela dos últimos N turnos (`Conversation:MaxTurnsInWindow`, padrão 10, mínimo 1), troca de modo, retentativa única de formato e fallback para texto cru (RN-BRAIN04) (US-003).
+- Added: `/mode` reconhecido pelo parser de comandos e `TutorMode.TryParse`; o console ainda o trata como desconhecido até a US-004 (US-003).
+- Added: console mostra o aviso local `Nothing was sent: type a sentence in English and press Enter.` em linha em branco (RN-CONV05) (US-003).
+- Added: ADR-006 (retentativa de formato e histórico no `ConversationService`) (US-003).
 - Fixed: `/quit` enviado por pipe no Windows PowerShell 5.1 era lido com BOM UTF-8 e tratado como texto livre (US-001).
 - Hábitos de trabalho com IA: skill `revisar-contexto`, `docs/aprendizados.md`, `specs/archive/`, Definition of Done verificável por US, seções Evidências e Comentários do usuário no plano, ADR proposto antes do código, hooks `post-edit-dotnet` e `executor-stop-gate`.
