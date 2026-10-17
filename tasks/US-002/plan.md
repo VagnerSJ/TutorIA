@@ -1,0 +1,309 @@
+# Plano — US-002 Contrato do professor e parser único da resposta
+
+Status: Aguardando aprovação
+Branch: feature/US-002_contrato-parser-resposta
+Spec: specs/sprints/SPRINT_1.md#us-002
+Regras: RN-BRAIN03, RN-FEED01–05 (RN-BRAIN04 como consumidora das mensagens de rejeição), ARCHITECTURE §2 (R1, R4), §3, §4, §6.2, §10; ADR-002 (Proposto), ADR-005 (Proposto, novo)
+
+## 1. Objetivo
+
+Criar o contrato `TutorReply`/`Correction` no Core e o `TutorReplyParser` único na Infrastructure, que aceita o JSON canônico e o formato com tags, valida as regras de conteúdo verificáveis (no Core) e devolve um resultado válido ou uma rejeição com motivo curto e mensagem que diz o que faltou e o que se espera.
+
+## 2. Abordagem
+
+Decisão central no **ADR-005 (Proposto)**: `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md`. A ARCHITECTURE §6.2 diz que o parser "valida as regras de conteúdo", mas a R4 proíbe regra de negócio na Infrastructure. Solução: **formato na Infrastructure, regras de conteúdo no Core**.
+
+### 2.1 Core (`src/EnglishTutor.Core/Brain/`) — só BCL
+
+```csharp
+public sealed record Correction(string Original, string Corrected, string Explanation);
+
+public sealed record TutorReply(string Reply, IReadOnlyList<Correction> Corrections,
+                                string? Pronunciation, string? Vocabulary, string? Praise,
+                                bool IsRawFallback, string RawText);   // igual à ARCHITECTURE §4
+
+public sealed record TutorReplyRejection(string Reason, string Message);
+
+public sealed record TutorReplyParseResult            // construtor privado
+{
+    public TutorReply? Reply { get; }
+    public TutorReplyRejection? Rejection { get; }
+    public IReadOnlyList<string> Warnings { get; }    // vazio quando inválido
+    [MemberNotNullWhen(true, nameof(Reply))]
+    [MemberNotNullWhen(false, nameof(Rejection))]
+    public bool IsValid => Reply is not null;
+    public static TutorReplyParseResult Valid(TutorReply reply, IReadOnlyList<string> warnings);
+    public static TutorReplyParseResult Invalid(TutorReplyRejection rejection);
+}
+
+public static class TutorReplyRejections               // catálogo único de motivos e mensagens
+{
+    public const string MissingReplyReason = "missing reply";
+    public const string ReplyMustEndWithQuestionReason = "reply must end with a question";
+    public const string InvalidJsonReason = "invalid JSON";
+    public const string InvalidCorrectionsReason = "invalid corrections";
+    public static TutorReplyRejection MissingReply();
+    public static TutorReplyRejection ReplyMustEndWithQuestion(string reply);
+    public static TutorReplyRejection InvalidJson(string detail);
+    public static TutorReplyRejection InvalidCorrections(string foundKind);
+}
+
+public static class TutorReplyValidator
+{
+    public static TutorReplyParseResult Validate(TutorReply candidate);
+}
+
+public static class FeedbackFormatter
+{
+    public static IReadOnlyList<string> Format(TutorReply reply);
+}
+```
+
+**Mensagens de rejeição** (inglês, porque vão na instrução de correção ao modelo — RN-BRAIN04; formato `"<Reason>: <o que está errado>. Expected <o que se espera>."`; D6):
+
+| Reason | Message (texto-alvo; o teste confere prefixo, o trecho do problema e `Expected`) |
+|---|---|
+| `missing reply` | `missing reply: the answer has no reply text. Expected a JSON object with a non-empty "reply" string, or the spoken text inside <reply>...</reply> followed by <feedback>...</feedback>.` |
+| `reply must end with a question` | `reply must end with a question: the reply "<reply, até 80 caracteres + ...>" does not end with "?". Expected 1 to 3 short sentences that end with one question to the student.` |
+| `invalid JSON` | `invalid JSON: <detalhe da JsonException ou "the root is an array">. Expected a single JSON object {"reply": string, "corrections": [{"original", "corrected", "explanation"}], "pronunciation": string or null, "vocabulary": string or null, "praise": string or null} with no text around it.` |
+| `invalid corrections` | `invalid corrections: "corrections" is a <string/number/object/...>. Expected an array of objects {"original", "corrected", "explanation"} (an empty array when there are no errors).` |
+
+**Regras do `TutorReplyValidator.Validate`** (nesta ordem):
+
+1. `Reply` após `Trim()` vazio → `Invalid(MissingReply())` (RN-FEED01).
+2. `Reply` após `Trim()` não termina com `'?'` → `Invalid(ReplyMustEndWithQuestion(reply))` (RN-FEED01, ADR-002 item 5).
+3. Correções com `Original` ou `Corrected` em branco são descartadas; aviso `Dropped {n} correction(s) without "original" or "corrected".` Campos das correções restantes passam por `Trim()`.
+4. Mais de 2 correções → mantém as 2 primeiras; aviso `Tutor reply had {n} corrections; kept the first 2 (RN-FEED02).`
+5. `Pronunciation`, `Vocabulary`, `Praise` em branco → `null`; senão `Trim()`.
+6. Resultado: `Valid(candidate with { Reply = trimmed, Corrections = ..., ... }, warnings)`. `RawText` e `IsRawFallback` (sempre `false`) são preservados.
+
+Não validados (fora de escopo, §8): número de frases (1–3), "exatamente uma" pergunta, ausência de correção dentro do reply, RN-FEED03 (praise obrigatório sem erros), RN-FEED05 (o JSON só tem um campo `vocabulary`; nas tags, linhas repetidas são unidas).
+
+**`FeedbackFormatter.Format`** (texto exibido; uma linha por item, nesta ordem; `IsRawFallback = true` → lista vazia, RN-BRAIN04):
+
+- correção: `{Original} → {Corrected} ({Explanation})`; sem explicação: `{Original} → {Corrected}`
+- `Pronunciation: {Pronunciation}`
+- `Vocabulary: {Vocabulary}`
+- `Praise: {Praise}`
+
+### 2.2 Infrastructure (`src/EnglishTutor.Infrastructure/Brain/`)
+
+```csharp
+public sealed class TutorReplyParser(ILogger<TutorReplyParser> logger)
+{
+    public TutorReplyParseResult Parse(string rawText);   // ArgumentNullException se null
+}
+internal static partial class TutorReplyParserLog
+{
+    [LoggerMessage(EventId = 2000, Level = LogLevel.Warning, Message = "Tutor reply adjusted: {Adjustment}")]
+    public static partial void TutorReplyAdjusted(ILogger logger, string adjustment);
+}
+```
+
+Método síncrono (CPU puro, sem I/O), por isso sem `CancellationToken`. Faixa de EventIds: Console 1000–1999 (US-001), cérebro/parser 2000–2999.
+
+**Detecção de formato** (sem receber `OutputMode`; P7): texto após `Trim()` começa com `{` → JSON; senão → tags.
+
+**Caminho JSON** (`System.Text.Json.JsonDocument`, BCL; leitura manual para mensagens claras):
+
+- `JsonException` → `Invalid(InvalidJson(ex.Message))`; raiz que não é objeto → `Invalid(InvalidJson("the root is a <kind>"))`.
+- `reply`: string → valor; ausente, `null` ou outro tipo → `""` (o validador rejeita com `missing reply`).
+- `corrections`: ausente ou `null` → `[]`; array → cada elemento objeto vira `Correction` (campos não-string → `""`); elemento não-objeto vira `Correction("", "", "")` (o validador descarta com aviso); outro tipo → `Invalid(InvalidCorrections(kind))`.
+- `pronunciation`, `vocabulary`, `praise`: string → valor; senão `null`. Propriedades extras são ignoradas; nomes diferenciam maiúsculas (o schema é minúsculo).
+
+**Caminho tags** (`[GeneratedRegex]`, `Singleline | IgnoreCase`):
+
+- `<reply>(.*?)</reply>` → `Reply` (com `Trim()`); sem o bloco → `""` (o validador rejeita com `missing reply`). Texto fora das tags é ignorado.
+- `<feedback>(.*?)</feedback>` opcional. Cada linha: `Trim()`, remove marcador inicial `-`, `*` ou `•` e espaços; linhas vazias ignoradas.
+  - prefixo `Pronunciation:` / `Vocabulary:` / `Praise:` (sem diferenciar maiúsculas) → campo correspondente; linhas repetidas do mesmo rótulo são unidas com `"; "`.
+  - linha com `→` ou `->` → corta na primeira seta: esquerda = `Original`; direita casa com `^(.*?)\s*\(([^()]*)\)\s*$` → `Corrected` + `Explanation`, senão `Corrected` = direita e `Explanation = ""`.
+  - qualquer outra linha é ignorada.
+
+Depois de montar o candidato (`IsRawFallback = false`, `RawText = rawText` original, sem `Trim`), o parser chama `TutorReplyValidator.Validate` e loga cada aviso com `TutorReplyAdjusted` (2000). Não loga o texto cru nem rejeições (a retentativa da US-003 loga).
+
+### 2.3 Testes e fixtures
+
+- Novo projeto `tests/EnglishTutor.Infrastructure.Tests` (já previsto na ARCHITECTURE §3 e na skill `tdd-dotnet`), com `Fixtures/TutorReply/` copiado para a saída e `Support/RecordingLogger<T>` (fake à mão que guarda nível, EventId e mensagem formatada; P8). O hook `post-edit-dotnet` já mapeia `src/EnglishTutor.Infrastructure` → `tests/EnglishTutor.Infrastructure.Tests`.
+- Fixtures desta US são **exemplos da spec** (não gravações reais): as saídas reais do Claude Code e do Ollama entram em US-004/US-006 e passam pelo mesmo parser.
+
+| Fixture | Conteúdo |
+|---|---|
+| `json-valid.json` | JSON exato do cenário "resposta JSON válida" |
+| `json-reply-without-question.json` | `{"reply":"I like that.","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}` |
+| `json-three-corrections.json` | reply terminando em `?` e 3 correções distintas (`a1→b1`, `a2→b2`, `a3→b3` com explicações) |
+| `json-no-errors-with-praise.json` | `{"reply":"That sounds great! What did you build last week?","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Great use of the present perfect!"}` |
+| `tags-valid.txt` | texto exato do cenário "resposta com tags válida" |
+| `tags-labeled-lines.txt` | layout de `prompts/format.tags.md` (multilinha) sem correção, com linhas `- Pronunciation: ...`, `- Vocabulary: ...`, `- Praise: ...` |
+| `out-of-format.txt` | `Sure! Here is my answer without tags.` |
+
+UTF-8 sem BOM e LF (`.editorconfig`/`.gitattributes` já cobrem `*.json`; `*.txt` cai em `* text=auto eol=lf`). Leitura com `File.ReadAllText` a partir de `AppContext.BaseDirectory` (`Support/Fixture.Read(name)`).
+
+### 2.4 Alterações nos documentos-raiz (propostas; aplicar após aprovação, antes da T2)
+
+`ARCHITECTURE.md`:
+
+- §3, linha `Brain/` do Core — texto novo:
+  `Brain/             ITutorBrain, BrainRequest, BrainMessage, TutorReply, Correction, TutorReplyParseResult,`
+  `                   TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, FeedbackFormatter,`
+  `                   BrainException, BrainOptions, BrainOptionsValidator, BrainProviders`
+- §4, logo após `TutorReply`: acrescentar `public sealed record Correction(string Original, string Corrected, string Explanation);`
+- §6.2, último bullet — texto novo: "As regras de conteúdo verificáveis (reply não vazio e terminando em `?`, no máximo 2 correções, correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04."
+
+Repetições da regra em `CLAUDE.md` e skills (Grep por `parser|TutorReply|R4`): `CLAUDE.md:31` ("Mensagens de erro do parser e das validações dizem o que está errado e o que se espera"), `checklist-revisao/SKILL.md:37` ("Regra de negócio no Core, não em adaptadores (R4)"), `checklist-revisao/SKILL.md:50` e `tdd-dotnet/SKILL.md:25` (`Brain/TutorReplyParserTests.cs` em Infrastructure.Tests) **continuam corretas sem alteração**. Nenhuma linha de `CLAUDE.md` ou de skill precisa mudar (AP-005).
+
+`specs/` não muda: os cenários e as RN citadas cobrem o comportamento; as interpretações estão em §9.
+
+### Alternativas descartadas
+
+- Parser inteiro na Infrastructure com as regras dentro — viola R4 e prende os motivos a um adaptador (ADR-005).
+- Parser inteiro no Core — formato de provedor é detalhe de adaptador (§3, ADR-002).
+- `JsonSerializer` com DTO — mensagens de erro genéricas e menos controle sobre tipos errados; `JsonDocument` dá mensagens que dizem o que se espera.
+- `Parse(string, OutputMode)` — exigiria o adaptador repassar o modo e falharia quando um modelo responde JSON no modo tags; a detecção pelo primeiro caractere é suficiente.
+- `FakeLogger` (`Microsoft.Extensions.Diagnostics.Testing`) — pacote a mais para um fake de ~20 linhas.
+- `ITutorReplyParser` — não há segunda implementação nem consumidor que precise de dublê nesta US (R3 trata de portas).
+- `AddEnglishTutorInfrastructure(configuration)` agora — sem consumidor; entra com o primeiro adaptador (US-004).
+
+## 3. Arquivos afetados
+
+| Ação | Caminho | Responsabilidade |
+|---|---|---|
+| Criar | `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md` | Decisão (Proposto) — criado junto com este plano |
+| Alterar | `ARCHITECTURE.md` | §3, §4, §6.2 (texto em §2.4) |
+| Alterar | `Directory.Packages.props` | `PackageVersion` de `Microsoft.Extensions.Logging.Abstractions` (10.0.13) no grupo novo `Infrastructure` |
+| Alterar | `EnglishTutor.slnx` | Incluir `tests/EnglishTutor.Infrastructure.Tests` |
+| Alterar | `src/EnglishTutor.Infrastructure/EnglishTutor.Infrastructure.csproj` | `PackageReference` a `Microsoft.Extensions.Logging.Abstractions` |
+| Criar | `src/EnglishTutor.Core/Brain/Correction.cs` | Correção `original → corrected` |
+| Criar | `src/EnglishTutor.Core/Brain/TutorReply.cs` | Contrato da resposta (ARCHITECTURE §4) |
+| Criar | `src/EnglishTutor.Core/Brain/TutorReplyRejection.cs` | Motivo + mensagem |
+| Criar | `src/EnglishTutor.Core/Brain/TutorReplyRejections.cs` | Catálogo de motivos e mensagens |
+| Criar | `src/EnglishTutor.Core/Brain/TutorReplyParseResult.cs` | Resultado válido/inválido + avisos |
+| Criar | `src/EnglishTutor.Core/Brain/TutorReplyValidator.cs` | Regras RN-FEED01/02 verificáveis |
+| Criar | `src/EnglishTutor.Core/Brain/FeedbackFormatter.cs` | Linhas de feedback exibidas |
+| Criar | `src/EnglishTutor.Infrastructure/Brain/TutorReplyParser.cs` | Detecção JSON/tags, extração, delegação ao validador, log dos avisos |
+| Criar | `src/EnglishTutor.Infrastructure/Brain/TutorReplyParserLog.cs` | `[LoggerMessage]` 2000 |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/EnglishTutor.Infrastructure.Tests.csproj` | Projeto de teste (pacotes de teste como o Core.Tests, sem DI; `Fixtures\**` com `CopyToOutputDirectory=PreserveNewest`) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/RecordingLogger.cs` | Logger fake que registra entradas |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/Fixture.cs` | Leitura de fixtures |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/TutorReply/*` | 7 fixtures (§2.3) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/TutorReplyParserTests.cs` | Cenários da US pelo parser |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyRejectionsTests.cs` | Mensagens dizem o que falta e o que se espera (D6) |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyValidatorTests.cs` | Regras de conteúdo |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/FeedbackFormatterTests.cs` | Texto do feedback |
+
+## 4. Mapa cenário BDD → testes
+
+| Cenário | Projeto de teste | Classe | Método (Metodo_Cenario_Resultado) | Tipo |
+|---|---|---|---|---|
+| resposta JSON válida | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonIsValid_ReturnsReplyAndOneCorrection` (fixture `json-valid.json`; Reply exato; 1 correção `since five years`/`for five years`/explicação) | Unidade com fixture |
+| resposta JSON válida | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyEndsWithQuestion_ReturnsValidReplyWithoutWarnings` | Unidade |
+| resposta JSON válida | Core.Tests | `FeedbackFormatterTests` | `Format_WithCorrection_ShowsOriginalArrowCorrected` (`[Theory]`: com explicação → `since five years → for five years (use 'for' with a period of time)`; sem explicação → `I am work → I work`) | Unidade |
+| resposta com tags válida | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTagsAreValid_ReturnsReplyAndOneCorrection` (fixture `tags-valid.txt`; Reply exato; correção `I am work`/`I work`/`simple present`) | Unidade com fixture |
+| resposta com tags válida | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTagsCorrectionLineVaries_ParsesOriginalCorrectedAndExplanation` (`[Theory]`: `- a → b (x)`; `* a -> b (x)`; `- a → b` → explicação `""`) | Unidade |
+| resposta com tags válida (apoio) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTagsHaveLabeledFeedbackLines_MapsPronunciationVocabularyAndPraise` (fixture `tags-labeled-lines.txt`) | Unidade com fixture |
+| resposta com tags válida (apoio) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTagsHaveNoFeedbackBlock_ReturnsReplyWithEmptyFeedback` | Unidade |
+| resposta fora do formato | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTextHasNoJsonNorTags_RejectsWithMissingReply` (fixture `out-of-format.txt`; `Reason == "missing reply"`) | Unidade com fixture |
+| resposta fora do formato | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonReplyIsMissingNullOrEmpty_RejectsWithMissingReply` (`[Theory]`: `{}`, `{"reply":null}`, `{"reply":""}`) | Unidade |
+| resposta fora do formato | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyIsBlank_RejectsWithMissingReply` (`[Theory]`: `""`, `"   "`, `"\t\n"`) | Unidade |
+| resposta fora do formato (apoio) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonIsMalformed_RejectsWithInvalidJson` (`{"reply": "Hi?"` sem fechar) | Unidade |
+| resposta fora do formato (apoio) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonCorrectionsIsNotArray_RejectsWithInvalidCorrections` (`"corrections": "none"`) | Unidade |
+| reply sem pergunta final | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonReplyHasNoFinalQuestion_RejectsWithQuestionReason` (fixture `json-reply-without-question.json`; `Reason == "reply must end with a question"`) | Unidade com fixture |
+| reply sem pergunta final | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTagsReplyHasNoFinalQuestion_RejectsWithQuestionReason` (mesma regra nos dois formatos, RN-BRAIN03) | Unidade |
+| reply sem pergunta final | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyDoesNotEndWithQuestion_RejectsWithQuestionReason` (`[Theory]`: `I like that.`; `Is it good? I like that.`) | Unidade |
+| reply sem pergunta final (apoio) | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyEndsWithQuestionFollowedBySpaces_IsValidAndTrimmed` | Unidade |
+| mais de duas correções | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonHasThreeCorrections_KeepsFirstTwoAndLogsWarning` (fixture `json-three-corrections.json`; correções `a1`, `a2`; `RecordingLogger` tem 1 entrada `Warning`, EventId 2000, mensagem com `3 corrections` e `kept the first 2`) | Unidade com fixture |
+| mais de duas correções | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenMoreThanTwoCorrections_KeepsFirstTwoAndWarns` | Unidade |
+| mais de duas correções (apoio) | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenCorrectionLacksOriginalOrCorrected_DropsItAndWarns` | Unidade |
+| sem erros | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonHasNoCorrectionsAndPraise_FeedbackContainsPraise` (fixture `json-no-errors-with-praise.json`; `FeedbackFormatter.Format(reply)` contém `Praise: Great use of the present perfect!`) | Unidade com fixture |
+| sem erros | Core.Tests | `FeedbackFormatterTests` | `Format_WhenNoCorrectionsAndPraise_ContainsPraise` | Unidade |
+| (apoio: ordem e rótulos do feedback) | Core.Tests | `FeedbackFormatterTests` | `Format_WithPronunciationAndVocabulary_ShowsLabeledLinesInOrder` | Unidade |
+| (apoio: RN-BRAIN04, resposta crua sem feedback) | Core.Tests | `FeedbackFormatterTests` | `Format_WhenRawFallback_ReturnsNoLines` | Unidade |
+| (apoio: campos opcionais) | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenOptionalFieldsAreBlank_NormalizesThemToNull` | Unidade |
+| (apoio: contrato preserva o texto cru) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenValid_KeepsRawTextAndIsNotRawFallback` | Unidade |
+| (DoD D6: mensagem diz o que falta e o que se espera) | Core.Tests | `TutorReplyRejectionsTests` | `Rejection_ForEachReason_MessageStartsWithReasonAndStatesExpectation` (`[Theory]` com os 4 motivos: `Message` começa com `Reason + ": "`, contém o trecho do problema — ex. `"I like that."`, `"corrections" is a string` — e contém `Expected`) | Unidade |
+
+Total previsto: **26 métodos, 37 casos** — Core.Tests: 12 métodos (`TutorReplyValidatorTests` 7 = 5 `[Fact]` + 2 `[Theory]` com 3 e 2 casos; `FeedbackFormatterTests` 4 = 3 `[Fact]` + 1 `[Theory]` com 2; `TutorReplyRejectionsTests` 1 `[Theory]` com 4) = 19 casos; Infrastructure.Tests: 14 métodos em `TutorReplyParserTests` (12 `[Fact]` + 2 `[Theory]` com 3 casos cada) = 18 casos. Suíte inteira após a US: 86 casos (Core.Tests 46, Console.Tests 22, Infrastructure.Tests 18). Se o Executor mudar a contagem, atualiza §4 e D2 com o motivo.
+
+## 5. Tarefas (ordem de execução TDD)
+
+Pré-condição: alterações da §2.4 em `ARCHITECTURE.md` aplicadas pelo orquestrador após a aprovação (commit `docs(ai): ...`), ADR-005 em "Aceito" se o usuário aprovar.
+
+- [ ] T1 — Esqueleto: `PackageVersion` de `Microsoft.Extensions.Logging.Abstractions` no CPM; `PackageReference` no Infrastructure; projeto `tests/EnglishTutor.Infrastructure.Tests` (csproj, `Fixtures\**` copiado para a saída, `Using` de FluentAssertions e Xunit) no `EnglishTutor.slnx`; `Support/Fixture.cs`, `Support/RecordingLogger.cs`; as 7 fixtures. `dotnet build` com 0 warnings e `dotnet test` verde (testes existentes). (commit: `chore(infra): add infrastructure test project and tutor reply fixtures`)
+- [ ] T2 — Red: esqueletos de `Correction`, `TutorReply`, `TutorReplyRejection`, `TutorReplyParseResult`, `TutorReplyRejections` (métodos com `NotImplementedException`) + `TutorReplyRejectionsTests`. Green: mensagens da §2.1 e fábricas `Valid`/`Invalid`. (commits: `test(core): tutor reply rejection messages` + `feat(core): add tutor reply contract and rejection catalog`)
+- [ ] T3 — Red: esqueleto de `TutorReplyValidator` + testes de reply (`ReturnsValidReplyWithoutWarnings`, `IsBlank`, `DoesNotEndWithQuestion`, `FollowedBySpaces`). Green: regras 1, 2 e 6. (commits: `test(core): tutor reply validation of the reply text` + `feat(core): validate tutor reply text`)
+- [ ] T4 — Red: `MoreThanTwoCorrections`, `CorrectionLacksOriginalOrCorrected`, `OptionalFieldsAreBlank`. Green: regras 3, 4 e 5 com avisos. (commits: `test(core): tutor reply corrections and optional fields` + `feat(core): limit corrections and normalize optional feedback`)
+- [ ] T5 — Red: esqueleto de `FeedbackFormatter` + `FeedbackFormatterTests`. Green: formatação da §2.1. (commits: `test(core): feedback display lines` + `feat(core): format tutor feedback lines`)
+- [ ] T6 — Red: esqueleto de `TutorReplyParser` (+ `TutorReplyParserLog`) e testes JSON: `JsonIsValid`, `JsonReplyIsMissingNullOrEmpty`, `JsonIsMalformed`, `JsonCorrectionsIsNotArray`, `JsonReplyHasNoFinalQuestion`, `JsonHasThreeCorrections` (log), `JsonHasNoCorrectionsAndPraise`, `KeepsRawTextAndIsNotRawFallback`. Green: detecção + caminho JSON + log dos avisos. (commits: `test(infra): parse canonical json tutor reply` + `feat(infra): parse json tutor reply with shared validation`)
+- [ ] T7 — Red: testes de tags e fora do formato: `TagsAreValid`, `TagsCorrectionLineVaries`, `TagsHaveLabeledFeedbackLines`, `TagsHaveNoFeedbackBlock`, `TagsReplyHasNoFinalQuestion`, `TextHasNoJsonNorTags`. Green: caminho tags com `[GeneratedRegex]`. Refactor: extrair a leitura de linhas de feedback em método privado. (commits: `test(infra): parse tagged tutor reply` + `feat(infra): parse tagged tutor reply`)
+- [ ] T8 — DoD: rodar D1–D11, colar em §11, atualizar §3/§5 com os commits (AP-005). (commit: `docs(ai): add DoD evidence for US-002`)
+
+## 6. Pacotes NuGet
+
+| Pacote | Projeto | Motivo |
+|---|---|---|
+| Microsoft.Extensions.Logging.Abstractions (10.0.13, novo `PackageVersion`) | Infrastructure | `ILogger<T>` e gerador `[LoggerMessage]` no parser |
+| xunit.v3, xunit.runner.visualstudio, Microsoft.NET.Test.Sdk, FluentAssertions 7.2.2, NSubstitute, coverlet.collector (versões já no CPM) | Infrastructure.Tests | Mesma pilha dos outros projetos de teste |
+
+Nenhum pacote novo no Core (continua só `Microsoft.Extensions.Options` e `Microsoft.Extensions.DependencyInjection.Abstractions`; `System.Text.Json` e `System.Text.RegularExpressions` são do shared framework e ficam na Infrastructure).
+
+## 7. Riscos e mitigação
+
+| Risco | Mitigação |
+|---|---|
+| Fixtures sintéticas não refletem saídas reais (texto antes do JSON, cerca markdown) | Escopo explícito (§8, P5); US-004/US-006 gravam saídas reais e acrescentam fixtures; o parser rejeita com mensagem clara, e a retentativa (US-003) corrige |
+| Regra "termina com `?`" rígida demais (ex.: `?"` no fim) gera retentativas | Medir no `eval` (US-009); revisão prevista no ADR-005 |
+| Seta `→` (U+2192) exibida errada no console do Windows | Não afeta esta US (sem console); registrar para a US-004 conferir `Console.OutputEncoding` no D6 dela. A seta é visível, não entra na regra de escape do AP-007 |
+| Fixture salva com BOM por ferramenta de edição | `File.ReadAllText` tolera BOM; D11 garante que nenhum arquivo novo tem BOM |
+| Fixtures não copiadas para a saída (teste falha com `FileNotFoundException`) | `None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest"` na T1; `Fixture.Read` diz o caminho procurado na mensagem |
+| `MemberNotNullWhen` em propriedade calculada de record não satisfazer o analisador | Se o analisador reclamar, trocar por `TryGetReply(out TutorReply reply)`/`TryGetRejection(...)` e registrar no §12 antes do código (AP-009) |
+| Cobertura do Core: tipos só de dados sem teste direto | Todos são exercitados pelos testes do validador/formatador/rejeições; D3b confere ≥ 80% |
+
+## 8. Fora de escopo
+
+- `ITutorBrain`, `BrainRequest`, `BrainMessage`, `BrainException`/`BrainErrorKind` (US-003/US-004).
+- Retentativa com instrução de correção e `IsRawFallback = true` (US-003); esta US só entrega as mensagens que ela usará.
+- Leitura de `structured_output` do Claude Code e do `format` do Ollama, fixtures gravadas de execuções reais (US-004/US-006).
+- JSON dentro de cerca markdown ou com texto em volta (P5).
+- Regras não verificáveis com segurança: 1–3 frases, "exatamente uma" pergunta, reply sem correções, praise obrigatório sem erros (RN-FEED03), uma só sugestão de vocabulário (RN-FEED05), dicas de pronúncia vinculadas às palavras de baixa confiança (RN-FEED04) — continuam no `prompts/tutor.md`.
+- Exibição do feedback no console e `AddEnglishTutorInfrastructure` (US-004).
+- JSON Schema do `TutorReply` usado por `--json-schema`/`format` (US-004/US-006).
+
+## 9. Perguntas em aberto
+
+- **P1 — Onde ficam as regras de conteúdo?** A ARCHITECTURE §6.2 diz "o parser valida"; a R4 proíbe regra na Infrastructure. **Padrão proposto:** regras no Core (`TutorReplyValidator`), formato no parser da Infrastructure (ADR-005, ajuste de texto na §6.2 em §2.4).
+- **P2 — O que é "o feedback exibido" do cenário "sem erros"?** **Padrão proposto:** as linhas de `FeedbackFormatter.Format` (Core), que o console da US-004 vai imprimir; o teste confere a linha `Praise: Great use of the present perfect!`. Alternativa: formatar só no console (US-004) e o cenário verificar apenas `TutorReply.Praise`.
+- **P3 — Correção sem `original` ou `corrected`.** **Padrão proposto:** descartar com aviso no log, sem rejeitar a resposta (o reply ainda serve). Alternativa: rejeitar com novo motivo `invalid correction`.
+- **P4 — Sem correções e sem `praise` (RN-FEED03).** **Padrão proposto:** aceitar sem aviso; a regra fica no prompt. Alternativa: aviso no log.
+- **P5 — JSON com texto em volta ou em cerca ```` ```json ````.** **Padrão proposto:** não tratar agora (cai em `missing reply`/`invalid JSON` com mensagem clara); decidir na US-006 com saída real do Ollama.
+- **P6 — Critério de "termina com pergunta".** **Padrão proposto:** último caractere de `Reply.Trim()` é `?`. Não verificar "exatamente uma" pergunta nem número de frases (o modo listening-practice permite reply mais longo, `prompts/tutor.md`).
+- **P7 — O parser recebe o `OutputMode`?** **Padrão proposto:** não; detecta pelo primeiro caractere não branco (`{` → JSON, senão tags).
+- **P8 — Como verificar o "aviso no log"?** **Padrão proposto:** `RecordingLogger<T>` escrito à mão em `Infrastructure.Tests/Support`, conferindo nível `Warning`, EventId 2000 e a mensagem. Alternativa: pacote `Microsoft.Extensions.Diagnostics.Testing` (`FakeLogger`).
+- **P9 — Linhas repetidas de `Pronunciation:`/`Vocabulary:`/`Praise:` nas tags.** **Padrão proposto:** unir com `"; "` (o limite de 1 vocabulário da RN-FEED05 não é aplicado pelo parser; ver §8).
+
+## 10. Definition of Done (comandos verificáveis)
+
+Executar a partir da raiz do repositório, em PowerShell. Esta US não altera o console, então não há comando com pipe no Windows PowerShell 5.1 (AP-006 não se aplica).
+
+| # | Comando | Esperado |
+|---|---|---|
+| D1 | `dotnet build` | 0 warnings, 0 erros |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes (86 casos: Core.Tests 46, Console.Tests 22, Infrastructure.Tests 18), em < 30 s, sem rede nem GPU |
+| D3 | `Remove-Item -Recurse -Force TestResults, coverage -ErrorAction SilentlyContinue; dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` | gera `coverage.cobertura.xml` para os 3 projetos de teste |
+| D3b | `dotnet tool restore; dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | linha `EnglishTutor.Core` ≥ 80% (registrar também `EnglishTutor.Infrastructure`, informativo) |
+| D4 | `dotnet format --verify-no-changes` | sem diferenças |
+| D5 | `dotnet test --filter "FullyQualifiedName~TutorReplyParser"` | verde: 14 métodos / 18 casos, incluindo as fixtures JSON e tags |
+| D6 | `dotnet test --filter "FullyQualifiedName~TutorReplyRejectionsTests"` + colar nas Evidências as 4 mensagens geradas (uma por motivo) | verde; cada mensagem começa com o motivo, diz o problema concreto e contém `Expected ...` (base da instrução de correção da RN-BRAIN04) |
+| D7 | `dotnet test --filter "FullyQualifiedName~CoreDependencyTests"`; `dotnet list src/EnglishTutor.Core package` | 3 testes verdes; só `Microsoft.Extensions.Options` e `Microsoft.Extensions.DependencyInjection.Abstractions` |
+| D8 | `dotnet list src/EnglishTutor.Infrastructure package` | só `Microsoft.Extensions.Logging.Abstractions` |
+| D9 | `dotnet sln EnglishTutor.slnx list` | inclui `tests/EnglishTutor.Infrastructure.Tests/EnglishTutor.Infrastructure.Tests.csproj` |
+| D10 | `git status --short` após D2–D5 | nenhum arquivo de `TestResults/`, `coverage/`, `bin/` ou `obj/` aparece |
+| D11 | (Bash) `grep -rlP '\xEF\xBB\xBF' src tests --include=*.cs --include=*.json --include=*.txt --exclude-dir=bin --exclude-dir=obj` | nenhuma saída (sem BOM nem U+FEFF literal; AP-007) |
+
+E também (DoD comum): todo cenário BDD com teste escrito antes do código; `review.md` sem bloqueantes; `docs/us/US-002.md` criado; ADR-005 aceito e `ARCHITECTURE.md` §3/§4/§6.2 atualizadas (§2.4); merge `--no-ff` em `develop`.
+
+## 11. Evidências
+
+_Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+## 12. Comentários do usuário
+
+_O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
