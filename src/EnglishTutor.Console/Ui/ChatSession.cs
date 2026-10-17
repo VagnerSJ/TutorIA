@@ -5,10 +5,13 @@ namespace EnglishTutor.Console.Ui;
 // Console shell: shows the state, handles local commands (RN-CONV06) and forwards free text to the input handler.
 public sealed class ChatSession(TextReader input, TextWriter output, IChatInputHandler inputHandler, string provider, TutorMode mode)
 {
+    private const char _byteOrderMark = '﻿';
+
     public async Task<int> RunAsync(CancellationToken ct)
     {
         await WriteLinesAsync(ConsoleText.Header(provider, mode), ct);
 
+        var isFirstLine = true;
         while (true)
         {
             await output.WriteAsync(ConsoleText.Prompt.AsMemory(), ct);
@@ -19,6 +22,13 @@ public sealed class ChatSession(TextReader input, TextWriter output, IChatInputH
             if (line is null)
             {
                 return ExitCodes.Success;
+            }
+
+            if (isFirstLine)
+            {
+                // P12: Windows PowerShell 5.1 prefixes piped input with a UTF-8 BOM that Console.In keeps.
+                line = RemoveLeadingByteOrderMark(line);
+                isFirstLine = false;
             }
 
             // RN-CONV05: blank lines never reach the brain (the warning arrives with US-003).
@@ -46,6 +56,9 @@ public sealed class ChatSession(TextReader input, TextWriter output, IChatInputH
             }
         }
     }
+
+    private static string RemoveLeadingByteOrderMark(string line) =>
+        line.StartsWith(_byteOrderMark) ? line[1..] : line;
 
     private async Task WriteLinesAsync(IReadOnlyList<string> lines, CancellationToken ct)
     {
