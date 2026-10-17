@@ -522,3 +522,10 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 - S6 → §4 (`SendAsync_WithNullText_ThrowsArgumentNullException`, `ChangeMode_WithNull_ThrowsArgumentNullException`), §5 T7 (esqueleto de `ChangeMode` sem guarda, para o Red), §7.
 - S7 → §2.5, §3 (`Directory.Packages.props`), §5 T1, §6.
 - Contagens → §4 (35 métodos / 51 casos; Core.Tests 34/48; `ConversationServiceTests` 18/21; suíte 148), §5 (T7 9/11, T8 6/7, T9 3), §10 D2 (148; Core 99), D5 (99), D8 (21/18).
+
+### 2026-10-17 — usuário (aprovação condicionada)
+
+Aprovo o plano com as respostas padrão para P1–P14 e o ADR-006. Incorporar as sugestões S8, S9 e S10 da rodada 2 de `plan-review.md`:
+- **S8** — §3: deixar explícito que o `Name` do `FakeTutorBrain` é `"Fake"` (a asserção de `SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason` depende disso).
+- **S9** — §2.6, cenário novo da US-004 "janela de turnos configurável": dizer que a aplicação encerra com o código de saída de configuração inválida (`ExitCodes.InvalidConfiguration`, ≠ 0), no cenário ou num D da US-004.
+- **S10** — §5 T7 e T8: usar os nomes completos dos métodos de teste (com o prefixo `SendAsync_`/`ChangeMode_` e sem `...`), idênticos aos da §4.
