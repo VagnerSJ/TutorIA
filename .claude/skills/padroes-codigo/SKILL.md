@@ -53,6 +53,11 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 - Sem `catch (Exception)` silencioso; se capturar genérico, logue e relance ou converta.
 - `OperationCanceledException` sempre propaga.
 
+## Console e entrada padrão
+
+- A entrada padrão redirecionada pode chegar com BOM UTF-8 (o Windows PowerShell 5.1 coloca `\uFEFF` antes do texto enviado por pipe). Remova o BOM inicial da primeira linha lida e tenha um teste para isso (US-001, P12; AP-006).
+- Na DoD de toda US que mexe no console, mantenha ao menos um comando com pipe executado no Windows PowerShell 5.1 (ex.: `"/quit" | dotnet run --project src/EnglishTutor.Console`).
+
 ## Processos externos
 
 - Envolva `System.Diagnostics.Process` numa porta (`IProcessRunner`) — testável com fake.

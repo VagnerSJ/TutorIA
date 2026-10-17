@@ -77,6 +77,7 @@ Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada li
 | D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s |
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas |
 | ... | (específicos da US: execução do console, eval, etc.) | ... |
+US que mexe no console: inclua ao menos um comando com pipe no Windows PowerShell 5.1 (BOM na entrada redirecionada, AP-006).
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
