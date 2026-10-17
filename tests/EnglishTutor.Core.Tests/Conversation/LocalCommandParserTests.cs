@@ -1,0 +1,65 @@
+using EnglishTutor.Core.Conversation;
+
+namespace EnglishTutor.Core.Tests.Conversation;
+
+// US-001 — Cenários: comando local de saída; comando local desconhecido — RN-CONV06
+public sealed class LocalCommandParserTests
+{
+    // US-001 — Cenário: comando local de saída — RN-CONV06
+    [Fact]
+    public void TryParse_WhenInputIsQuit_ReturnsQuitCommand()
+    {
+        var recognized = LocalCommandParser.TryParse("/quit", out var command);
+
+        recognized.Should().BeTrue();
+        command.Should().Be(new LocalCommand(LocalCommandKind.Quit, "/quit", string.Empty));
+    }
+
+    // US-001 — Cenário: comando local de saída — RN-CONV06
+    [Theory]
+    [InlineData("/QUIT", LocalCommandKind.Quit, "/QUIT")]
+    [InlineData("  /quit  ", LocalCommandKind.Quit, "/quit")]
+    [InlineData("/Help", LocalCommandKind.Help, "/Help")]
+    public void TryParse_WhenCommandHasDifferentCaseOrSurroundingSpaces_RecognizesIt(
+        string input, LocalCommandKind expectedKind, string expectedName)
+    {
+        var recognized = LocalCommandParser.TryParse(input, out var command);
+
+        recognized.Should().BeTrue();
+        command.Should().Be(new LocalCommand(expectedKind, expectedName, string.Empty));
+    }
+
+    // US-001 — Cenário: comando local desconhecido — RN-CONV06
+    [Theory]
+    [InlineData("/xyz", "/xyz", "")]
+    [InlineData("/", "/", "")]
+    [InlineData("/mode interview", "/mode", "interview")]
+    public void TryParse_WhenSlashCommandIsUnknown_ReturnsUnknownCommand(
+        string input, string expectedName, string expectedArguments)
+    {
+        var recognized = LocalCommandParser.TryParse(input, out var command);
+
+        recognized.Should().BeTrue();
+        command.Should().Be(new LocalCommand(LocalCommandKind.Unknown, expectedName, expectedArguments));
+    }
+
+    // US-001 — Cenário: comando local desconhecido — RN-CONV06
+    [Fact]
+    public void TryParse_WhenInputDoesNotStartWithSlash_ReturnsFalse()
+    {
+        var recognized = LocalCommandParser.TryParse("I goed to the park /quit", out var command);
+
+        recognized.Should().BeFalse();
+        command.Should().BeNull();
+    }
+
+    // US-001 — apoio: /help citado no cabeçalho — RN-CONV06
+    [Fact]
+    public void TryParse_WhenInputIsHelp_ReturnsHelpCommand()
+    {
+        var recognized = LocalCommandParser.TryParse("/help", out var command);
+
+        recognized.Should().BeTrue();
+        command.Should().Be(new LocalCommand(LocalCommandKind.Help, "/help", string.Empty));
+    }
+}
