@@ -155,7 +155,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** `Parse_WhenJsonIsMalformed_RejectsWithInvalidJson` e `Parse_WhenJsonHasTrailingText_RejectsWithInvalidJson` conferiam `Contain("Expected ")`, mas a `JsonException` do System.Text.Json também diz "Expected ...". O parser poderia montar `"invalid JSON: " + ex.Message`, sem o sufixo do catálogo, e os dois testes continuariam verdes. Corrigido na T9 (f3c8b36) com um trecho que só o catálogo produz (`Expected a single JSON object {"reply": string`) e o final `with no text around it.`.
 - **Por que importa:** o teste passa por causa de um texto que o código do projeto não controla; a instrução de correção da RN-BRAIN04 perderia a descrição do objeto esperado sem aviso.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md` e checklist do Planejador/Revisor de plano (`.claude/agents/revisor.md`, modo revisão de plano): "quando a mensagem embute texto de biblioteca externa, o teste confere um trecho que só o código do projeto produz, e o plano já mapeia o teste assim na §4".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-016 — Comportamento de linha única escapa da cobertura de linhas
 
@@ -164,7 +164,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o corte do reply em 80 caracteres + `...` (ternário) e o `TrimEnd('.')` do detalhe da `JsonException` estavam a 100% de cobertura sem nenhum teste que os fixasse. Fixados na T9 (e8f5f00).
 - **Por que importa:** a meta de cobertura de linhas não vê transformações de uma linha; a US-003 e a US-009 poderiam mexer no catálogo com regressão silenciosa.
 - **Correção (proposta):** `.claude/agents/revisor.md` (checklist de revisão de plano) e `.claude/agents/planejador.md`: "cada transformação citada nas tabelas de mensagens da §2 (corte, normalização, limite) tem teste na §4, inclusive nos dois lados do limite, como já se exige para as respostas P*".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-017 — Red por mutação temporária para testes de caracterização
 
@@ -173,7 +173,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a revisão pediu testes que fixam comportamento que o código já tem, então não existe Red natural. O Executor mostrou o Red por mutação temporária, não commitada, descrita na T9 com a mensagem de falha obtida (ex.: sem corte e sem `TrimEnd` → 2 falhas; `>=` no lugar de `>` → falha o teste dos 80 caracteres). O 80º caractere do reply de teste é `b`, o que distingue corte em 79 de corte em 80. Ligado ao AP-010 (o Red falha pelo motivo certo). A S6 acrescenta: o valor usado para conferir que um campo é preservado não deve coincidir com o de outro campo que o código poderia copiar por engano (no teste da S4, `RawText` igual ao `Reply`).
 - **Por que importa:** sem o procedimento, o teste de caracterização pode nascer verde sem provar que discrimina.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, seção Red: "teste de caracterização pedido em revisão: aplique uma mutação temporária que quebre o comportamento, mostre a falha pelo motivo certo, reverta (não commite) e descreva a mutação e a falha na tarefa do `plan.md`. Em testes de preservação de campo, use valores distintos entre campos".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-018 — P* sem "Teste: ..." mapeado no plano (recorrência do AP-004)
 
@@ -209,7 +209,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** no Windows PowerShell 5.1, `git commit -m @'...'@` com aspas duplas dentro da mensagem divide os argumentos do `git`. O que funcionou foi o Bash com `git commit -F -` e heredoc.
 - **Por que importa:** o commit sai com mensagem truncada ou falha, e o corpo/atribuição se perdem.
 - **Correção (proposta):** `.claude/agents/executor.md` (seção Git) e skill `padroes-codigo` (seção Git): "mensagem de commit com várias linhas ou aspas: `git commit -F -` com heredoc no Bash; não usar here-string do PowerShell 5.1".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-022 — Adiamento em cadeia sem dono na spec
 
@@ -218,7 +218,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a US-001 adiou `/mode`, o aviso de linha em branco e `Conversation:MaxTurnsInWindow` para a US-003. A primeira versão do plano da US-003 entregou parte e adiou o resto para a US-004, cuja spec não citava nada disso (segundo adiamento sem dono). O Revisor do plano pegou como B1; o usuário escolheu registrar os itens na US-004 (4 cenários e D8 a D10), em commit anterior à T1.
 - **Por que importa:** item adiado sem registro na spec de destino se perde ou vira escopo implícito; é mudança de spec disfarçada.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md`: todo item da §8 que diz "fica para a US-YYY" é registrado na spec da US-YYY (cenário ou DoD extra) num commit `docs(ai)` anterior à T1, com o texto exato no plano; (b) checklist de revisão de plano (`.claude/agents/revisor.md` ou `checklist-revisao`): o Revisor confere a spec da US de destino.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-023 — Trecho de documento citado só pelo número da linha
 
@@ -227,7 +227,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o plano citou a faixa "55–58" da skill `bdd-para-testes` para substituição, deslocada em uma linha; a correção foi citar o texto antigo exato. O espelho ocorreu na revisão de código: o Executor copiou para a §12 números de linha da Rodada 1 do Revisor que estavam uma linha acima do real (S6).
 - **Por que importa:** o número de linha envelhece a cada edição; quem aplica a mudança altera o trecho errado ou não o encontra.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md`, regra das alterações nos documentos-raiz: identificar o trecho pelo texto antigo (citação), com a linha só como apoio; (b) `checklist-revisao`, seção "Como escrever bloqueantes e sugestões": o Revisor identifica o trecho pelo símbolo (classe/método) além da linha; (c) `.claude/agents/executor.md`: conferir a linha no arquivo antes de copiá-la.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-024 — Cenário ou DoD escrito para outra US sem os critérios já fixados
 
@@ -236,7 +236,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o cenário novo da US-004 "janela de turnos configurável" descrevia o encerramento por configuração inválida sem o código de saída, embora a US-001 já tivesse fixado o padrão (`ExitCodes.InvalidConfiguration`, diferente de 0). Corrigido a pedido do usuário.
 - **Por que importa:** o cenário escrito para outra US vira a spec dela; sem os critérios observáveis, o teste dessa US pode deixar de conferir o que o projeto já decidiu.
 - **Correção (proposta):** `.claude/agents/planejador.md`: ao escrever cenário ou DoD para outra US, reutilizar os critérios observáveis que o projeto já fixou para o mesmo tipo de comportamento (código de saída, texto da mensagem, canal de saída).
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-025 — Nome abreviado de teste nas tarefas da §5
 
@@ -245,7 +245,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** as tarefas T7 e T8 citavam testes com prefixo omitido ou `...`, diferentes dos nomes da §4. O usuário pediu os nomes completos, idênticos aos da §4.
 - **Por que importa:** Executor e Revisor não conseguem conferir por busca textual se a tarefa e o mapa da §4 falam do mesmo teste.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md`: nas tarefas da §5, os testes aparecem com o nome completo idêntico ao da §4, sem prefixo omitido nem `...`; (b) checklist de revisão de plano, item "Consistência interna": "nomes de teste da §5 idênticos aos da §4".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-026 — Reforço do AP-017: valores distintos por turno e por campo
 
@@ -254,7 +254,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** recorrência do AP-017. Em testes de janela e histórico, a asserção passa por coincidência se todo turno usa o mesmo texto, ou se a resposta rejeitada é igual à aceita. O plano passou a exigir `TutorReplies.Valid(label)` com `Reply`, `RawText` e `Correction` únicos por rótulo e `raw1` diferente da resposta que fica. A revisão de código confirmou que nenhuma asserção passou por coincidência.
 - **Por que importa:** é a segunda US em que o problema aparece no plano, e a regra do AP-017 continua só como proposta.
 - **Correção (proposta):** acrescentar ao texto já proposto no AP-017 (`.claude/skills/tdd-dotnet/SKILL.md`): "em testes de janela, histórico ou retentativa, cada turno tem aluno e professor com textos únicos, e a resposta rejeitada difere da aceita". Sem arquivo novo; aprovar junto com o AP-017.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-027 — AP-014 recorre pela terceira vez
 
@@ -263,7 +263,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** as escolhas de forma E1 a E7 (nomes `ReplyRejectedRetrying`/`ReplyRejectedAgainUsingRawFallback`, guardas `ArgumentNullException`, `paramName: "kind"`, mensagem do `FakeTutorBrain` sem resposta) foram decididas no Red/Green e registradas na §12 só no commit de evidências (3156357), depois de todos os `feat`. O Executor reconheceu o desvio em E5. A regra do AP-014 (em `executor.md` e no `checklist-revisao` §1 como item não obrigatório) não bastou. Na rodada de correção (S2/S3), com o escopo definido no pedido do usuário, o registro saiu antes do código (3a09c34): a etapa funciona quando há ponto de parada.
 - **Por que importa:** a intenção chega ao documento depois do código (hábito 4); o usuário só aceita os desvios depois de implementados.
 - **Correção (proposta):** (a) `.claude/agents/executor.md` e o modelo da §5 do `.claude/agents/planejador.md`: cada tarefa fecha com a linha "Escolhas de forma: nenhuma | §12 em `<hash>`", preenchida antes do commit `feat`; (b) `.claude/skills/checklist-revisao/SKILL.md` §1: promover o item do AP-014 a [O] quando a escolha muda texto exibido, mensagem de exceção ou nome público; nos demais casos continua sugestão.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-028 — Igualdade de `record` com coleção compara por referência
 
@@ -272,7 +272,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** `Add_WhenMoreTurnsThanMax_KeepsMostRecentInOrder` comparava `ConversationTurn` inteiros com `Equal`. Um `record` com membro `IReadOnlyList<T>` (aqui `Corrections`) compara a lista por referência, e cada `TutorReplies.Valid` cria uma lista nova; o teste falhava com a janela correta. Passou a comparar a sequência de `StudentMessage`.
 - **Por que importa:** o Red vira falso e custa uma volta; vale para qualquer teste sobre `TutorReply`, `ConversationTurn` e outros DTOs com coleção.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, seção Organização: "para comparar records com coleções, compare uma projeção (ex.: chave) ou use `BeEquivalentTo`; não use `Equal` sobre o record inteiro".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-029 — Mutação de Red que não compila (CA1805)
 
@@ -281,7 +281,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** para provar que o teste de caracterização do padrão 10 discrimina, o plano pediu a mutação temporária `= 0`, que não compila (CA1805: inicialização explícita com o valor padrão). O Executor removeu o inicializador, que dá o mesmo valor 0, e registrou a falha obtida.
 - **Por que importa:** com `TreatWarningsAsErrors`, mutações "óbvias" podem ser barradas por analisadores; sem regra, o Executor perde tempo ou desiste da prova de Red. Complementa o AP-017.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, junto do AP-017: "a mutação temporária pode ser qualquer forma equivalente que compile (ex.: remover o inicializador), registrada na tarefa com a falha obtida".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
 
 ### AP-030 — Ponto único de aplicação da §2.6 virou dois commits
 
@@ -290,7 +290,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o plano e a pré-condição da §5 prometiam um único commit `docs(ai): update architecture and spec for US-003`. O orquestrador, seguindo o fluxo do `/us`, usou dois: `4b82f0a` (spec) e `f522128` (arquitetura e skill). Não houve dano, mas plano e fluxo dizem coisas diferentes.
 - **Por que importa:** quando o plano promete algo que o fluxo não faz, o Revisor pode apontar falso desvio.
 - **Correção (proposta):** alinhar `.claude/agents/planejador.md` ao fluxo do `/us`: o plano prevê dois commits (`docs(ai): update spec for US-XXX` e `docs(ai): update architecture for US-XXX`) antes da T1, em vez de um único. Alternativa: mudar o `/us` para um commit só; a escolha cabe ao usuário.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31"; opção padrão: `planejador.md` alinhado ao `/us`, com dois commits antes da T1)
 
 ### AP-031 — Contagens atualizadas só no cabeçalho do plano
 
@@ -299,4 +299,4 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** depois do review S3 (+2 métodos, +3 casos), o Executor atualizou o cabeçalho da §4 e a DoD (D2/D5), mas não o detalhamento por classe: ele ainda dizia `Core.Tests: 34 métodos / 48 casos` e `BrainExceptionTests: 2 / 2`, sem `TutorReplyTests`, e a frase da suíte total misturava 148 e 151. Os números finais são 151 casos (Core 102, Console 25, Infrastructure 24). Também ficaram T12 e T13 marcadas `[x]` sem o "feito: `<hash>`" que T1 a T11 têm (S5).
 - **Por que importa:** quem lê o detalhamento (o Documentador, o próximo Planejador) copia o número antigo.
 - **Correção (proposta):** `.claude/agents/executor.md`, etapa de evidências: "mudou uma contagem → atualize o cabeçalho, o detalhamento por classe da §4 e D2/D5/D8, e confira se a soma bate"; e "tarefa marcada `[x]` leva o hash na própria linha".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")

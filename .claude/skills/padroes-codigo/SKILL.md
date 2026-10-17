@@ -70,3 +70,4 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 - Branch: `feature/US-XXX_slug-curto` a partir de `develop`, com o nome do que a US cria (ex.: `feature/US-001_fundacao-solucao`). US pronta → merge `--no-ff` em `develop`. `main` só recebe `develop` depois de testado, a pedido do usuário.
 - Commits convencionais: `<tipo>(<escopo>): <imperativo em inglês>`; tipos `feat`, `fix`, `test`, `refactor`, `docs`, `chore`, `ci`, `perf`. Escopo `ai` para governança/agentes (`docs(ai): ...`).
 - Commits pequenos: um ciclo TDD por commit (ou um par test/feat).
+- Mensagem de commit com várias linhas ou aspas: `git commit -F -` com heredoc no Bash; não use here-string do Windows PowerShell 5.1 (AP-021).

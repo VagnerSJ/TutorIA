@@ -33,6 +33,9 @@ tests/EnglishTutor.Infrastructure.Tests/
 - Cite a regra/US no topo do teste: `// US-003 / RN-BRAIN04`.
 - Estrutura Arrange / Act / Assert separada por linha em branco (sem comentários `// Arrange`).
 - FluentAssertions 7 não informa a análise de nulidade: depois de `result.IsValid.Should().BeTrue()`, o `[MemberNotNullWhen]` não vale e `result.Reply.Reply` gera CS8602 (erro, com `TreatWarningsAsErrors`). Acesse `result.Reply!` (o `!` é seguro porque a asserção anterior já falha o teste); idem `result.Rejection!` depois de `IsValid.Should().BeFalse()`. Não use `if` no teste para contornar (AP-020).
+- Para comparar records com coleções, compare uma projeção (ex.: `turns.Select(t => t.StudentMessage)`) ou use `BeEquivalentTo`; não use `Equal`/`Be` sobre o record inteiro, porque o membro `IReadOnlyList<T>` é comparado por referência (AP-028).
+- Quando a mensagem embute texto de biblioteca externa (ex.: `JsonException.Message`), confira um trecho que só o código do projeto produz (AP-015).
+- Valores distintos: em testes de preservação de campo, de janela, de histórico ou de retentativa, cada campo e cada turno têm textos únicos (aluno ≠ professor, `Reply` ≠ `RawText`, resposta rejeitada ≠ aceita), para nenhuma asserção passar por coincidência (AP-017, AP-026).
 
 ## Fakes x mocks
 
@@ -63,6 +66,8 @@ public sealed class FakeTutorBrain : ITutorBrain
 1. **Red**: primeiro crie os esqueletos mínimos que o teste vai usar (arquivos, tipos e membros que lançam `NotImplementedException`, `using`s); só então escreva o teste do cenário. Assim o hook pós-edição compila a cada passo, e o Red falha **na asserção ou na exceção prevista**, nunca por erro de compilação (AP-013). Commit `test(...)` com teste e esqueletos.
 2. **Green**: o mínimo para passar. Commit `feat(...)`.
 3. **Refactor**: com tudo verde. Commit `refactor(...)`.
+
+**Teste de caracterização** (comportamento que já existe, então não há Red natural): aplique uma mutação temporária que quebre o comportamento, mostre a falha pelo motivo certo, reverta sem commitar e descreva a mutação e a falha na tarefa do `plan.md`. A mutação pode ser qualquer forma equivalente que compile (ex.: remover o inicializador em vez de `= 0`, que a CA1805 barra) (AP-017, AP-029).
 
 ## Assíncrono e cancelamento
 

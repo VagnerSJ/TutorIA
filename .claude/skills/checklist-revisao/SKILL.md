@@ -13,8 +13,9 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Cada resposta P* com efeito observável (texto exibido, código de saída, normalização, evento de log) tem teste mapeado na §4 e tarefa na §5.
 - [O] A DoD da §10 cobre a DoD da US na sprint, com comandos verificáveis e resultado esperado (inclui cobertura do Core ≥ 80%).
 - [O] Conformidade com R1–R4, `RN-*` citadas e regras rápidas do `CLAUDE.md`; decisões técnicas relevantes têm ADR Proposto.
-- [O] Escopo: nada além nem aquém do que a US pede; fora de escopo explícito.
-- [O] Consistência interna: §3 (arquivos) × §4 (testes) × §5 (tarefas) × §6 (pacotes), com contagens que batem.
+- [O] Escopo: nada além nem aquém do que a US pede; fora de escopo explícito. Item da §8 adiado para outra US tem texto exato a registrar na spec da US de destino, que você confere (AP-022).
+- [O] Consistência interna: §3 (arquivos) × §4 (testes) × §5 (tarefas) × §6 (pacotes), com contagens que batem e nomes de teste da §5 idênticos aos da §4 (AP-025).
+- Transformações citadas nas tabelas de mensagens da §2 (corte, normalização, limite) têm teste nos dois lados do limite (AP-016); asserção sobre mensagem que embute texto de biblioteca confere um trecho que só o projeto produz (AP-015).
 - [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
 - Alteração proposta na `ARCHITECTURE.md` lista também as linhas do `CLAUDE.md` e das skills que repetem a mesma regra.
 - Riscos técnicos e ambiguidades que travariam o Executor estão tratados ou viraram pergunta em aberto.
@@ -22,6 +23,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 
 ## Como escrever bloqueantes e sugestões
 - Descreva o **efeito esperado** e onde está o problema, não a técnica de implementação ou de teste. Ex.: "a mensagem de configuração inválida não pode se perder se o cancelamento chegar durante a escrita", e não "teste com token já cancelado". Cabe ao Executor escolher a técnica e confirmar que o Red falha pelo motivo certo (AP-010).
+- Identifique o trecho pelo símbolo (classe/método) além do número de linha, que envelhece (AP-023).
 
 ## 1. Spec e regras
 - [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código).
@@ -31,7 +33,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Mudanças de comportamento estão primeiro na spec/plano e decisões técnicas relevantes têm ADR commitado **antes** do código que as implementa.
 - [O] Todos os comandos da Definition of Done foram rodados pelo Executor, com resultado colado em "Evidências" no `plan.md`, e o resultado confere com o seu.
 - Comentários do usuário no `plan.md` foram respondidos e respeitados.
-- Escolhas de forma registradas pelo Executor no §12 têm commit anterior ao `feat`/`fix` que as implementa (AP-014).
+- [O] Escolha de forma que muda texto exibido, mensagem de exceção ou nome público está no §12 em commit anterior ao `feat`/`fix` que a implementa (AP-014, AP-027). Nos demais casos (nomes privados, detalhes internos), o mesmo item é sugestão.
 
 ## 2. Arquitetura (`ARCHITECTURE.md`)
 - [O] `EnglishTutor.Core` sem referência a Infrastructure/Console/pacotes de terceiros (R1).

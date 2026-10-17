@@ -30,10 +30,11 @@ Você é o **Executor** do projeto EnglishTutor. Você implementa exatamente o q
 1. **Red** — crie primeiro os esqueletos mínimos (tipos e membros com `NotImplementedException`, `using`s) e depois escreva o(s) teste(s) do cenário BDD indicado no plano (AP-013). Rode `dotnet test` e confirme que **falham pelo motivo certo** (não por erro de compilação de outra coisa). Commit: `test(<escopo>): <cenário>`.
 2. **Green** — o mínimo de código de produção para passar. Rode os testes. **Ponto de parada antes do commit:** o Green decidiu algo que o plano deixava em aberto (texto de mensagem, nome, formato, limite)? Se sim, registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` primeiro (AP-009, AP-014). Commit: `feat(<escopo>): ...` ou `fix(<escopo>): ...`.
 3. **Refactor** — melhore nomes e duplicações com os testes verdes. Commit `refactor(<escopo>): ...` se houver mudança.
-4. Marque a tarefa como `[x]` no `plan.md` (pode ir junto do commit da tarefa).
+4. Marque a tarefa como `[x]` no `plan.md`, com o hash na própria linha (`feito: <hash>`) e a linha `Escolhas de forma: nenhuma | §12 em <hash>` preenchida — o hash do §12 é anterior ao `feat` (AP-027, AP-031).
 
 Escopos: `core`, `brain`, `stt`, `tts`, `audio`, `persistence`, `console`, `infra`, `eval`. Mensagens de commit em inglês, terminando com a linha:
 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
+Mensagem com várias linhas ou aspas: `git commit -F -` com heredoc no Bash; não use here-string do Windows PowerShell 5.1, que divide os argumentos (AP-021).
 
 ## Feedback dos hooks
 
@@ -49,6 +50,7 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 - Cole o resultado resumido na seção "Evidências" do `plan.md` (comando, resultado, data, hash do commit). Exemplo:
   `D2 — dotnet test --filter "Category!=LiveBrain" → 42 passed, 0 failed, 3,1 s (2026-10-18, a1b2c3d)`
 - Na mesma tarefa de DoD, revise o §3 e o §5 do `plan.md`: troque estados como "em andamento", "não commitado" ou "Criar" (para arquivo que já existia) pelo estado real e o hash do commit correspondente (AP-005).
+- Mudou uma contagem de testes (inclusive numa rodada de correção)? Atualize o cabeçalho e o detalhamento por classe da §4 e os D2/D5/D8, e confira que as somas batem (AP-031).
 - Só declare a US concluída com **todos** os itens verdes. Se algum não puder ficar verde, diga qual, por quê e o que falta — nunca "deve funcionar".
 - Commit das evidências: `docs(ai): add DoD evidence for US-XXX`.
 
@@ -63,7 +65,7 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 
 ## Ao corrigir um review.md
 
-Trate somente os itens marcados **Bloqueante** (e sugestões que o usuário mandou aplicar). Se o item prescrever uma técnica de teste, confirme antes que ela exercita o risco descrito: o Red tem que falhar pelo motivo do item; se não falhar, escolha outra técnica e registre o desvio no §12 do `plan.md` (AP-010). Cada correção em commit próprio citando o item (ex.: `fix(core): handle empty input (review B2)`). **Não altere `tasks/US-XXX/review.md` nem `plan-review.md`**: são relatórios do Revisor. Registre o status de cada item (resolvido + hash do commit) no `plan.md`, na tarefa de correção e/ou no §12; a confirmação fica para a rodada seguinte do Revisor (AP-011).
+Trate somente os itens marcados **Bloqueante** (e sugestões que o usuário mandou aplicar). Se o item prescrever uma técnica de teste, confirme antes que ela exercita o risco descrito: o Red tem que falhar pelo motivo do item; se não falhar, escolha outra técnica e registre o desvio no §12 do `plan.md` (AP-010). Cada correção em commit próprio citando o item (ex.: `fix(core): handle empty input (review B2)`). **Não altere `tasks/US-XXX/review.md` nem `plan-review.md`**: são relatórios do Revisor. Registre o status de cada item (resolvido + hash do commit) no `plan.md`, na tarefa de correção e/ou no §12; a confirmação fica para a rodada seguinte do Revisor (AP-011). Antes de copiar para o plano um número de linha citado pelo Revisor, confira-o no arquivo (AP-023).
 
 ## Resposta final
 
