@@ -312,7 +312,8 @@ Se o usuário escolher o caminho (b) do B1 (trazer os itens para esta US), este 
 | Criar | `tests/EnglishTutor.Core.Tests/Support/RecordingLogger.cs` | Logger fake (cópia do da Infrastructure.Tests) | criado em `f75cc4b` |
 | Alterar | `tests/EnglishTutor.Core.Tests/Conversation/TutorModeTests.cs` | `TryParse` | feito em `89dd1f6` |
 | Alterar | `tests/EnglishTutor.Core.Tests/Conversation/LocalCommandParserTests.cs` | `/mode`; caso `"/mode interview"` do desconhecido trocado por `"/foo bar"` | feito em `89dd1f6` |
-| Criar | `tests/EnglishTutor.Core.Tests/Brain/BrainExceptionTests.cs` | Fábrica e guarda do construtor | criado em `3bb384f` |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/BrainExceptionTests.cs` | Fábrica e guarda do construtor; guardas de nulo da fábrica (review S3) | criado em `3bb384f`; review S3 em (T13) |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyTests.cs` | Guarda de nulo de `RawFallback` (review S3) | (T13) |
 | Criar | `tests/EnglishTutor.Core.Tests/Conversation/ConversationOptionsTests.cs` | Padrão 10 | criado em `513066e` |
 | Criar | `tests/EnglishTutor.Core.Tests/Conversation/ConversationOptionsValidatorTests.cs` | Limite ≥ 1 nos dois lados | criado em `513066e` |
 | Alterar | `tests/EnglishTutor.Core.Tests/DependencyInjection/CoreServiceCollectionExtensionsTests.cs` | Validador de `ConversationOptions` registrado | feito em `513066e` |
@@ -362,12 +363,14 @@ Todos os testes do Core usam `FakeTutorBrain` (sem estado: só enxerga o `BrainR
 | troca de modo (apoio) | Core.Tests | `TutorModeTests` | `TryParse_WithUnknownOrBlankName_ReturnsFalse` (`[Theory]`: `interview`, `""`, `"   "`) | Unidade |
 | (apoio: P2, contrato da rejeição) | Core.Tests | `BrainExceptionTests` | `InvalidOutput_Always_CarriesKindRejectionAndRawText` (`Kind == InvalidOutput`, `IsInvalidOutput`, mesma rejeição, mesmo raw, `Message` contém `rejection.Message`) | Unidade |
 | (apoio: P2) | Core.Tests | `BrainExceptionTests` | `Constructor_WithInvalidOutputKind_ThrowsArgumentException` | Unidade |
+| (apoio, review S3: guarda do contrato) | Core.Tests | `BrainExceptionTests` | `InvalidOutput_WithNullArgument_ThrowsArgumentNullException` (`[Theory]` `"rejection"`, `"rawText"`; `ParamName` = caso) | Unidade (caracterização) |
+| (apoio, review S3: guarda do contrato) | Core.Tests | `TutorReplyTests` | `RawFallback_WithNullRawText_ThrowsArgumentNullException` (`ParamName == "rawText"`) | Unidade (caracterização) |
 | (apoio, P11: só InvalidOutput é refeito) | Core.Tests | `ConversationServiceTests` | `SendAsync_WhenBrainFailsWithOtherKind_PropagatesWithoutRetry` (`BrainException(Timeout, ...)` propaga; `Requests` com 1 item) | Unidade |
 | (apoio, P11: cancelamento) | Core.Tests | `ConversationServiceTests` | `SendAsync_WhenCancelled_PropagatesAndDoesNotRecordTurn` (cérebro lança `OperationCanceledException`, que propaga; o envio seguinte tem `Messages` com 1 item) | Unidade |
 
 Teste existente alterado: em `LocalCommandParserTests.TryParse_WhenSlashCommandIsUnknown_ReturnsUnknownCommand`, o caso `"/mode interview"` vira `"/foo bar"` (`"/foo"`, `"bar"`), porque `/mode` deixa de ser desconhecido. A contagem de casos não muda. `ChatSessionTests.RunAsync_AfterUnknownCommand_KeepsSessionOpenAndForwardsNothing` (`"/mode interview"` → `Unknown command "/mode".`) **não muda** e continua verde como regressão de P12. A US-004 o atualiza ao tratar `/mode` no console (cenário "troca de modo pelo console", §2.6).
 
-**Contagens previstas: 35 métodos novos, 51 casos novos.**
+**Contagens previstas: 35 métodos novos, 51 casos novos** (após o review S3: 37 métodos / 54 casos; `BrainExceptionTests` 3 / 4 e `TutorReplyTests` 1 / 1, ver §12).
 
 - Core.Tests: 34 métodos / 48 casos.
   - `ConversationServiceTests`: 18 / 21 (16 `[Fact]` + 2 `[Theory]`, com 3 e 2 casos).
@@ -381,7 +384,7 @@ Teste existente alterado: em `LocalCommandParserTests.TryParse_WhenSlashCommandI
   - `CoreServiceCollectionExtensionsTests`: +1 / +1.
 - Console.Tests: 1 / 3.
 
-Suíte inteira após a US: **148 casos** (Core.Tests 51 + 48 = 99; Console.Tests 22 + 3 = 25; Infrastructure.Tests 24). Se o Executor mudar uma contagem, atualiza §4 e D2/D5/D8 com o motivo.
+Suíte inteira após a US: **148 casos** (151 após o review S3, com Core.Tests 102) (Core.Tests 51 + 48 = 99; Console.Tests 22 + 3 = 25; Infrastructure.Tests 24). Se o Executor mudar uma contagem, atualiza §4 e D2/D5/D8 com o motivo.
 
 ## 5. Tarefas (ordem de execução TDD)
 
@@ -418,7 +421,10 @@ Em toda tarefa, os esqueletos vêm antes dos testes (AP-013). Depois de `x.Shoul
   Todos falham porque a `BrainException` de `InvalidOutput` propaga (estado da T7): nos 5 primeiros, por exceção inesperada; no último, porque a exceção recebida não é a esperada (`Kind` ≠ `Timeout` ou tipo ≠ `OperationCanceledException`) e `Requests` tem 1 item, não 2. O Executor confere esse motivo antes do Green. Green: `catch` de `IsInvalidOutput`, log 3000 e nova chamada com as mensagens extras e o mesmo `ct`. **Estado ao fim da T8:** se a segunda chamada também lançar `InvalidOutput`, a exceção propaga, sem `catch` interno; outras falhas da segunda chamada propagam (e continuam propagando na T9). (commits: `test(core): retry once on invalid tutor reply` + `feat(core): retry with format correction on invalid reply`) — feito: `89a1524` (Red: os 7 casos recebem a `BrainException` de `InvalidOutput`; no `[Theory]`, exceção diferente da esperada) + `a401b33`.
 - [x] T9 — Red: esqueleto `TutorReply.RawFallback` (lança `NotImplementedException`) + `SendAsync_WhenReplyIsInvalidTwice_ReturnsRawSecondAnswerWithoutFeedback`, `SendAsync_WhenReplyIsInvalidTwice_LogsRawFallbackWarning`, `SendAsync_AfterRawFallbackTurn_SendsRawAnswerAsTutorMessage` (3). Todos falham porque a segunda `BrainException` propaga (estado da T8). Green: `catch` interno só de `IsInvalidOutput`, log 3001 e `RawFallback`. Refactor: extrair a montagem do `BrainRequest` num método privado. (commits: `test(core): raw fallback after second invalid reply` + `feat(core): fall back to raw reply after second failure` + `refactor(core): ...` se houver) — feito: `613b98d` (Red: a 2ª `BrainException` propaga nos 3) + `88aa8eb` + `3206913` (refactor: `AskWithFormatRetryAsync` e `CreateRequest`).
 - [x] T10 — Red: `ChatSessionTests.RunAsync_WhenLineIsBlank_ShowsEmptyInputWarning` (3 casos), que falha porque hoje nada é escrito. Green: `ChatSession` escreve `ConversationMessages.EmptyInput` na linha em branco e atualiza o comentário da RN-CONV05. `RunAsync_WhenLineIsBlank_IgnoresItAndForwardsNothing` continua verde (2 prompts). (commits: `test(console): warn on blank input` + `feat(console): show local warning for blank input`) — feito: `3efb049` (Red: "Expected ... to be 1, but found 0" nos 3 casos) + `232693a`.
-- [x] T11 — DoD: rodar D1–D11, colar em §11, marcar §5 com os hashes. (commit: `docs(ai): add DoD evidence for US-003`) — feito: ver §11 (commit desta evidência).
+- [x] T11 — DoD: rodar D1–D11, colar em §11, marcar §5 com os hashes. (commit: `docs(ai): add DoD evidence for US-003`) — feito: `3156357`.
+- [ ] T12 — Review S2 (§12): `ConversationService` sem o campo `_logger`, usando o parâmetro `logger` do construtor primário. Sem mudança de comportamento; `ConversationServiceTests` 21 verdes antes e depois. (commit: `refactor(core): use primary constructor logger in conversation service (review S2)`)
+- [ ] T13 — Review S3 (§12): `BrainExceptionTests.InvalidOutput_WithNullArgument_ThrowsArgumentNullException` (2 casos) e `TutorReplyTests.RawFallback_WithNullRawText_ThrowsArgumentNullException` (1). Testes de caracterização: Red por mutação temporária não commitada (remover cada guarda). (commit: `test(core): characterize null guards of brain contract (review S3)`)
+- [ ] T14 — DoD afetada (D1, D2, D3/D3b, D4, D5, D6, D8, D10, D11) refeita e §11 atualizada. (commit: `docs(ai): update DoD evidence for US-003 review fixes`)
 
 Conferência das contagens por tarefa: `ConversationServiceTests` = T7 9/11 + T8 6/7 + T9 3/3 = 18 métodos / 21 casos.
 
@@ -480,11 +486,11 @@ Executar a partir da raiz do repositório, em PowerShell (exceto D11, em Git Bas
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros (sem CS8775 nem CA1032) |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes: 148 casos (Core.Tests 99, Console.Tests 25, Infrastructure.Tests 24), em < 30 s, sem rede nem GPU |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes: 151 casos (Core.Tests 102, Console.Tests 25, Infrastructure.Tests 24; eram 148/99 antes do review S3), em < 30 s, sem rede nem GPU |
 | D3 | `Remove-Item -Recurse -Force TestResults, coverage -ErrorAction SilentlyContinue; dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` | gera `coverage.cobertura.xml` para os 3 projetos de teste |
 | D3b | `dotnet tool restore; dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | linha `EnglishTutor.Core` ≥ 80% |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
-| D5 | `dotnet test tests/EnglishTutor.Core.Tests --no-build` (depois do D1) | 99 casos verdes; o número comparado com 10 s é a duração da linha de resumo do teste (`Duração`/`Duration`), que não inclui build; só fakes |
+| D5 | `dotnet test tests/EnglishTutor.Core.Tests --no-build` (depois do D1) | 102 casos verdes (99 antes do review S3); o número comparado com 10 s é a duração da linha de resumo do teste (`Duração`/`Duration`), que não inclui build; só fakes |
 | D6 | `dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage/conversation -reporttypes:TextSummary -assemblyfilters:"+EnglishTutor.Core" -classfilters:"+EnglishTutor.Core.Conversation.*"; Get-Content coverage/conversation/Summary.txt` (após D3) | linha `EnglishTutor.Core` (restrita ao namespace `Conversation`) ≥ 90% de linhas |
 | D7 | `dotnet test --filter "FullyQualifiedName~CoreDependencyTests"`; `dotnet list src/EnglishTutor.Core package` | 3 testes verdes; pacotes: `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions`, `Microsoft.Extensions.Options` |
 | D8 | `dotnet test --filter "FullyQualifiedName~ConversationServiceTests"` | 21 casos verdes (18 métodos), cobrindo os 7 cenários da US |
@@ -579,3 +585,13 @@ Nenhum desvio de comportamento, de arquitetura nem de contagem (148 casos; `Conv
 Aplicar as sugestões S2 e S3 de `tasks/US-003/review.md` (Rodada 1) antes da documentação:
 - **S2** — `ConversationService.cs:18`: usar uma forma só para as dependências da classe (sem o campo `_logger` que só copia o parâmetro do construtor primário).
 - **S3** — guardas de nulo fora do plano: um teste por guarda do contrato público (no mínimo `BrainException.InvalidOutput` e `TutorReply.RawFallback`); as guardas que ficarem sem teste são registradas aqui como defensivas.
+
+→ Executor: escolhas de forma (registradas antes dos commits de código, AP-014):
+
+- **S2 → forma única: todas as dependências capturadas do construtor primário.** O campo `_logger` sai e o serviço usa `logger` direto, como já faz com `brain` e `promptSource`. O `_window` continua campo porque é estado da sessão derivado de `options`, não dependência. Sem mudança de comportamento: os 21 casos de `ConversationServiceTests` seguem verdes sem alteração. Commit `refactor(core): use primary constructor logger in conversation service (review S2)`.
+- **S3 → testes de caracterização das guardas do contrato público usado pelos adaptadores (US-004/US-006):**
+  - `BrainExceptionTests.InvalidOutput_WithNullArgument_ThrowsArgumentNullException` (`[Theory]` `"rejection"` e `"rawText"`; o argumento nomeado é `null` e o outro é válido; confere `ArgumentNullException` com `ParamName` igual ao nome do caso).
+  - `TutorReplyTests.RawFallback_WithNullRawText_ThrowsArgumentNullException` (classe nova `tests/EnglishTutor.Core.Tests/Brain/TutorReplyTests.cs`; `ParamName == "rawText"`).
+  - Como as guardas já existem, os testes nascem verdes. O Red é mostrado por mutação temporária **não commitada** (remover a guarda) e o motivo da falha fica na tarefa T13 da §5. Commit `test(core): characterize null guards of brain contract (review S3)`.
+- **S3 → guardas defensivas, sem teste (decisão registrada):** `ConversationTurnResult.Replied`/`Ignored` (`ConversationTurnResult.cs:28,34`), `ConversationWindow.Add` (`ConversationWindow.cs:22`), `TurnMessageBuilder.Build` (3 argumentos) e `TurnMessageBuilder.BuildFormatCorrection` (`TurnMessageBuilder.cs:13-15,29`). Hoje só o `ConversationService` os chama, sempre com valores não nulos; ficam como proteção contra uso indevido futuro. Se outro chamador surgir (ex.: o console na US-004), a US que o criar acrescenta o teste.
+- **Contagens:** +2 métodos / +3 casos no Core.Tests (`BrainExceptionTests` 3 / 4; `TutorReplyTests` 1 / 1). Core.Tests 99 → 102; suíte 148 → 151. `ConversationServiceTests` continua 18 / 21 (D8 não muda). §4, §10 D2/D5 e §11 atualizados.
