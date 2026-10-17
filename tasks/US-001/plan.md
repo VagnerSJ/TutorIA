@@ -58,10 +58,11 @@ Decisões detalhadas no **ADR-004 (Aceito em 2026-10-17)**: `docs/adr/ADR-004-fu
      4. **Token da sessão** (S3, a partir da T11): `using var session = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.ApplicationStopping);` com `lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>()`. `ChatSession.RunAsync(session.Token)`. Assim o Ctrl+C (via `ConsoleLifetime` → `ApplicationStopping`) e o `ct` do chamador cancelam a sessão.
      5. Para o host (`StopAsync`) e o descarta em `finally` (flush do log antes de retornar).
    - Tratamento de saída (P8):
-     - `OptionsValidationException` na partida → escreve em `Error` `Invalid configuration:` + uma linha por falha, loga `StartupFailed` e retorna `ExitCodes.InvalidConfiguration` (2).
+     - Falha ao montar o host (`BuildHost`: ex. `appsettings.json` inválido ou seção `Serilog` mal configurada) → ainda não há logger; escreve em `Error` `The application could not start: <mensagem da exceção>` (sem stack trace) e retorna `ExitCodes.UnexpectedError` (1) (review S2, T14).
+     - `OptionsValidationException` na partida → escreve em `Error` `Invalid configuration:` + uma linha por falha (com `CancellationToken.None`, para um cancelamento simultâneo não esconder a mensagem — review S3, T14), loga `StartupFailed` e retorna `ExitCodes.InvalidConfiguration` (2).
      - `catch (OperationCanceledException) when (session.Token.IsCancellationRequested)` (ou `ct.IsCancellationRequested` se o cancelamento chegar antes da sessão) → encerra limpo com 0. Cancelamento que não veio desses tokens propaga (S3).
      - Qualquer outra exceção → log `Fatal` `UnexpectedError` (1003) com a exceção, `Error` recebe `An unexpected error occurred. See the log file for details.` e retorna `ExitCodes.UnexpectedError` (1) (S7).
-     - `ApplicationStopped` é logado em `finally` com o código de saída, sempre que o logger existir.
+     - `ApplicationStopped` é logado em `finally` com o código de saída, sempre que o logger existir. Quando um cancelamento que não veio dos tokens da aplicação propaga, não há código de saída conhecido: o `finally` loga `ApplicationAborted` (1004, `Warning`, `{ElapsedMs}`) em vez de `ApplicationStopped` (review S4, T14).
    - `ChatSession.RunAsync(CancellationToken ct) : Task<int>` (em `Console/Ui`): recebe `TextReader`, `TextWriter`, `IChatInputHandler` e o texto do estado (provedor canônico e modo); escreve o cabeçalho e lê linhas em laço com prompt `> `. Leitura com `await input.ReadLineAsync(ct).AsTask().WaitAsync(ct)`, para honrar o cancelamento mesmo quando o leitor ignora o token (caso do `Console.In`, que bloqueia) (S3):
      - `/quit` → retorna `ExitCodes.Success` (0);
      - `/help` → lista `LocalCommands.Available`;
@@ -76,7 +77,7 @@ Decisões detalhadas no **ADR-004 (Aceito em 2026-10-17)**: `docs/adr/ADR-004-fu
      Type /help for commands or /quit to exit.
      ```
    - `IChatInputHandler` (porta da UI, em `Console/Ui`) com `Task HandleAsync(string text, CancellationToken ct)`. Implementação da US-001: `TutorNotConnectedInputHandler`, que só escreve `The tutor is not connected yet.` (testada por `EnglishTutorAppTests`, S7). Na US-003/004 ela é trocada por uma que delega ao `ConversationService` (R2). Nos testes, `RecordingChatInputHandler` prova que `/quit`, comandos e linhas em branco não chegam ao "cérebro" (P5).
-7. **Logs**: Serilog com `ReadFrom.Configuration`, apenas sink de arquivo (`logs/englishtutor-.log`, `rollingInterval: Day`, `CompactJsonFormatter`). Caminho relativo ao diretório atual (no `dotnet run` a partir da raiz, `./logs`). Eventos com `[LoggerMessage]` em `Console/Logging/AppLog.cs`: `ApplicationStarted` (1000, `{Provider}`, `{Mode}`), `ApplicationStopped` (1001, `{ExitCode}`, `{ElapsedMs}` via `TimeProvider`), `StartupFailed` (1002, `{Failures}`), `UnexpectedError` (1003, nível `Critical`/Fatal, com a exceção). Logger por instância, `services.AddSerilog(logger, dispose: true)`; o descarte do host faz o flush antes de `RunAsync` retornar.
+7. **Logs**: Serilog com `ReadFrom.Configuration`, apenas sink de arquivo (`logs/englishtutor-.log`, `rollingInterval: Day`, `CompactJsonFormatter`). Caminho relativo ao diretório atual (no `dotnet run` a partir da raiz, `./logs`). Eventos com `[LoggerMessage]` em `Console/Logging/AppLog.cs`: `ApplicationStarted` (1000, `{Provider}`, `{Mode}`), `ApplicationStopped` (1001, `{ExitCode}`, `{ElapsedMs}` via `TimeProvider`), `StartupFailed` (1002, `{Failures}`), `UnexpectedError` (1003, nível `Critical`/Fatal, com a exceção), `ApplicationAborted` (1004, `Warning`, `{ElapsedMs}`; T14, review S4). Logger por instância, `services.AddSerilog(logger, dispose: true)`; o descarte do host faz o flush antes de `RunAsync` retornar.
 8. **CI (cenário opcional — incluído)** (S12): `.github/workflows/ci.yml` em push/PR para `develop` e `main`, `runs-on: ubuntu-latest` (P11):
    - `actions/checkout@v4`; `actions/setup-dotnet@v4` com `global-json-file: global.json`; passo `dotnet --version` para registrar o SDK instalado.
    - Compatibilidade: o `global.json` pede 10.0.100 com `latestFeature`, ou seja, qualquer SDK 10.0.x ≥ 10.0.100 serve. Se o `setup-dotnet` instalar exatamente o 10.0.100 ou um 10.0.x mais novo, os dois satisfazem o `global.json`. O Executor confere no log da primeira execução (D10 só inspeciona o arquivo).
@@ -140,7 +141,7 @@ Alternativas descartadas (detalhes no ADR-004):
 | Criar | `src/EnglishTutor.Console/Ui/IChatInputHandler.cs` | Porta da UI para texto livre |
 | Criar | `src/EnglishTutor.Console/Ui/TutorNotConnectedInputHandler.cs` | Implementação provisória (sem cérebro) |
 | Criar | `src/EnglishTutor.Console/appsettings.json` | `Brain:Provider = "ClaudeCode"` e seção `Serilog` |
-| Criar (em andamento, não commitado) | `tests/EnglishTutor.Core.Tests/Support/RepositoryRoot.cs` | Localiza a raiz (pasta com `EnglishTutor.slnx`); entra no commit da T2 |
+| Criado (T2, 1ca6aed) | `tests/EnglishTutor.Core.Tests/Support/RepositoryRoot.cs` | Localiza a raiz (pasta com `EnglishTutor.slnx`) |
 | Criar | `tests/EnglishTutor.Core.Tests/Architecture/CoreDependencyTests.cs` | Regra R1 por reflexão e por `.csproj` |
 | Criar | `tests/EnglishTutor.Core.Tests/Architecture/BuildSettingsTests.cs` | Guarda de `TreatWarningsAsErrors`/`Nullable` |
 | Criar | `tests/EnglishTutor.Core.Tests/Brain/BrainProvidersTests.cs` | Normalização para o nome canônico (S1) |
@@ -152,6 +153,9 @@ Alternativas descartadas (detalhes no ADR-004):
 | Criar | `tests/EnglishTutor.Console.Tests/Support/RecordingChatInputHandler.cs` | Fake que registra o texto encaminhado |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/PendingTextReader.cs` | Leitor cujo `ReadLineAsync` nunca completa e sinaliza quando foi chamado (teste de cancelamento) |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/ThrowingTextWriter.cs` | Escritor que lança `IOException` (teste de erro inesperado) |
+| Criado (T14, 4303f24) | `tests/EnglishTutor.Console.Tests/Support/CancellingTextWriter.cs` | Escritor que cancela a fonte de token a cada linha e honra o token recebido (review S3) |
+| Criado (T14, 4303f24) | `tests/EnglishTutor.Console.Tests/Support/ForeignCancellationTextReader.cs` | Leitor que lança `OperationCanceledException` não vinda dos tokens da aplicação (review S4) |
+| Alterado (T14) | `src/EnglishTutor.Console/EnglishTutorApp.cs`, `Ui/ConsoleText.cs`, `Logging/AppLog.cs`, `Ui/ChatSession.cs` | Falha de montagem do host (S2), escrita com `CancellationToken.None` (S3), `ApplicationAborted` 1004 (S4), escape `'\uFEFF'` (S1) |
 | Criar | `tests/EnglishTutor.Console.Tests/Ui/ChatSessionTests.cs` | Comandos, linhas em branco e encaminhamento |
 | Criar | `tests/EnglishTutor.Console.Tests/EnglishTutorAppTests.cs` | Partida, cabeçalho, códigos de saída, configuração inválida, erro inesperado, cancelamento, log |
 | Criar | `.github/workflows/ci.yml` | Build, testes sem LiveBrain, cobertura |
@@ -197,19 +201,22 @@ Alternativas descartadas (detalhes no ADR-004):
 | (apoio: erro inesperado, P8) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter` na saída; código 1, mensagem curta em `Error`, evento `UnexpectedError` no arquivo) | Componente |
 | (apoio: Ctrl+C encerra limpo, P8 e ARCHITECTURE §9) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` (`PendingTextReader`; cancela o `ct` depois que a leitura começou) | Componente |
 | (apoio: Ctrl+C encerra limpo) | — | — | DoD D13 (Ctrl+C real no executável) | Verificação manual obrigatória |
+| (apoio: falha ao montar o host, P8, review S2) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenHostCannotBeBuilt_ReturnsOneWithShortMessage` (`Serilog:MinimumLevel:Default = "NotALevel"`; código 1, `The application could not start: ...` sem stack trace, sessão não abre) | Componente |
+| configuração do cérebro é validada na inicialização (review S3) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenProviderIsInvalidAndCancelledWhileWritingError_StillExplainsAndReturnsTwo` (`CancellingTextWriter` em `Error`; código 2 e mensagem completa) | Componente |
+| (apoio: cancelamento externo no log, review S4) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenForeignCancellationPropagates_LogsAbortedInsteadOfStoppedWithExitCode` (`ForeignCancellationTextReader`; exceção propaga, log tem `ApplicationAborted` 1004 e não tem `ApplicationStopped`) | Componente |
 | logs estruturados | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile` | Componente (arquivo em pasta temporária) |
 | integração contínua (opcional) | — | — | DoD D10 (inspeção do `ci.yml`) + primeira execução no GitHub após push feito pelo usuário | Verificação manual registrada no review |
 
-Total previsto: **33 métodos de teste** — 16 no Core.Tests e 17 no Console.Tests. Seis são `[Theory]` (19 casos de dados) e 27 são `[Fact]`, totalizando **46 casos executados** (Core.Tests: 11 `[Fact]` + 16 casos = 27; Console.Tests: 16 `[Fact]` + 3 casos = 19). Os 2 métodos de P12 entraram depois da primeira DoD (388afee).
+Total previsto: **36 métodos de teste** — 16 no Core.Tests e 20 no Console.Tests. Seis são `[Theory]` (19 casos de dados) e 30 são `[Fact]`, totalizando **49 casos executados** (Core.Tests: 11 `[Fact]` + 16 casos = 27; Console.Tests: 19 `[Fact]` + 3 casos = 22). Os 2 métodos de P12 entraram depois da primeira DoD (388afee); os 3 da T14 (review S2–S4), em 4303f24.
 
-Conferência por classe: `CoreDependencyTests` 3, `BuildSettingsTests` 1, `BrainProvidersTests` 2 (7 casos), `BrainOptionsValidatorTests` 3 (1 Theory com 3 casos), `CoreServiceCollectionExtensionsTests` 1, `TutorModeTests` 1, `LocalCommandParserTests` 5 (2 Theory com 3 + 3 casos); `ChatSessionTests` 9 (1 Theory com 3 casos), `EnglishTutorAppTests` 8.
+Conferência por classe: `CoreDependencyTests` 3, `BuildSettingsTests` 1, `BrainProvidersTests` 2 (7 casos), `BrainOptionsValidatorTests` 3 (1 Theory com 3 casos), `CoreServiceCollectionExtensionsTests` 1, `TutorModeTests` 1, `LocalCommandParserTests` 5 (2 Theory com 3 + 3 casos); `ChatSessionTests` 9 (1 Theory com 3 casos), `EnglishTutorAppTests` 11.
 
 ## 5. Tarefas (ordem de execução TDD)
 
 Pré-condição do Executor: `dotnet --list-sdks` mostra um SDK 10.0.x. Satisfeita: o orquestrador registrou o SDK 10.0.402.
 
 - [x] T1 — Esqueleto: `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `EnglishTutor.slnx`, os 3 projetos de `src/` e os 2 de `tests/` (vazios, com referências entre si e pacotes da §6), `.config/dotnet-tools.json`, `Program.cs` com `return 0;`. `dotnet build` com 0 warnings e `dotnet test` executando (0 testes). (commit 648f510: `chore(infra): scaffold solution, build props and test projects`)
-- [x] T2 — Testes de guarda de arquitetura e build: `RepositoryRoot` (já existe, não commitado), `CoreDependencyTests` (Core via `Assembly.Load("EnglishTutor.Core")`, allowlist do §2.10), `BuildSettingsTests`. Passam com o Core vazio. **Red de demonstração** (reverter sem commitar e registrar nas Evidências qual teste falhou e a mensagem):
+- [x] T2 — Testes de guarda de arquitetura e build: `RepositoryRoot` (commitado em 1ca6aed), `CoreDependencyTests` (Core via `Assembly.Load("EnglishTutor.Core")`, allowlist do §2.10), `BuildSettingsTests`. Passam com o Core vazio. **Red de demonstração** (reverter sem commitar e registrar nas Evidências qual teste falhou e a mensagem):
   - (a) `<PackageReference Include="Serilog.Sinks.File" />` no Core (já versionado no CPM, sem NU1010) → falha esperada **só** em `CoreProject_PackageAndProjectReferences_OnlyAllowedOnes` (referência não usada não aparece em `GetReferencedAssemblies`);
   - (b) mantendo (a), um arquivo temporário no Core que usa `typeof(Serilog.ILogger)` → falha também em `CoreAssembly_References_OnlyBclAndAllowedMicrosoftExtensions`;
   - (c) `TreatWarningsAsErrors=false` no `Directory.Build.props` → falha em `BuildSettingsTests`;
@@ -225,7 +232,8 @@ Pré-condição do Executor: `dotnet --list-sdks` mostra um SDK 10.0.x. Satisfei
 - [x] T10 — Red: `RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile` (lê o arquivo CLEF, faz parse JSON por linha e procura `EventId.Name` = `ApplicationStarted` com `Provider`/`Mode` e `ApplicationStopped` com `ExitCode`). Green: Serilog (`ReadFrom.Configuration`, sink de arquivo, `CompactJsonFormatter`), `AppLog` (1000–1002), `TimeProvider` para `ElapsedMs`. (commits: `test(console): structured start and stop log events` + `feat(console): add serilog file logging`)
 - [x] T11 — Red: `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter`) e `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` (`PendingTextReader`; o teste espera o sinal de leitura iniciada e então cancela o `CancellationTokenSource` passado a `RunAsync`). Ambos falham antes: a exceção e o `OperationCanceledException` escapam de `RunAsync`. Green: token da sessão ligado a `ApplicationStopping`, `catch (OperationCanceledException) when (...IsCancellationRequested)` → 0, `catch` genérico → log `UnexpectedError` (1003) + mensagem curta + `ExitCodes.UnexpectedError`, `ApplicationStopped` em `finally`. (commits: `test(console): unexpected error and cancellation exit codes` + `feat(console): handle cancellation and unexpected errors on exit`)
 - [x] T12 — CI: `.github/workflows/ci.yml` (`ubuntu-latest`, `setup-dotnet@v4` com `global-json-file`, `dotnet --version`, build, testes sem LiveBrain com cobertura, ReportGenerator no step summary, upload do artefato). (commit: `ci(infra): add build and test workflow with coverage`)
-- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; **falta o D13 (usuário)**. P12 implementado (388afee + e71b316); D1–D5, D11 e D12 refeitos.
+- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; **falta o D13 (usuário)**. P12 implementado (388afee + e71b316); D1–D5, D11 e D12 refeitos. Após a T14, D1–D5, D11 e D12 refeitos de novo.
+- [x] T14 — Sugestões S1–S4 da revisão de código (Rodada 1, `review.md`; pedido em §12). S1 (refactor, sem Red): escape `'\uFEFF'` / `"\uFEFF/quit"` no `ChatSession`, nos testes e nos documentos. S2–S4: Red com 3 testes novos em `EnglishTutorAppTests` (§4) + `CancellingTextWriter` e `ForeignCancellationTextReader`; Green em 3 commits `fix(console)`, um por item. (commits: 6d68c9e `refactor(console): use escape for byte order mark character (review S1)`, 9c35276 `docs(ai): replace literal byte order mark with escape in US-001 docs (review S1)`, 4303f24 `test(console): ... (review S2-S4)`, c173601 `fix(console): ... (review S2)`, 54778b9 `fix(console): ... (review S3)`, db60928 `fix(console): ... (review S4)`)
 
 ## 6. Pacotes NuGet
 
@@ -307,7 +315,7 @@ Executar a partir da raiz do repositório, em PowerShell.
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes (33 métodos, 46 casos: 27 no Core.Tests e 19 no Console.Tests), em < 30 s, sem rede nem GPU |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes (36 métodos, 49 casos: 27 no Core.Tests e 22 no Console.Tests), em < 30 s, sem rede nem GPU |
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` (apagar `TestResults/` antes) | gera `coverage.cobertura.xml` para os dois projetos de teste |
 | D3b | `dotnet tool restore; dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | linha `EnglishTutor.Core` ≥ 80% |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
@@ -336,6 +344,22 @@ Decisão P12 (2026-10-17), no chat: aprovada a proposta — o `ChatSession` remo
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+### DoD após T14 — review S1–S4 (2026-10-17, commit db60928, PowerShell 5.1.26100, SDK 10.0.402)
+
+Red da T14 (4303f24), cada teste falhando pelo motivo previsto: S2 `System.InvalidOperationException : The value NotALevel is not a valid Serilog level.` (escapa de `RunAsync`); S3 `System.OperationCanceledException : The operation was canceled.` (lançada de dentro do `catch` de configuração inválida); S4 `Expected events ... to not have any items matching (EventName(e) == "ApplicationStopped") ... but found {... "ExitCode":1 ...}`. Green: c173601 (S2), 54778b9 (S3), db60928 (S4). S1 é refactor (6d68c9e, 9c35276): `grep` por U+FEFF literal no repositório (fora de `.git`, `bin`, `obj`) não encontra nada. Itens não listados (D6–D10) não dependem da mudança e mantêm o resultado da rodada anterior; os caminhos de S2–S4 são cobertos pelos testes novos.
+
+| # | Resultado | Status |
+|---|---|---|
+| D1 | `dotnet build` → `0 Aviso(s)`, `0 Erro(s)`, 1,6 s | ✅ |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` → Core.Tests 27 passed / 0 failed (72 ms); Console.Tests 22 passed / 0 failed (327 ms) — 49 casos, 36 métodos; sem rede nem GPU | ✅ |
+| D3 | `TestResults/` e `coverage/` apagados antes; 2 `coverage.cobertura.xml`; 49 passed | ✅ |
+| D3b | ReportGenerator (TextSummary): `EnglishTutor.Core 100%`; `EnglishTutor.Console 93.6%` (`EnglishTutorApp` 94,6%, `AppLog` 100%, `ConsoleText` 100%, `ChatSession` 100%; `Program` 0%, só exercitado pela DoD manual); geral 94,9% (264/278 linhas) | ✅ |
+| D4 | `dotnet format --verify-no-changes` → saída vazia, exit 0 | ✅ |
+| D5 | `"/quit" \| dotnet run ...` (Windows PowerShell 5.1, com BOM) → cabeçalho `Brain: ClaudeCode \| Mode: free-conversation`, dicas `/help`/`/quit`, um único prompt `> `, sem `The tutor is not connected yet.`; `exit: 0`. Conferência extra `"/quit","hello" \| ...` → mesma saída, `exit: 0` | ✅ |
+| D11 | `"hello" \| dotnet run ...` → `The tutor is not connected yet.`; `exit: 0` | ✅ |
+| D12 | `git status --short` vazio após D3–D5 e D11 | ✅ (repetir após D13) |
+| D13 | **Pendente do usuário** (manual, terminal interativo) | ⏳ |
 
 ### DoD após P12 (2026-10-17, commit e71b316, PowerShell 5.1.26100, SDK 10.0.402)
 
@@ -437,3 +461,9 @@ Pedido do usuário no chat (transcrito pelo orquestrador): aplicar S1–S4 de [r
 - **R1-S4** — `ApplicationStopped` não deve registrar `ExitCode` 1 quando um `OperationCanceledException` externo propaga: registrar o código real ou indicar saída anormal. Teste novo cobrindo o evento logado nesse caminho.
 
 Executor: atualizar §3/§4/§5 (contagens, nova tarefa T14 para S1–S4), D2 e Evidências (refazer D1–D4 e D5); aproveitar para corrigir o texto do §3 sobre `RepositoryRoot.cs` (já commitado em 1ca6aed).
+
+→ Feito na T14 (§5); §2.6, §2.7, §3, §4, D2 e §11 atualizados; D1–D5, D11 e D12 refeitos. Notas do Executor:
+- **R1-S1**: além do código e dos testes, as ocorrências literais de U+FEFF no `plan.md` e no `review.md` viraram `\uFEFF`.
+- **R1-S2**: texto escolhido para a mensagem (o pedido não fixava): `The application could not start: <mensagem da exceção>`. Não reaproveita `An unexpected error occurred. See the log file for details.` porque nesse ponto ainda não há arquivo de log.
+- **R1-S3 (desvio do teste descrito)**: um token **já cancelado** antes de `RunAsync` não chega ao caminho de configuração inválida: `host.StartAsync(ct)` lança `OperationCanceledException` antes do `ValidateOnStart`, e o app encerra com 0 e `Error` vazio (conferido com um teste provisório, descartado sem commit). Por isso o teste cancela o token **durante** a escrita da mensagem (`CancellingTextWriter`), que é o cenário real que a S3 descreve.
+- **R1-S4**: em vez de um código de saída que o processo não terá, o `finally` loga o evento novo `ApplicationAborted` (1004, `Warning`, `{ElapsedMs}`) e não loga `ApplicationStopped`.
