@@ -20,7 +20,7 @@ public sealed class ConversationWindowTests
             sut.Add(Turn($"t{index}"));
         }
 
-        sut.Turns.Should().Equal(expectedLabels.Select(Turn));
+        sut.Turns.Select(turn => turn.StudentMessage).Should().Equal(expectedLabels.Select(label => $"student {label}"));
     }
 
     [Fact]
