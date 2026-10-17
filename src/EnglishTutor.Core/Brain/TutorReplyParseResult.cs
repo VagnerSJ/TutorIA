@@ -24,9 +24,16 @@ public sealed record TutorReplyParseResult
     [MemberNotNullWhen(false, nameof(Rejection))]
     public bool IsValid { get; }
 
-    public static TutorReplyParseResult Valid(TutorReply reply, IReadOnlyList<string> warnings) =>
-        throw new NotImplementedException();
+    public static TutorReplyParseResult Valid(TutorReply reply, IReadOnlyList<string> warnings)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+        ArgumentNullException.ThrowIfNull(warnings);
+        return new(reply, rejection: null, warnings);
+    }
 
-    public static TutorReplyParseResult Invalid(TutorReplyRejection rejection) =>
-        throw new NotImplementedException();
+    public static TutorReplyParseResult Invalid(TutorReplyRejection rejection)
+    {
+        ArgumentNullException.ThrowIfNull(rejection);
+        return new(reply: null, rejection, warnings: []);
+    }
 }
