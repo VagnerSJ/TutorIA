@@ -129,6 +129,112 @@ public sealed class TutorReplyParserTests
         FeedbackFormatter.Format(result.Reply!).Should().Contain("Praise: Great use of the present perfect!");
     }
 
+    // US-002 — Cenário: resposta com tags válida — RN-BRAIN03
+    [Fact]
+    public void Parse_WhenTagsAreValid_ReturnsReplyAndOneCorrection()
+    {
+        var raw = Fixture.Read("TutorReply/tags-valid.txt");
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be("Great question. What do you do at work?");
+        result.Reply!.Corrections.Should().Equal(new Correction("I am work", "I work", "simple present"));
+    }
+
+    // US-002 — Cenário: resposta com tags válida (variações da linha de correção)
+    [Theory]
+    [InlineData("- a → b (x)", "a", "b", "x")]
+    [InlineData("* a -> b (x)", "a", "b", "x")]
+    [InlineData("- a → b", "a", "b", "")]
+    public void Parse_WhenTagsCorrectionLineVaries_ParsesOriginalCorrectedAndExplanation(
+        string line, string original, string corrected, string explanation)
+    {
+        var raw = $"<reply>What did you do?</reply><feedback>\n{line}\n</feedback>";
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Corrections.Should().Equal(new Correction(original, corrected, explanation));
+    }
+
+    // US-002 — Cenário: resposta com tags válida (apoio: linhas rotuladas, prompts/format.tags.md)
+    [Fact]
+    public void Parse_WhenTagsHaveLabeledFeedbackLines_MapsPronunciationVocabularyAndPraise()
+    {
+        var raw = Fixture.Read("TutorReply/tags-labeled-lines.txt");
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be("I take the train every morning. How do you get to work?");
+        result.Reply!.Corrections.Should().BeEmpty();
+        result.Reply!.Pronunciation.Should().Be("\"comfortable\" is said KUMF-ter-bul");
+        result.Reply!.Vocabulary.Should().Be("\"commute\" is more natural than \"way to work\"");
+        result.Reply!.Praise.Should().Be("Great use of the simple present!");
+    }
+
+    // US-002 — Cenário: resposta com tags válida (apoio, P9: rótulo repetido, sem diferenciar maiúsculas)
+    [Fact]
+    public void Parse_WhenTagsRepeatLabeledLine_JoinsValuesWithSemicolon()
+    {
+        var raw = "<reply>How was your trip?</reply><feedback>\n- Vocabulary: commute\n- vocabulary: rush hour\n</feedback>";
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Vocabulary.Should().Be("commute; rush hour");
+    }
+
+    // US-002 — Cenário: resposta com tags válida (apoio: feedback opcional)
+    [Fact]
+    public void Parse_WhenTagsHaveNoFeedbackBlock_ReturnsReplyWithEmptyFeedback()
+    {
+        var result = _sut.Parse("<reply>What do you do at work?</reply>");
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be("What do you do at work?");
+        result.Reply!.Corrections.Should().BeEmpty();
+        result.Reply!.Pronunciation.Should().BeNull();
+        result.Reply!.Vocabulary.Should().BeNull();
+        result.Reply!.Praise.Should().BeNull();
+    }
+
+    // US-002 — Cenário: reply sem pergunta final (mesma regra nos dois formatos) — RN-BRAIN03, RN-FEED01
+    [Fact]
+    public void Parse_WhenTagsReplyHasNoFinalQuestion_RejectsWithQuestionReason()
+    {
+        var result = _sut.Parse("<reply>I like that.</reply><feedback>- Praise: Nice sentence.</feedback>");
+
+        result.IsValid.Should().BeFalse();
+        result.Rejection!.Reason.Should().Be("reply must end with a question");
+    }
+
+    // US-002 — Cenário: resposta fora do formato — RN-FEED01
+    [Fact]
+    public void Parse_WhenTextHasNoJsonNorTags_RejectsWithMissingReply()
+    {
+        var raw = Fixture.Read("TutorReply/out-of-format.txt");
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeFalse();
+        result.Rejection!.Reason.Should().Be("missing reply");
+    }
+
+    // US-002 — Cenário: resposta fora do formato (apoio, P5: JSON em cerca markdown ou depois de texto)
+    [Theory]
+    [InlineData("```json\n{\"reply\":\"Hi?\",\"corrections\":[]}\n```")]
+    [InlineData("Here is my answer: {\"reply\":\"Hi?\",\"corrections\":[]}")]
+    public void Parse_WhenJsonIsInFenceOrAfterText_RejectsWithMissingReply(string raw)
+    {
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeFalse();
+        result.Rejection!.Reason.Should().Be("missing reply");
+        result.Rejection!.Message.Should().Contain("Expected ");
+    }
+
     // US-002 — contrato preserva o texto cru (S11)
     [Fact]
     public void Parse_WhenValid_KeepsRawTextAndIsNotRawFallback()
