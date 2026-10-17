@@ -294,6 +294,101 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
         exception.Message.Should().Contain("is not a JSON result").And.Contain("Expected").And.NotContain("Reply t1?");
     }
 
+    // US-004 — Cenário: continuidade de sessão (apoio, P2: sem estado) — RN-BRAIN01
+    [Fact]
+    public async Task SendAsync_WithHistoryAndNoKnownSession_SendsRenderedTranscriptWithoutResume()
+    {
+        _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-2", ClaudeOutputs.ValidReplyJson("t2")));
+        var request = Request(User("t1"), Assistant("raw answer t1"), User("t2"));
+        var sut = CreateSut();
+
+        await sut.SendAsync(request, TestContext.Current.CancellationToken);
+
+        var run = _processRunner.Requests.Should().ContainSingle().Subject;
+        run.StandardInput.Should().Be(ClaudeCodePromptRenderer.Render(request.Messages));
+        run.Arguments.Should().NotContain("--resume");
+    }
+
+    // US-004 — Cenário: continuidade de sessão — RN-BRAIN01, ADR-007
+    [Fact]
+    public async Task SendAsync_OnSecondTurnWithUseResume_ResumesSessionAndSendsOnlyNewMessage()
+    {
+        _processRunner
+            .ReturnsOutput(ClaudeOutputs.Structured("abc", ClaudeOutputs.ValidReplyJson("t1")))
+            .ReturnsOutput(ClaudeOutputs.Structured("s-2", ClaudeOutputs.ValidReplyJson("t2")));
+        var sut = CreateSut();
+        var reply1 = await sut.SendAsync(Request(User("t1")), TestContext.Current.CancellationToken);
+        var second = Request(User("t1"), Assistant(reply1.RawText), User("t2"));
+
+        await sut.SendAsync(second, TestContext.Current.CancellationToken);
+
+        _processRunner.Requests.Should().HaveCount(2);
+        ValueAfter(_processRunner.Requests[1], "--resume").Should().Be("abc");
+        _processRunner.Requests[1].StandardInput.Should().Be(StudentMessage("t2"));
+    }
+
+    // US-004 — Cenário: continuidade de sessão (apoio) — RN-BRAIN01
+    [Fact]
+    public async Task SendAsync_WhenUseResumeIsDisabled_SendsFullTranscriptWithoutResume()
+    {
+        _processRunner
+            .ReturnsOutput(ClaudeOutputs.Structured("abc", ClaudeOutputs.ValidReplyJson("t1")))
+            .ReturnsOutput(ClaudeOutputs.Structured("s-2", ClaudeOutputs.ValidReplyJson("t2")));
+        var sut = CreateSut(options => options.UseResume = false);
+        var reply1 = await sut.SendAsync(Request(User("t1")), TestContext.Current.CancellationToken);
+        var second = Request(User("t1"), Assistant(reply1.RawText), User("t2"));
+
+        await sut.SendAsync(second, TestContext.Current.CancellationToken);
+
+        _processRunner.Requests.Should().HaveCount(2);
+        _processRunner.Requests[1].Arguments.Should().NotContain("--resume");
+        _processRunner.Requests[1].StandardInput.Should().Be(ClaudeCodePromptRenderer.Render(second.Messages));
+    }
+
+    // US-004 — Cenário: continuidade de sessão (apoio, P1) — ADR-007
+    [Theory]
+    [InlineData("tutor-differs")]
+    [InlineData("window-slid")]
+    [InlineData("after-failure")]
+    [InlineData("system-prompt-changed")]
+    [InlineData("session-id-missing")]
+    public async Task SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript(string situation)
+    {
+        var sut = CreateSut();
+        var last = await ArrangeSessionThatIsNotExtendedAsync(sut, situation);
+        _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-last", ClaudeOutputs.ValidReplyJson("t-last")));
+
+        await sut.SendAsync(last, TestContext.Current.CancellationToken);
+
+        var run = _processRunner.Requests[^1];
+        run.Arguments.Should().NotContain("--resume");
+        run.StandardInput.Should().Be(ClaudeCodePromptRenderer.Render(last.Messages));
+    }
+
+    // US-004 — Cenário: continuidade de sessão (apoio, ADR-006 × ADR-007) — RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_WhenRetryingRejectedAnswer_ResumesWithOnlyFormatCorrection()
+    {
+        const string rejectedJson =
+            """{"reply":"I like that.","corrections":[],"pronunciation":null,"vocabulary":null,"praise":null}""";
+        _processRunner
+            .ReturnsOutput(ClaudeOutputs.Structured("s-1", rejectedJson))
+            .ReturnsOutput(ClaudeOutputs.Structured("s-2", ClaudeOutputs.ValidReplyJson("t1")));
+        var sut = CreateSut();
+        var first = Request(User("t1"));
+        var rejected = (await FluentActions
+            .Awaiting(() => sut.SendAsync(first, TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<BrainException>()).Which;
+        rejected.IsInvalidOutput.Should().BeTrue();
+        var correction = TurnMessageBuilder.BuildFormatCorrection(rejected.Rejection!);
+        var retry = Request(User("t1"), Assistant(rejected.RawText!), new BrainMessage(BrainRole.User, correction));
+
+        await sut.SendAsync(retry, TestContext.Current.CancellationToken);
+
+        ValueAfter(_processRunner.Requests[1], "--resume").Should().Be("s-1");
+        _processRunner.Requests[1].StandardInput.Should().Be(correction);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootDirectory))
@@ -326,6 +421,42 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
 
     private static BrainRequest SingleMessageRequest(string label) =>
         new(_systemPrompt, [new BrainMessage(BrainRole.User, StudentMessage(label))], SessionHint: null);
+
+    private static BrainMessage User(string label) => new(BrainRole.User, StudentMessage(label));
+
+    private static BrainMessage Assistant(string rawText) => new(BrainRole.Assistant, rawText);
+
+    private static BrainRequest Request(params BrainMessage[] messages) => new(_systemPrompt, messages, SessionHint: null);
+
+    // Runs the calls before the last one and returns the last request, which does not extend the known session.
+    private async Task<BrainRequest> ArrangeSessionThatIsNotExtendedAsync(ClaudeCodeTutorBrain sut, string situation)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var firstOutput = situation == "session-id-missing"
+            ? ClaudeOutputs.Structured(string.Empty, ClaudeOutputs.ValidReplyJson("t1"))
+            : ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1"));
+        _processRunner.ReturnsOutput(firstOutput);
+        var reply1 = await sut.SendAsync(Request(User("t1")), ct);
+        var second = Request(User("t1"), Assistant(reply1.RawText), User("t2"));
+
+        switch (situation)
+        {
+            case "tutor-differs":
+                return Request(User("t1"), Assistant("another raw answer"), User("t2"));
+            case "window-slid":
+                _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-2", ClaudeOutputs.ValidReplyJson("t2")));
+                var reply2 = await sut.SendAsync(second, ct);
+                return Request(User("t2"), Assistant(reply2.RawText), User("t3"));
+            case "after-failure":
+                _processRunner.Returns(new ProcessResult(1, string.Empty, "failure t2"));
+                await FluentActions.Awaiting(() => sut.SendAsync(second, ct)).Should().ThrowAsync<BrainException>();
+                return second;
+            case "system-prompt-changed":
+                return second with { SystemPrompt = "SYSTEM PROMPT v2 for test" };
+            default:
+                return second;
+        }
+    }
 
     private static string ValidOutputFor(string outputMode, string sessionId, string label) =>
         outputMode.Equals(BrainOutputModes.Tags, StringComparison.OrdinalIgnoreCase)
