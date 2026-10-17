@@ -21,6 +21,20 @@ public sealed class EnglishTutorAppTests : IDisposable
             "Type /help for commands or /quit to exit."));
     }
 
+    // US-001 — Cenário: configuração do cérebro é validada na inicialização
+    [Fact]
+    public async Task RunAsync_WhenProviderIsInvalid_ReturnsNonZeroAndExplainsAcceptedProviders()
+    {
+        var options = CreateOptions("Inexistente", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.");
+        _output.ToString().Should().NotContain("Brain:", because: "the session must not start with an invalid configuration");
+    }
+
     // US-001 — Cenário: aplicação inicia e mostra o estado (P4: nome canônico)
     [Fact]
     public async Task RunAsync_WhenProviderCaseDiffers_ShowsCanonicalProviderInHeader()
