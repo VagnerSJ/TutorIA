@@ -857,3 +857,14 @@ Corrigir os bloqueantes abaixo (texto completo e "Esperado" em [plan-review.md](
 - S11 → §7 (risco aceito de forma explícita, com anotação na §11), §8, ADR-007 "Consequências".
 - S12 → §8 (item de timeout do `checklist-revisao` §4 = N/A nesta US), §9 P6.
 - S13 → §4 (correção conferida com "contém", sem diferenciar maiúsculas), §5 T10.
+
+### 2026-10-17 — pedido do usuário (sugestões da rodada 2, `plan-review.md`)
+
+Incorporar as sugestões S1–S4 da Rodada 2 (texto completo e "Esperado" em [plan-review.md](plan-review.md), Rodada 2):
+
+- **S1** — Corrigir a contagem no ADR-007 ("Consequências") e na §7: com `ConversationWindow.Add`, o turno `MaxTurnsInWindow + 1` ainda estende a sessão; a janela só desliza a partir do turno `MaxTurnsInWindow + 2` (padrão 12). `--resume` ajuda nos primeiros `MaxTurnsInWindow + 1` turnos. Conferir no código antes de escrever.
+- **S2** — Linha 2 da §2.5: um JSON válido sem `"type": "result"` (outro `type`, array) também resulta na `BrainException(Unknown)` da linha 2. Caso de teste próprio; atualizar contagens, §5, D2 e D11.
+- **S3** — §3, `Support/ClaudeOutputs.cs`: os auxiliares `Structured`, `Text` e `Error` produzem o objeto de resultado da CLI com `"type": "result"`, no formato das fixtures gravadas.
+- **S4** — Registrar na §7 ou na P17 que um `Brain:ClaudeCode` inválido impede a partida mesmo com `Brain:Provider = Ollama`, comportamento aceito até a `BrainFactory` (US-007).
+
+Depois desses ajustes e de uma revisão do plano sem bloqueantes, o plano está aprovado pelo usuário.
