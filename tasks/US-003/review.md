@@ -90,3 +90,69 @@ Arquivos relevantes:
 - C:\Crescimento\TutorIA\src\EnglishTutor.Core\Conversation\ConversationService.cs
 - C:\Crescimento\TutorIA\tests\EnglishTutor.Core.Tests\Conversation\ConversationServiceTests.cs
 - C:\Crescimento\TutorIA\docs\aprendizados.md
+
+## Rodada 2
+
+Data: 2026-10-17
+Commits revisados: 1cfa147..6591575 (pedido do usuário: 1cfa147; escolhas de forma: 3a09c34; código: d00a61f, e704924; evidências: 6591575)
+Resultado: APROVADO
+
+### Itens da rodada anterior
+| Item | Status |
+|---|---|
+| S1 — escolhas de forma da §12 registradas depois dos `feat` (AP-014) | Não estava no pedido do usuário (§12, 1cfa147). Nesta rodada a regra foi seguida: as escolhas de S2 e S3 estão em 3a09c34, antes de d00a61f e e704924. Segue como aprendizado do processo, sem pendência nesta US. |
+| S2 — `ConversationService` com o campo `_logger` que só copiava o parâmetro | Resolvido em d00a61f. O campo saiu e `logger` é usado direto (`ConversationService.cs:55`, `:71`), como `brain` e `promptSource`. `_window` continua campo porque é estado da sessão (justificado na §12). Sem mudança de comportamento: `ConversationServiceTests` 21/21 e nenhum teste alterado. |
+| S3 — guardas de nulo sem teste e sem registro | Resolvido em e704924 (testes) + 3a09c34 (registro). `BrainExceptionTests.InvalidOutput_WithNullArgument_ThrowsArgumentNullException` (2 casos, `ParamName` conferido) e `TutorReplyTests.RawFallback_WithNullRawText_ThrowsArgumentNullException` (1 caso). As guardas de `ConversationTurnResult`, `ConversationWindow.Add` e `TurnMessageBuilder` ficaram registradas como defensivas, e a US que criar um novo chamador assume o teste. Red por mutação registrado na T13 com o motivo de cada falha (NRE no construtor privado e em `rawText.Trim()`; "no exception was thrown" sem a guarda de `rawText` em `InvalidOutput`). Os três motivos batem com o código (`BrainException.cs:41-43`, `TutorReply.cs:16-17`). |
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| Build sem warnings | ✅ (0 avisos, 0 erros) |
+| Testes (exceto LiveBrain) | ✅ 151 passaram (Core 102, Console 25, Infrastructure 24) |
+| Cobertura de linhas do Core | 100% (namespace `Conversation`: 100%, 168/168; ramos 85%, 17/20; geral 87,8%) |
+| Cenários BDD com teste | 7/7 (sem mudança; D8 com 21 casos / 18 métodos) |
+| Teste antes do código (ordem de commits) | ✅ (S2 é refactor sem teste novo, com os 21 casos verdes antes e depois. S3 é caracterização: os testes nascem verdes e o Red por mutação não commitada está registrado na T13, conforme a §12) |
+| Evidências da DoD conferem | ✅ (§11.1: D1, D2, D3/D3b, D4, D5, D6, D8, D10 e D11 reproduzidos. D7 reconferido: `CoreDependencyTests` 3/3. D9 é evidência do Executor da Rodada 1, não reproduzida, e não foi refeita porque o console não mudou, AP-008) |
+| Intenção antes do código (spec/ADR → código) | ✅ (pedido do usuário em 1cfa147 → escolhas de forma em 3a09c34 → código em d00a61f/e704924 → evidências em 6591575, AP-014) |
+
+#### Evidências da DoD (§11.1) × resultado do Revisor
+| # | Executor | Revisor |
+|---|---|---|
+| D1 | 0 avisos, 0 erros | 0 avisos, 0 erros ✅ |
+| D2 | 151 (102/25/24) | 151 (102/25/24) ✅ |
+| D3/D3b | Core 100%, geral 87,8% | Core 100%, geral 87,8% ✅ (relatório em `%TEMP%`) |
+| D4 | sem diferenças, exit=0 | exit=0 ✅ |
+| D5 | 102, 120 ms | 102, 121 ms ✅ |
+| D6 | `Conversation` 100% (168/168), ramos 85% (17/20) | igual ✅ |
+| D8 | 21 casos (18 métodos) | 21 ✅ |
+| D10 | vazio | `git status --short` vazio ✅ |
+| D11 | 0, exit 1 | 0, exit 1 ✅ |
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S4** — `tasks/US-003/plan.md:378-386` (§4, detalhamento das contagens). O cabeçalho foi atualizado ("37 métodos / 54 casos; `BrainExceptionTests` 3 / 4 e `TutorReplyTests` 1 / 1"). A lista abaixo dele não foi: ainda diz `Core.Tests: 34 métodos / 48 casos` e `BrainExceptionTests: 2 / 2`, e não tem a linha de `TutorReplyTests`. A frase "Suíte inteira após a US: **148 casos** (151 após o review S3, ...) (Core.Tests 51 + 48 = 99; ...)" mistura os dois estados. Esperado: o detalhamento soma o mesmo total do cabeçalho, para o Documentador não copiar o número antigo.
+- **S5** — `tasks/US-003/plan.md:425-426` (T12, T13). As linhas estão marcadas `[x]`, mas não têm o "feito: `<hash>`" que as tarefas T1–T11 têm. Os hashes só aparecem na §3 e na §11.1. Esperado: T12 → `d00a61f` e T13 → `e704924` na própria linha da tarefa.
+- **S6** — §12 (3a09c34), lista das guardas defensivas. As linhas citadas vieram da minha Rodada 1 e estão uma acima do real: `ConversationTurnResult.cs:27,33` (não 28,34) e `TurnMessageBuilder.cs:28` (não 29). O nome dos métodos já identifica cada guarda, então o efeito é pequeno. Esperado: linhas corretas ou só os nomes dos métodos.
+
+### Pontos positivos
+- A ordem docs → código do AP-014 foi seguida nesta rodada: as escolhas de forma (nomes dos testes, `ParamName`, quais guardas ficam sem teste e por quê) foram commitadas antes dos dois commits de código.
+- O Red de cada caso de caracterização foi mostrado por mutação, uma guarda por vez, e o motivo de cada falha foi registrado. Os motivos são diferentes entre si e coerentes com o código. Assim, cada teste falha pela razão certa (AP-010).
+- O `[Theory]` de `InvalidOutput` deixa o outro argumento válido e confere `ParamName`, então cada caso isola uma guarda.
+- A decisão sobre as guardas sem teste diz quem vai criar o teste (a US que criar um novo chamador), em vez de deixar o assunto em aberto.
+- O efeito do S2 na cobertura (169 → 168 linhas) foi explicado na evidência D6.
+
+### Aprendizados para o processo
+- **Contagens atualizadas só no cabeçalho** (S4). Quando uma rodada de correção acrescenta testes, o Executor atualiza o total e a DoD, mas não o detalhamento por classe. Proposta: em `.claude/agents/executor.md`, na etapa de evidências, incluir "mudou uma contagem → atualize o cabeçalho, o detalhamento por classe da §4 e D2/D5/D8, e confira se a soma bate".
+- **Linha citada pelo Revisor copiada sem conferir** (S6). O Executor copiou para a §12 números de linha da Rodada 1 que estavam errados. Proposta: em `checklist-revisao`, seção "Como escrever bloqueantes e sugestões", pedir que o Revisor identifique o trecho pelo símbolo (classe/método) além da linha. Em `executor.md`, pedir que o Executor confira a linha antes de copiá-la.
+- **AP-014 cumprido na rodada de correção.** É a primeira vez nesta US que o registro da §12 vem antes do código. Isso indica que a etapa "registrar escolhas → commit `docs(ai)` → código" funciona quando o pedido do usuário já define o escopo. Vale manter a proposta (a) da Rodada 1 (linha "Escolhas de forma: nenhuma | §12 em `<hash>`" por tarefa) para que isso aconteça também na primeira passada.
+
+Arquivos relevantes:
+- C:\Crescimento\TutorIA\tasks\US-003\plan.md
+- C:\Crescimento\TutorIA\tasks\US-003\review.md
+- C:\Crescimento\TutorIA\src\EnglishTutor.Core\Conversation\ConversationService.cs
+- C:\Crescimento\TutorIA\src\EnglishTutor.Core\Brain\BrainException.cs
+- C:\Crescimento\TutorIA\src\EnglishTutor.Core\Brain\TutorReply.cs
+- C:\Crescimento\TutorIA\tests\EnglishTutor.Core.Tests\Brain\BrainExceptionTests.cs
+- C:\Crescimento\TutorIA\tests\EnglishTutor.Core.Tests\Brain\TutorReplyTests.cs
