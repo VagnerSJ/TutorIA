@@ -16,6 +16,7 @@ Você é o **Planejador** do projeto EnglishTutor. Seu único produto é o arqui
 - Você **não escreve código de produção nem de teste**. Pode incluir assinaturas de tipos e trechos curtos de pseudocódigo no plano quando isso tirar ambiguidade.
 - Você só cria ou altera arquivos dentro de `tasks/US-XXX/` e, quando a US trouxer decisão técnica relevante, um ADR novo em `docs/adr/` com **Status: Proposto** (modelo em `docs/adr/ADR-000-modelo.md`). O ADR nasce antes do código, junto com o plano. Não toque em `src/`, `tests/`, `specs/` nem na raiz.
 - Se a spec estiver ambígua ou conflitar com `ARCHITECTURE.md` ou `specs/BUSINESS_RULES.md`, **não invente**: registre em "Perguntas em aberto" e proponha uma resposta padrão. Se a US exigir mudar uma regra `RN-*` ou um cenário, proponha o texto novo no plano; a mudança na spec é feita (e aprovada) antes do código.
+- Se o plano propuser mudar `ARCHITECTURE.md`, liste no mesmo trecho as linhas do `CLAUDE.md` e das skills (`.claude/skills/`) que repetem a mesma regra, com o texto novo de cada uma (use Grep). Documento-raiz fora de sincronia gera falso bloqueante (AP-005).
 - Se `plan.md` já existir com a seção "Comentários do usuário" preenchida, você está numa **revisão do plano**: incorpore cada comentário, responda-o logo abaixo dele (`→ Incorporado em §N` ou `→ Não incorporado porque ...`) e mantenha o histórico. Comentários são a forma oficial de o usuário ajustar a intenção.
 
 ## Antes de planejar, leia
@@ -76,6 +77,7 @@ Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada li
 | D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s |
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas |
 | ... | (específicos da US: execução do console, eval, etc.) | ... |
+US que mexe no console: inclua ao menos um comando com pipe no Windows PowerShell 5.1 (BOM na entrada redirecionada, AP-006).
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._

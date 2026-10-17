@@ -30,7 +30,7 @@ flowchart TB
 
 | Projeto | Responsabilidade | Pode depender de |
 |---|---|---|
-| `EnglishTutor.Core` | Modelos de domínio, interfaces (portas), `ConversationService`, montagem de mensagens, regras de negócio | BCL, `Microsoft.Extensions.Logging.Abstractions`, `Microsoft.Extensions.Options` |
+| `EnglishTutor.Core` | Modelos de domínio, interfaces (portas), `ConversationService`, montagem de mensagens, regras de negócio | BCL, `Microsoft.Extensions.*.Abstractions` (Logging, DependencyInjection), `Microsoft.Extensions.Options` |
 | `EnglishTutor.Infrastructure` | Implementações das portas: STT, cérebros, parser, TTS, áudio, persistência | Core + pacotes externos (Whisper.net, NAudio, EF Core/Dapper, Microsoft.Extensions.AI, ...) |
 | `EnglishTutor.Console` | Composition root: DI, Options, Serilog, loop de interação, comando `eval` | Core + Infrastructure |
 | (futuro) `EnglishTutor.Wpf` / `EnglishTutor.Web` | Outra interface sobre o mesmo Core | Core + Infrastructure |
@@ -47,8 +47,10 @@ Regras:
 ```
 src/
   EnglishTutor.Core/
-    Conversation/      ConversationService, ConversationWindow, TurnMessageBuilder, TutorMode
-    Brain/             ITutorBrain, BrainRequest, BrainMessage, TutorReply, Correction, BrainException
+    Conversation/      ConversationService, ConversationWindow, TurnMessageBuilder, TutorMode,
+                       LocalCommandParser, LocalCommand, LocalCommands
+    Brain/             ITutorBrain, BrainRequest, BrainMessage, TutorReply, Correction, BrainException,
+                       BrainOptions, BrainOptionsValidator, BrainProviders
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
@@ -60,7 +62,7 @@ src/
     Audio/             NAudioRecorder, NAudioPlayer
     Persistence/       SqliteConversationStore
   EnglishTutor.Console/
-    Program.cs, appsettings.json, Commands/ (chat, eval), Ui/
+    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/, Logging/
 prompts/
   tutor.md             system prompt único (regras de conteúdo)
   format.json.md       instrução de formato quando o provedor usa saída estruturada
@@ -70,6 +72,7 @@ eval/
 tests/
   EnglishTutor.Core.Tests/
   EnglishTutor.Infrastructure.Tests/   (inclui Fixtures/ e Contract/)
+  EnglishTutor.Console.Tests/          (casca do console, em processo com TextReader/TextWriter)
 ```
 
 ## 4. Portas do Core (contratos)
@@ -226,7 +229,7 @@ SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala tran
 ## 9. Transversais
 
 - DI com `Microsoft.Extensions.Hosting`; Options Pattern com validação.
-- Logs estruturados com Serilog (console + arquivo em `logs/`), incluindo latência por etapa (STT, cérebro, TTS).
+- Logs estruturados com Serilog em arquivo (`logs/`, formato JSON compacto), incluindo latência por etapa (STT, cérebro, TTS). O console é reservado à interface do aluno (ADR-004).
 - `CancellationToken` em todo fluxo assíncrono; Ctrl+C encerra a sessão de forma limpa.
 - `TreatWarningsAsErrors`, `Nullable` habilitado, analisadores .NET.
 

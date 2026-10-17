@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EnglishTutor.Core/EnglishTutor.Core.csproj" />
+    <Project Path="src/EnglishTutor.Infrastructure/EnglishTutor.Infrastructure.csproj" />
+    <Project Path="src/EnglishTutor.Console/EnglishTutor.Console.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EnglishTutor.Core.Tests/EnglishTutor.Core.Tests.csproj" />
+    <Project Path="tests/EnglishTutor.Console.Tests/EnglishTutor.Console.Tests.csproj" />
+  </Folder>
+</Solution>

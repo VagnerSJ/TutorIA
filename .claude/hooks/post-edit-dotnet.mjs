@@ -1,4 +1,5 @@
-// PostToolUse hook (Edit|Write): formats the edited C# file, builds the affected project and runs
+// PostToolUse hook (Edit|Write): formats the edited C# file, checks its .editorconfig style rules
+// (e.g. IDE1006 naming, which the build does not enforce), builds the affected project and runs
 // its unit tests. Exit code 2 sends the summary on stderr back to the agent.
 // Disable the test step with ENGLISHTUTOR_HOOK_TESTS=0.
 import {
@@ -15,7 +16,19 @@ const csproj = findProjectFile(filePath, root);
 if (!csproj || !dotnetAvailable(root)) process.exit(0);
 
 if (filePath.toLowerCase().endsWith(".cs")) {
-  runDotnet(["format", "whitespace", csproj, "--include", filePath], root, 60_000);
+  // --include must be relative to the working directory: an absolute path is silently ignored.
+  const include = rel(root, filePath);
+  runDotnet(["format", "whitespace", csproj, "--include", include], root, 60_000);
+
+  const style = runDotnet(["format", "style", csproj, "--verify-no-changes", "--include", include], root, 120_000);
+  if (!style.ok && !style.timedOut) {
+    process.stderr.write(
+      `Style rules from .editorconfig violated in ${rel(root, filePath)} (the build does not enforce them).\n` +
+        `Fix these before continuing, or run "dotnet format style ${rel(root, csproj)} --include ${include}":\n` +
+        `${summarize(style.output)}\n`,
+    );
+    process.exit(2);
+  }
 }
 
 const testProject = findTestProject(csproj, root);

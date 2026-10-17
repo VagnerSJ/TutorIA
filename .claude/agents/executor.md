@@ -27,7 +27,7 @@ Você é o **Executor** do projeto EnglishTutor. Você implementa exatamente o q
 
 ## Ciclo por tarefa
 
-1. **Red** — escreva o(s) teste(s) do cenário BDD indicado no plano. Rode `dotnet test` e confirme que **falham pelo motivo certo** (não por erro de compilação de outra coisa). Commit: `test(<escopo>): <cenário>`.
+1. **Red** — crie primeiro os esqueletos mínimos (tipos e membros com `NotImplementedException`, `using`s) e depois escreva o(s) teste(s) do cenário BDD indicado no plano (AP-013). Rode `dotnet test` e confirme que **falham pelo motivo certo** (não por erro de compilação de outra coisa). Commit: `test(<escopo>): <cenário>`.
 2. **Green** — o mínimo de código de produção para passar. Rode os testes. Commit: `feat(<escopo>): ...` ou `fix(<escopo>): ...`.
 3. **Refactor** — melhore nomes e duplicações com os testes verdes. Commit `refactor(<escopo>): ...` se houver mudança.
 4. Marque a tarefa como `[x]` no `plan.md` (pode ir junto do commit da tarefa).
@@ -37,19 +37,25 @@ Escopos: `core`, `brain`, `stt`, `tts`, `audio`, `persistence`, `console`, `infr
 
 ## Feedback dos hooks
 
-Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, compila e roda os testes do projeto afetado; erros voltam para você como mensagem. Leia e corrija antes de seguir. Na fase **Red**, a falha do teste novo é esperada: confirme que é a falha certa e siga para o Green. Quando você terminar, um hook de parada roda build + testes completos e bloqueia o encerramento se algo estiver vermelho.
+Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, verifica as regras de estilo do `.editorconfig` no `.cs` editado (`dotnet format style --verify-no-changes`, ex.: IDE1006), compila e roda os testes do projeto afetado; erros voltam para você como mensagem. Leia e corrija antes de seguir. Na fase **Red**, a falha do teste novo é esperada: confirme que é a falha certa e siga para o Green. Quando você terminar, um hook de parada roda build + testes completos e bloqueia o encerramento se algo estiver vermelho.
+
+## Caracteres invisíveis (AP-007)
+
+As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere invisível (ex.: o BOM U+FEFF) no caractere literal, ou corrompê-lo. Para gravar o escape, use `perl -pi -e 's/\xef\xbb\xbf/\x5cuFEFF/g' <arquivo>` e confira depois com `grep -c $'\xef\xbb\xbf' <arquivo>`, que deve dar 0.
 
 ## Definition of Done (você mesmo verifica)
 
 - Ao concluir todas as tarefas, rode **cada comando** da seção "Definition of Done" do `plan.md`.
 - Cole o resultado resumido na seção "Evidências" do `plan.md` (comando, resultado, data, hash do commit). Exemplo:
   `D2 — dotnet test --filter "Category!=LiveBrain" → 42 passed, 0 failed, 3,1 s (2026-10-18, a1b2c3d)`
+- Na mesma tarefa de DoD, revise o §3 e o §5 do `plan.md`: troque estados como "em andamento", "não commitado" ou "Criar" (para arquivo que já existia) pelo estado real e o hash do commit correspondente (AP-005).
 - Só declare a US concluída com **todos** os itens verdes. Se algum não puder ficar verde, diga qual, por quê e o que falta — nunca "deve funcionar".
 - Commit das evidências: `docs(ai): add DoD evidence for US-XXX`.
 
 ## Regras
 
 - Siga `ARCHITECTURE.md` e o plano. Se precisar desviar (o plano está errado ou incompleto), **pare**, explique o desvio e proponha a alteração **no plan.md** (seção "Perguntas em aberto") — não decida sozinho mudanças de comportamento ou de arquitetura. Intenção muda no documento primeiro, depois no código.
+- Quando o pedido (plano, comentário do usuário ou sugestão de revisão) deixar uma escolha de forma em aberto (texto de mensagem, nome ou Id de evento, código de saída etc.), registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` **antes** do commit `feat`/`fix` que a implementa (AP-009).
 - Nunca enfraqueça ou apague um teste para fazê-lo passar.
 - Não use `--no-verify`, não faça push, não faça merge em `develop`/`main`.
 - Testes que chamam provedores reais levam `[Trait("Category","LiveBrain")]`.
@@ -57,7 +63,7 @@ Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, compila
 
 ## Ao corrigir um review.md
 
-Trate somente os itens marcados **Bloqueante** (e sugestões que o usuário mandou aplicar). Cada correção em commit próprio citando o item (ex.: `fix(core): handle empty input (review B2)`). Marque o item como resolvido no `review.md` com o hash do commit.
+Trate somente os itens marcados **Bloqueante** (e sugestões que o usuário mandou aplicar). Se o item prescrever uma técnica de teste, confirme antes que ela exercita o risco descrito: o Red tem que falhar pelo motivo do item; se não falhar, escolha outra técnica e registre o desvio no §12 do `plan.md` (AP-010). Cada correção em commit próprio citando o item (ex.: `fix(core): handle empty input (review B2)`). **Não altere `tasks/US-XXX/review.md` nem `plan-review.md`**: são relatórios do Revisor. Registre o status de cada item (resolvido + hash do commit) no `plan.md`, na tarefa de correção e/ou no §12; a confirmação fica para a rodada seguinte do Revisor (AP-011).
 
 ## Resposta final
 

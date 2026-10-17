@@ -12,7 +12,7 @@ A estrutura de pastas e as camadas estão em `ARCHITECTURE.md` §2–§3. Aqui f
 
 - `Directory.Build.props` na raiz: `TargetFramework` (o do `global.json`), `Nullable=enable`, `ImplicitUsings=enable`, `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-recommended`, `LangVersion=latest`.
 - Versões de pacotes centralizadas em `Directory.Packages.props` (Central Package Management).
-- `.editorconfig` da raiz é a referência de estilo; `dotnet format` não pode gerar diff.
+- `.editorconfig` da raiz é a referência de estilo; `dotnet format` não pode gerar diff. O build não aplica as regras de estilo (ex.: IDE1006); quem as verifica a cada edição é o hook `post-edit-dotnet` (`dotnet format style --verify-no-changes` no arquivo editado) e, no fim, o D4 (AP-012).
 
 ## Nomes
 
@@ -25,6 +25,8 @@ A estrutura de pastas e as camadas estão em `ARCHITECTURE.md` §2–§3. Aqui f
 | Assíncrono | sufixo `Async`, último parâmetro `CancellationToken ct` | `SendAsync(BrainRequest request, CancellationToken ct)` |
 | Campo privado | `_camelCase` | `_brain` |
 | Testes | `Metodo_Cenario_Resultado` | ver skill `tdd-dotnet` |
+
+Caracteres não imprimíveis ou invisíveis (BOM, espaço sem quebra, zero-width etc.) aparecem em código e testes **sempre como escape** (`'\uXXXX'`), nunca como caractere literal (AP-007).
 
 Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens exibidas ao aluno em inglês (ele está praticando), exceto quando a spec disser outra coisa.
 
@@ -52,6 +54,11 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 - Falhas de provedores viram exceções de domínio (`BrainException` com `BrainErrorKind`), traduzidas pelo adaptador; o Core não conhece `Win32Exception` nem `HttpRequestException`.
 - Sem `catch (Exception)` silencioso; se capturar genérico, logue e relance ou converta.
 - `OperationCanceledException` sempre propaga.
+
+## Console e entrada padrão
+
+- A entrada padrão redirecionada pode chegar com BOM UTF-8 (o Windows PowerShell 5.1 coloca `\uFEFF` antes do texto enviado por pipe). Remova o BOM inicial da primeira linha lida e tenha um teste para isso (US-001, P12; AP-006).
+- Na DoD de toda US que mexe no console, mantenha ao menos um comando com pipe executado no Windows PowerShell 5.1 (ex.: `"/quit" | dotnet run --project src/EnglishTutor.Console`).
 
 ## Processos externos
 

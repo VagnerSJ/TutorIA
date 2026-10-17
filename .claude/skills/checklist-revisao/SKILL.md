@@ -8,6 +8,21 @@ user-invocable: false
 
 Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌ neles é **Bloqueante**. Os demais viram **Sugestão**, salvo se o problema também violar uma regra `RN-*` ou o `ARCHITECTURE.md`.
 
+## 0. Revisão de plano (modo revisão de plano, antes do código)
+- [O] Todo cenário BDD da US aparece no mapa da §4 com projeto, classe e método no padrão `Metodo_Cenario_Resultado`.
+- [O] Cada resposta P* com efeito observável (texto exibido, código de saída, normalização, evento de log) tem teste mapeado na §4 e tarefa na §5.
+- [O] A DoD da §10 cobre a DoD da US na sprint, com comandos verificáveis e resultado esperado (inclui cobertura do Core ≥ 80%).
+- [O] Conformidade com R1–R4, `RN-*` citadas e regras rápidas do `CLAUDE.md`; decisões técnicas relevantes têm ADR Proposto.
+- [O] Escopo: nada além nem aquém do que a US pede; fora de escopo explícito.
+- [O] Consistência interna: §3 (arquivos) × §4 (testes) × §5 (tarefas) × §6 (pacotes), com contagens que batem.
+- [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
+- Alteração proposta na `ARCHITECTURE.md` lista também as linhas do `CLAUDE.md` e das skills que repetem a mesma regra.
+- Riscos técnicos e ambiguidades que travariam o Executor estão tratados ou viraram pergunta em aberto.
+- Viabilidade técnica no SDK e nas bibliotecas em uso.
+
+## Como escrever bloqueantes e sugestões
+- Descreva o **efeito esperado** e onde está o problema, não a técnica de implementação ou de teste. Ex.: "a mensagem de configuração inválida não pode se perder se o cancelamento chegar durante a escrita", e não "teste com token já cancelado". Cabe ao Executor escolher a técnica e confirmar que o Red falha pelo motivo certo (AP-010).
+
 ## 1. Spec e regras
 - [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código).
 - [O] Comportamento implementado bate com os cenários (valores, mensagens, códigos de saída).
@@ -43,6 +58,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Logs estruturados (templates), sem interpolação e sem dados sensíveis.
 - Sem código morto, TODO sem US, números mágicos sem constante/configuração.
 - Tipos `sealed`/`record` conforme `padroes-codigo`.
+- Nenhum caractere invisível literal no diff (BOM, zero-width, espaço sem quebra); use escape `\uXXXX`. Confira por bytes (BOM, zero-width space, espaço sem quebra) com `git diff develop...HEAD | grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`, que deve dar 0.
 
 ## 5. Segurança e privacidade
 - [O] Nenhum segredo, token, caminho pessoal ou dado do usuário commitado (inclui fixtures).
