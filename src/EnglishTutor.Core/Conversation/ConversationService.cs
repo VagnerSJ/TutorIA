@@ -40,8 +40,25 @@ public sealed class ConversationService(
         var systemPrompt = await promptSource.GetSystemPromptAsync(ct);
         List<BrainMessage> messages = [.. _window.ToMessages(), new(BrainRole.User, studentMessage)];
 
-        // P11: any failure propagates and the turn is not recorded.
-        var reply = await brain.SendAsync(new BrainRequest(systemPrompt, messages, SessionHint: null), ct);
+        // P11: any other failure (and cancellation) propagates and the turn is not recorded.
+        TutorReply reply;
+        try
+        {
+            reply = await brain.SendAsync(new BrainRequest(systemPrompt, messages, SessionHint: null), ct);
+        }
+        catch (BrainException first) when (first.IsInvalidOutput)
+        {
+            ConversationLog.ReplyRejectedRetrying(_logger, brain.Name, first.Rejection.Reason);
+
+            // ADR-006: the model sees its rejected answer and the correction; neither enters the window.
+            List<BrainMessage> retryMessages =
+            [
+                .. messages,
+                new(BrainRole.Assistant, first.RawText),
+                new(BrainRole.User, TurnMessageBuilder.BuildFormatCorrection(first.Rejection)),
+            ];
+            reply = await brain.SendAsync(new BrainRequest(systemPrompt, retryMessages, SessionHint: null), ct);
+        }
 
         _window.Add(new ConversationTurn(studentMessage, reply));
         return ConversationTurnResult.Replied(reply);
