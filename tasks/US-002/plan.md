@@ -1,9 +1,9 @@
 # Plano — US-002 Contrato do professor e parser único da resposta
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-17
 Branch: feature/US-002_contrato-parser-resposta
 Spec: specs/sprints/SPRINT_1.md#us-002
-Regras: RN-BRAIN03, RN-FEED01–05 (RN-BRAIN04 como consumidora das mensagens de rejeição), ARCHITECTURE §2 (R1, R4), §3, §4, §6.2, §10; ADR-002 (Proposto), ADR-005 (Proposto, novo)
+Regras: RN-BRAIN03, RN-FEED01–05 (RN-BRAIN04 como consumidora das mensagens de rejeição), ARCHITECTURE §2 (R1, R4), §3, §4, §6.2, §10; ADR-002 (Proposto), ADR-005 (Aceito, novo)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Criar o contrato `TutorReply`/`Correction` no Core e o `TutorReplyParser` único
 
 ## 2. Abordagem
 
-Decisão central no **ADR-005 (Proposto)**: `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md`. A ARCHITECTURE §6.2 diz que o parser "valida as regras de conteúdo", mas a R4 proíbe regra de negócio na Infrastructure. Solução: **formato na Infrastructure, regras de conteúdo no Core**.
+Decisão central no **ADR-005 (Aceito)**: `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md`. A ARCHITECTURE §6.2 diz que o parser "valida as regras de conteúdo", mas a R4 proíbe regra de negócio na Infrastructure. Solução: **formato na Infrastructure, regras de conteúdo no Core**.
 
 ### 2.1 Core (`src/EnglishTutor.Core/Brain/`) — só BCL
 
@@ -199,7 +199,7 @@ Repetições das regras do parser em `CLAUDE.md` e skills (Grep por `parser|Tuto
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md` | Decisão (Proposto) — criado junto com este plano |
+| Criar | `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md` | Decisão (Aceito) — criado junto com este plano |
 | Alterar | `ARCHITECTURE.md` | §3, §4, §6.2, §10 (texto em §2.4) — pelo orquestrador, antes da T1 |
 | Alterar | `.claude/skills/tdd-dotnet/SKILL.md` | Linhas 28 e 90: ressalva das fixtures reais (texto em §2.4) — pelo orquestrador, antes da T1 |
 | Alterar | `Directory.Packages.props` | `PackageVersion` de `Microsoft.Extensions.Logging.Abstractions` (10.0.13) no grupo novo `Infrastructure` |
@@ -391,3 +391,11 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
   - Respostas de P1–P9 aceitas → nota no início da §9. O texto das P* não mudou.
   - Contagens sem alteração: §4 continua com 31 métodos / 44 casos, §5 com T3+T4 = 8 e T6+T7 = 10+8 = 18, D2 com 93 casos (47 + 22 + 24) e D5 com 18 métodos / 24 casos. Nenhuma sugestão aplicada acrescentou ou removeu teste. S4, S6, S9, S10 e S13 não foram aplicadas, como pedido.
   - Status continua "Aguardando aprovação".
+
+### 2026-10-17 — aprovação do usuário (no chat)
+
+- Plano aprovado com as sugestões S1, S2, S3, S5, S7, S8, S11 e S12 incorporadas (rodada 3 da revisão do plano: APROVADO, sem bloqueantes).
+- Respostas às perguntas em aberto: P1–P9 com as respostas padrão.
+- ADR-005 → Aceito. ADR-002 continua Proposto (confirmação prevista para US-004/US-009, fora desta US).
+- Alterações da §2.4 aplicadas em `ARCHITECTURE.md` (§3, §4, §6.2, §10) e em `.claude/skills/tdd-dotnet/SKILL.md` (linhas 28 e 90) no commit `docs(ai): update architecture for US-002`, antes da T1.
+- Sugestão S14 (rodada 3) não incorporada ao texto; nota para o Executor: na D11b, código de saída 1 do `grep -rl` sem saída é o resultado esperado, não falha.
