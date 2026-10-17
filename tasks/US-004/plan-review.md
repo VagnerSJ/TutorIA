@@ -64,3 +64,62 @@ Resultado: REPROVADO (4 bloqueantes)
 - **B2 (recorrência do AP-022):** o adiamento ficou escrito numa P* ("a US-005 troca isso..."), e não só na §8. Por isso a conferência da §8 ("Nada novo a registrar") não o pegou. Proposta: no `.claude/agents/planejador.md` e no `checklist-revisao` §0, procurar adiamentos também nas P* e nos comentários de teste ("a US-YYY troca/atualiza"), não só na §8.
 - **B4 (recorrência da S1 do `plan-review` da US-001):** normalização aceita pelo validador sem dono no consumidor. Proposta: no checklist de revisão de plano, "valor aceito sem diferenciar maiúsculas pelo validador tem teste no consumidor com caixa diferente".
 - **B3/S5 (variação do AP-016):** em tabelas de decisão com linhas sobrepostas (código ≠ 0 e `is_error`), um caso de teste pode cair numa linha anterior e deixar a seguinte sem cobertura. Proposta: na skill `tdd-dotnet`, "em tabela de decisão, cada linha tem um caso que só ela satisfaz".
+
+## Rodada 2
+
+Data: 2026-10-17
+Escopo revisado: `tasks/US-004/plan.md` e `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` no commit c09f820 (`docs(ai): revise plan for US-004`). Comparei com a rodada 1 (`git diff 4e7b224 HEAD`) e conferi o plano contra o código atual de `develop`: `EnglishTutorApp`, `ConversationService`, `ConversationWindow`, `CoreServiceCollectionExtensions`, `BrainOptionsValidator`, `ConversationOptionsValidator`, `TutorReplyParser` e `ChatSessionTests`. Também conferi contra `specs/sprints/SPRINT_1.md` (US-005 e US-006) e `BUSINESS_RULES.md` (RN-CONV03). Ainda não há código na branch. Não rodei a suíte de novo: a linha de base da rodada 1 (Core 102, Infrastructure 24, Console 25) continua valendo, porque o c09f820 só mexe em documentos.
+Resultado: APROVADO
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| [O] Todo cenário BDD da US está no mapa da §4 com projeto, classe e método `Metodo_Cenario_Resultado` | ✅ 9/9 |
+| [O] Cada P* com efeito observável tem teste na §4 e tarefa na §5 | ✅ P5 (linha 3 da §2.5), P13 (normalização no adaptador) e P19 (falhas em várias seções) agora têm teste e tarefa |
+| [O] A DoD da §10 cobre a DoD da US, com comandos verificáveis e resultado esperado (inclui Core ≥ 80%) | ✅ D2 = 214 e D11 = 29/20 batem com a §4. O D12 agora confere que a pasta existe |
+| [O] Conformidade com R1–R4, `RN-*`, regras rápidas do `CLAUDE.md`; ADR Proposto para decisão relevante | ✅ O ADR-007 foi revisado e continua Proposto. A P19 mantém as mensagens de validação na partida (ARCHITECTURE §10) |
+| [O] Escopo: nada além nem aquém; adiamentos registrados na spec de destino (AP-022) | ✅ Conferi os textos da US-005 (cenário novo + D7) e da US-006 contra o `SPRINT_1.md`. As âncoras existem: a linha 327 está dentro do bloco `gherkin`, a linha D6 é a 335, e não havia D7 na US-005 |
+| [O] Consistência §3 × §4 × §5 × §6, contagens e nomes idênticos (AP-025) | ✅ Recontei método a método. `ClaudeCodeTutorBrainTests` 20/29 (T5 5/6 + T6 4/5 + T7 4/7 + T8 5/9 + T10 2/2). Infrastructure 34/46, Console 14/16, Core 1/1, total 49/63, suíte 214. O número intermediário da T15 (30 casos) está certo |
+| Transformações da §2 testadas nos dois lados do limite (AP-016); asserções com trecho do projeto (AP-015) | ⚠️ Os três ramos do `<detalhe>` e a primeira linha do stderr estão cobertos. A condição "JSON válido que não é um resultado da CLI" da linha 2 continua sem caso (S2) |
+| [O] Ordem das tarefas preserva o Red de cada teste | ✅ T5 deixa `OutputMode` com comparação exata e `is_error` lançando `NotImplementedException("US-004 T7")`, então a T6 (outra caixa) e a T7 (código 0) nascem vermelhas. T16 → T17: com os binds da T16, os dois casos da T17 falham com código 1, e o Executor confirma o motivo no log 1003 |
+| Alteração na `ARCHITECTURE.md` lista também `CLAUDE.md` e skills que repetem a regra | ✅ Sem mudança desde a rodada 1. O texto novo da §6.3 agora diz o que acontece com o executável inexistente, alinhado com a §2.1 |
+| Riscos e ambiguidades que travariam o Executor tratados | ✅ S4 da rodada 1 (pipe fechado), S9 (system prompt nos testes `LiveBrain`) e S11 (configuração de usuário da CLI) foram tratados |
+| Viabilidade técnica no SDK e nas bibliotecas | ✅ Com mais de uma Options inválida, o validador de partida do `Microsoft.Extensions.Options` lança `AggregateException` só com `OptionsValidationException`. Com uma só, relança a própria `OptionsValidationException`. A T17 manda confirmar isso no Red |
+
+### Itens da rodada anterior
+
+Bloqueantes:
+- [x] **B1** — Resolvido em c09f820. A P19 decide o tratamento e a §2.6 (composition root) aceita `OptionsValidationException` ou `AggregateException` só com `OptionsValidationException`: escreve `Invalid configuration:` + uma linha por falha, loga `StartupFailed` com todas e devolve `ExitCodes.InvalidConfiguration`. A §2.9 cobre a `AggregateException` mista. O teste é `EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration`, com 2 casos (Provider + janela, OutputMode + janela). As mensagens esperadas batem com as de `BrainOptionsValidator` e `ConversationOptionsValidator`. Também foram atualizados a T17, a §7, o D2 e as contagens.
+- [x] **B2** — Resolvido em c09f820. A §2.8 traz o cenário "falha do cérebro no console não encerra a sessão" e a linha D7 da US-005, com texto antigo de referência e critérios reaproveitados (saída de erro, `/quit` → 0, `Claude Code failed (exit code <n>): ...`). A §8 deixou de dizer "Nada novo a registrar", e a P11 e o comentário do teste apontam para o cenário.
+- [x] **B3** — Resolvido em c09f820. A tabela da §2.5 agora é numerada e ordenada. A linha 3 tem a mensagem própria `Claude Code reported an error: <detalhe>` e não chama o parser. O teste `SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing` usa código 0 e um `structured_output` **válido**, então só passa se o `is_error` for respeitado. Também foram atualizados D11, T7 e o ADR-007, item 5.
+- [x] **B4** — Resolvido em c09f820. A §2.2 e a P13 tornam o adaptador o dono da normalização. Os passos 2, 6 e 10 da §2.4 usam o modo canônico, e o teste `SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog` (`"jsonschema"`, `"TAGS"`) confere argumentos, arquivo de formato e log 2001. O estado da T5 garante o Red.
+
+Sugestões (o planejador incorporou todas, §12):
+- S1 resolvido (ADR-007 "Consequências", §7), mas com um erro de contagem herdado da própria S1. Ver S1 abaixo.
+- S2, S3, S4, S6, S7, S8, S9, S10, S11, S12 e S13 resolvidos em c09f820.
+- S5 resolvido em c09f820: (a) e (b) nos casos de B3; (c) com `session_id` vazio. O `session_id` **ausente** não tem caso, o que é aceitável, porque é o mesmo ramo "senão `null`".
+
+### Bloqueantes
+
+Nenhum.
+
+### Sugestões
+
+- **S1** — ADR-007, "Consequências", terceiro item ("a partir do turno `MaxTurnsInWindow + 1` (padrão 11)"), e plano §7, linha "`--resume` só ajuda nos primeiros `MaxTurnsInWindow` turnos". O erro veio da S1 da rodada 1, que dizia "padrão 10". Pelo `ConversationWindow.Add` (guarda os últimos N turnos **anteriores**), o request do turno 11 ainda leva os turnos 1–10 mais a frase nova. Ele estende exatamente a sessão e retoma. A janela só desliza no turno 12. **Esperado:** "a partir do turno `MaxTurnsInWindow + 2` (padrão 12)" e "nos primeiros `MaxTurnsInWindow + 1` turnos", ou outra formulação equivalente que bata com `ConversationWindow`. Isso afeta a leitura da taxa de sessões novas no `eval` (US-009).
+- **S2** — Plano §2.5, linha 2 ("stdout não é objeto JSON com `"type": "result"`"), e o teste `SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation`. O único caso é `not json at all`. Uma implementação que só trate `JsonException` passaria. Com um JSON válido que não é o resultado da CLI (outro `type`, array), o fluxo cairia na linha 5 com `RawText = ""`: `InvalidOutput` → retentativa → fallback cru vazio na tela. **Esperado:** um JSON válido sem `"type": "result"` também resulta na `BrainException(Unknown)` da linha 2 (AP-016, a condição tem dois lados).
+- **S3** — Plano §3, `Support/ClaudeOutputs.cs`. A descrição de `Structured`, `Text` e `Error` não diz que o stdout montado tem `"type": "result"`. Se `Error(...)` omitir esse campo, a linha 2 absorve os casos de `is_error` e os testes de B3 falham pelo motivo errado (ou passam por acaso no caso de código ≠ 0). **Esperado:** a §3 diz que os três auxiliares produzem o objeto de resultado da CLI com `"type": "result"`, no mesmo formato das fixtures gravadas.
+- **S4** — Plano §2.6, `BuildHost`, bind de `ClaudeCodeOptions` com `ValidateOnStart`. A seção é validada mesmo com `Brain:Provider = Ollama`. Até a US-007, um `Brain:ClaudeCode` inválido impede o uso do Ollama, que nem o usa. É coerente com o registro fixo da P17, mas não está escrito. **Esperado:** registrar na §7 ou na P17 como comportamento aceito até a `BrainFactory`.
+
+### Pontos positivos
+
+- Cada bloqueante tem resposta rastreável na §12, com a lista exata das seções tocadas. Facilitou a conferência item por item.
+- O teste de B3 usa um `structured_output` válido junto com `is_error`, de modo que ignorar o erro devolva uma resposta e o teste falhe. É o uso certo de "um caso que só a linha satisfaz", aplicado ao próprio plano (§2.5: "Cada linha de falha tem ... um caso de teste que só ela satisfaz").
+- A T5 descreve o estado provisório dos ramos novos (comparação exata de `OutputMode`, `is_error` com qualquer código). Assim, os testes de B3 e B4 têm Red garantido nas tarefas seguintes (AP-018(b)).
+- A T17 manda o Executor confirmar no log que o Red vem da `AggregateException` e parar se não vier. A dúvida de viabilidade virou verificação, não suposição.
+- Os textos para a US-005 reaproveitam critérios já fixados (saída de erro, código 0 no `/quit`, mensagem `Claude Code failed ...`), seguindo o AP-024. Delimitar "que chegue ao console" exclui o `InvalidOutput` de forma correta (ADR-006).
+- O system prompt entrou na identidade da sessão (S2 da rodada 1) com um caso próprio, `"system-prompt-changed"`, de valores distintos.
+
+### Aprendizados para o processo
+
+- **S1 (erro do próprio Revisor, propagado):** uma afirmação numérica da revisão ("a partir do turno N + 1") foi copiada para o ADR sem conferência contra o código. Proposta: no `checklist-revisao`, seção "Como escrever bloqueantes e sugestões", acrescentar "afirmação quantitativa sobre comportamento existente (limites, contagens, a partir de qual turno) cita o símbolo que a sustenta (ex.: `ConversationWindow.Add`)". No `.claude/agents/planejador.md`: "número vindo da revisão é conferido no código antes de ir para ADR ou spec".
+- **S2/S3 (variação do AP-016 em tabelas de decisão):** a linha 2 tem condição composta ("não é JSON" ou "não é `type: result`"), e o auxiliar de teste que monta a entrada decide em silêncio qual linha casa. Proposta: na skill `tdd-dotnet`, junto com a regra proposta na rodada 1 ("cada linha tem um caso que só ela satisfaz"), acrescentar: "condição composta de uma linha tem um caso por parte; auxiliares de teste que montam a entrada declaram os campos que decidem a linha".
