@@ -129,6 +129,19 @@ public sealed class TutorReplyValidatorTests
         result.Warnings.Should().BeEmpty();
     }
 
+    // US-002 — §2.1 regra 6: RawText e IsRawFallback preservados (revisão S4; a US-003 cria a resposta crua)
+    [Fact]
+    public void Validate_WhenCandidateIsRawFallback_PreservesRawFallbackAndRawText()
+    {
+        var candidate = Candidate("What did you do?", []) with { IsRawFallback = true, RawText = "What did you do?" };
+
+        var result = TutorReplyValidator.Validate(candidate);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.IsRawFallback.Should().BeTrue();
+        result.Reply!.RawText.Should().Be("What did you do?");
+    }
+
     private static TutorReply Candidate(
         string reply,
         IReadOnlyList<Correction> corrections,
