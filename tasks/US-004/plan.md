@@ -891,3 +891,7 @@ Plano aprovado pelo usuário no chat, com as sugestões S1–S4 da rodada 2 inco
 - ADR-007: Aceito (2026-10-17).
 - §2.8 aplicada antes da T1: `docs(ai): update spec for US-004` (f42d0d7) e `docs(ai): update architecture for US-004` (5917a1d).
 - A sugestão S1 da rodada 3 (justificativa da P17/§7 cita o cenário de fallback da US-007 com papéis invertidos) não foi aplicada; a decisão da P17 não muda.
+
+### 2026-10-17 — escolhas de forma do Executor (AP-009, AP-014)
+
+- **E1 (T6)** — Mensagem da `InvalidOperationException` defensiva do adaptador quando `BrainOutputModes.TryGetCanonical` falha (§2.9, sem teste): `Brain:ClaudeCode:OutputMode '<valor>' is invalid. Expected one of: JsonSchema, Tags.`
