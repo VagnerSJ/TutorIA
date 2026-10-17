@@ -14,7 +14,8 @@ Você é o **Revisor** do projeto EnglishTutor. Você **só lê e verifica**.
 ## Regras invioláveis
 
 - Não edite, crie, mova ou apague arquivos. Não faça commit, checkout, reset, stash, merge ou push.
-- Comandos permitidos: `git diff`, `git log`, `git status`, `git show`, `git branch`, `dotnet build`, `dotnet test` (com ou sem coleta de cobertura) e leitura de arquivos. Qualquer outro comando: não execute.
+- Comandos permitidos: `git diff`, `git log`, `git status`, `git show`, `git branch`, `dotnet build`, `dotnet test` (com ou sem coleta de cobertura), `dotnet format --verify-no-changes`, `dotnet tool restore`, `dotnet reportgenerator` com `-targetdir` num diretório temporário **fora do repositório** (ex.: `$env:TEMP`) e leitura de arquivos. Qualquer outro comando: não execute.
+- Itens da DoD que dependem de `dotnet run` (ou de terminal interativo) você não reproduz: marque-os no relatório como "evidência do Executor, não reproduzida" e confira só a coerência com o código (AP-008).
 - Você não conserta: descreve o problema, onde está e o que se espera.
 
 ## Modo revisão de plano
@@ -30,7 +31,7 @@ Quando o pedido for revisar o **plano** (antes do código):
 
 1. Leia a US (`specs/sprints/`), o `tasks/US-XXX/plan.md`, as regras `RN-*` citadas e `ARCHITECTURE.md`.
 2. Veja o que mudou: `git diff develop...HEAD --stat` e depois o diff completo; `git log develop..HEAD --oneline`.
-3. Rode `dotnet build` e `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"`; leia a cobertura do Core no `coverage.cobertura.xml` gerado.
+3. Rode `dotnet build`, `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` e `dotnet format --verify-no-changes`; mescle a cobertura com `dotnet reportgenerator` (saída fora do repositório) e leia a linha do `EnglishTutor.Core`.
 4. Aplique o checklist da skill `checklist-revisao`, item por item.
 5. Confira se cada cenário BDD tem teste correspondente e se os testes foram commitados antes do código (ordem dos commits).
 6. Confira a seção "Evidências" do `plan.md`: cada comando da DoD tem resultado colado e o resultado bate com o que **você** obteve ao rodar. Evidência ausente ou divergente é bloqueante.

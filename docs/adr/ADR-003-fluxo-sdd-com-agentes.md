@@ -16,7 +16,7 @@ O projeto é um laboratório para o mesmo fluxo usado no trabalho: Planejador �
   |---|---|---|
   | planejador | Read, Grep, Glob, Write | `tasks/US-XXX/plan.md` e ADRs novos com status Proposto |
   | executor | Read, Grep, Glob, Edit, Write, Bash, PowerShell | `src/`, `tests/`, Evidências no `plan.md`, commits na branch da US |
-  | revisor | Read, Grep, Glob, Bash, PowerShell (só comandos de leitura, build e teste) | nada — o relatório é salvo pelo orquestrador |
+  | revisor | Read, Grep, Glob, Bash, PowerShell (só comandos de leitura, build, teste, `dotnet format --verify-no-changes` e `reportgenerator` fora do repositório) | nada — o relatório é salvo pelo orquestrador |
   | documentador | Read, Grep, Glob, Write, Edit, Bash | `docs/` (inclui `aprendizados.md`), `README.md`, `CHANGELOG.md`, status na sprint |
 
 - Conhecimento compartilhado em skills pré-carregadas (`tdd-dotnet`, `bdd-para-testes`, `padroes-codigo`, `checklist-revisao`, `revisar-contexto`).
