@@ -31,18 +31,23 @@ public sealed class ClaudeCodeTutorBrain(
         ArgumentNullException.ThrowIfNull(request);
 
         var options = _options.Value;
-        var workingDirectory = options.WorkingDirectory;
-        var mode = options.OutputMode switch
+        // RN-BRAIN06: a dedicated empty folder; the adapter never writes into it.
+        var workingDirectory = Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.WorkingDirectory));
+        Directory.CreateDirectory(workingDirectory);
+
+        // P13: only the canonical mode is used; the validator rejects unknown values before this point.
+        if (!BrainOutputModes.TryGetCanonical(options.OutputMode, out var mode))
         {
-            BrainOutputModes.JsonSchema => BrainOutputModes.JsonSchema,
-            BrainOutputModes.Tags => BrainOutputModes.Tags,
-            _ => throw new NotImplementedException("US-004 T6"),
-        };
+            throw new InvalidOperationException(
+                $"{ClaudeCodeOptions.SectionName}:OutputMode '{options.OutputMode}' is invalid. " +
+                $"Expected one of: {string.Join(", ", BrainOutputModes.All)}.");
+        }
 
         var standardInput = request.Messages[^1].Content;
         var systemPromptPath = Path.Combine(Path.GetTempPath(), $"englishtutor-system-prompt-{Guid.NewGuid():N}.md");
         await File.WriteAllTextAsync(systemPromptPath, request.SystemPrompt, _utf8WithoutBom, ct);
         ProcessResult result;
+        var startedAt = _timeProvider.GetTimestamp();
         try
         {
             var arguments = BuildArguments(options, mode, systemPromptPath);
@@ -54,6 +59,8 @@ public sealed class ClaudeCodeTutorBrain(
             File.Delete(systemPromptPath);
         }
 
+        var elapsedMs = (long)_timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
+
         var output = ClaudeCodeOutput.Read(result);
         var parsed = _parser.Parse(output.RawText);
         if (!parsed.IsValid)
@@ -61,6 +68,7 @@ public sealed class ClaudeCodeTutorBrain(
             throw new NotImplementedException("US-004 T7");
         }
 
+        ClaudeCodeLog.Replied(_logger, Name, elapsedMs, mode, resumed: false);
         return parsed.Reply;
     }
 
