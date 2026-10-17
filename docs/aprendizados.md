@@ -180,7 +180,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a primeira versão do plano deixou P4, P5, P7 e P9 (normalização e comportamento de borda) sem teste na §4 (B1). Na revisão, só as P* citadas no bloqueante receberam "Teste: ..." (P2 e P3 ficaram de fora, S13). Padrões vizinhos da mesma revisão: (1) uma tarefa que cria um desvio (detecção JSON/tags) fazia o ramo da tarefa seguinte existir e o teste da T7 nascer verde (B2); resolvido dizendo que o ramo lança `NotImplementedException` até lá, e os testes da tarefa atual declaram a entrada que os mantém no ramo já implementado (S11); (2) a resposta da §12 no formato "sugestão → seções tocadas" permitiu conferir tudo numa rodada.
 - **Por que importa:** o AP-004 já tinha motivado o item [O] do checklist; a regra existe só no revisor e o planejador reincide.
 - **Correção (proposta):** `.claude/agents/planejador.md`: (a) na §9, **toda** P* termina com "Teste: `<Classe>.<Método>`" ou "Sem efeito observável", conferido antes de entregar; (b) na §5, quando uma tarefa cria um desvio cujo outro ramo pertence à tarefa seguinte, o plano diz o estado desse ramo; (c) respostas a revisão de plano na §12 seguem o formato "sugestão → seções tocadas". Opcional: espelhar (a) e (b) em `.claude/skills/tdd-dotnet/SKILL.md`.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17; (a), (b) e (c) em `.claude/agents/planejador.md`; o espelho opcional na `tdd-dotnet` não foi feito)
 
 ### AP-019 — Forma única de checar caracteres invisíveis (LC_ALL=C)
 
