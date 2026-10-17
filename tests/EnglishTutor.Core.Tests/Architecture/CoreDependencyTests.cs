@@ -8,20 +8,20 @@ namespace EnglishTutor.Core.Tests.Architecture;
 // US-001 — Cenário: Core não depende de pacotes externos — R1 (ARCHITECTURE §2)
 public sealed partial class CoreDependencyTests
 {
-    private const string CoreAssemblyName = "EnglishTutor.Core";
+    private const string _coreAssemblyName = "EnglishTutor.Core";
 
-    private const string RuleDescription =
+    private const string _ruleDescription =
         "R1 (ARCHITECTURE §2): EnglishTutor.Core may reference only the BCL, " +
         "Microsoft.Extensions.*.Abstractions and Microsoft.Extensions.Options.";
 
-    private static readonly string[] AllowedPackageReferences =
+    private static readonly string[] _allowedPackageReferences =
     [
         "Microsoft.Extensions.Options",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
     ];
 
     // Loaded by name so the test does not depend on any specific Core type (plan §2.10).
-    private static Assembly CoreAssembly => Assembly.Load(CoreAssemblyName);
+    private static Assembly CoreAssembly => Assembly.Load(_coreAssemblyName);
 
     [Fact]
     public void CoreAssembly_References_DoNotIncludeInfrastructureOrConsole()
@@ -31,7 +31,7 @@ public sealed partial class CoreDependencyTests
         referenced.Should().NotContain(
             name => name != null && (name.StartsWith("EnglishTutor.Infrastructure", StringComparison.Ordinal)
                                      || name.StartsWith("EnglishTutor.Console", StringComparison.Ordinal)),
-            because: "the Core is the inner layer and must not depend on Infrastructure or Console. " + RuleDescription);
+            because: "the Core is the inner layer and must not depend on Infrastructure or Console. " + _ruleDescription);
     }
 
     [Fact]
@@ -47,13 +47,13 @@ public sealed partial class CoreDependencyTests
         forbidden.Should().BeEmpty(
             because: "these assemblies are not allowed in the Core: [{0}]. {1}",
             string.Join(", ", forbidden),
-            RuleDescription);
+            _ruleDescription);
     }
 
     [Fact]
     public void CoreProject_PackageAndProjectReferences_OnlyAllowedOnes()
     {
-        var project = XDocument.Load(RepositoryRoot.Combine("src", CoreAssemblyName, $"{CoreAssemblyName}.csproj"));
+        var project = XDocument.Load(RepositoryRoot.Combine("src", _coreAssemblyName, $"{_coreAssemblyName}.csproj"));
 
         var packages = project.Descendants("PackageReference")
             .Select(element => (string?)element.Attribute("Include") ?? string.Empty)
@@ -63,15 +63,15 @@ public sealed partial class CoreDependencyTests
             .ToList();
 
         packages.Should().BeSubsetOf(
-            AllowedPackageReferences,
+            _allowedPackageReferences,
             because: "the Core .csproj may only reference [{0}] directly; found [{1}]. {2}",
-            string.Join(", ", AllowedPackageReferences),
+            string.Join(", ", _allowedPackageReferences),
             string.Join(", ", packages),
-            RuleDescription);
+            _ruleDescription);
         projects.Should().BeEmpty(
             because: "the Core must not reference other projects; found [{0}]. {1}",
             string.Join(", ", projects),
-            RuleDescription);
+            _ruleDescription);
     }
 
     private static bool IsAllowedReference(string name, HashSet<string> sharedFramework) =>

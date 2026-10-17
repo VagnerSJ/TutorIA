@@ -5,14 +5,14 @@ namespace EnglishTutor.Core.Conversation;
 // RN-CONV06: input starting with "/" (after trimming) is always a local command and never goes to the brain.
 public static class LocalCommandParser
 {
-    private const char Prefix = '/';
+    private const char _prefix = '/';
 
     public static bool TryParse(string input, [NotNullWhen(true)] out LocalCommand? command)
     {
         ArgumentNullException.ThrowIfNull(input);
 
         var trimmed = input.Trim();
-        if (!trimmed.StartsWith(Prefix))
+        if (!trimmed.StartsWith(_prefix))
         {
             command = null;
             return false;

@@ -2,7 +2,7 @@ namespace EnglishTutor.Core.Tests.Support;
 
 internal static class RepositoryRoot
 {
-    private const string SolutionFileName = "EnglishTutor.slnx";
+    private const string _solutionFileName = "EnglishTutor.slnx";
 
     public static string Path { get; } = Find();
 
@@ -13,7 +13,7 @@ internal static class RepositoryRoot
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(System.IO.Path.Combine(directory.FullName, SolutionFileName)))
+            if (File.Exists(System.IO.Path.Combine(directory.FullName, _solutionFileName)))
             {
                 return directory.FullName;
             }
@@ -22,7 +22,7 @@ internal static class RepositoryRoot
         }
 
         throw new InvalidOperationException(
-            $"Could not find the repository root: no '{SolutionFileName}' in '{AppContext.BaseDirectory}' or any parent folder. " +
+            $"Could not find the repository root: no '{_solutionFileName}' in '{AppContext.BaseDirectory}' or any parent folder. " +
             "Run the tests from inside the repository.");
     }
 }
