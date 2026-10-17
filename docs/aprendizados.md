@@ -44,3 +44,12 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** confirma o hábito 4: a intenção foi ajustada no documento (prompt → `CLAUDE.md`, agentes, skills, sprint) antes de qualquer código.
 - **Correção:** hábitos embutidos em `CLAUDE.md`, nos 4 agentes, no `/us`, no `checklist-revisao`, na nova skill `revisar-contexto`, em DoD por US no Sprint 1 e em hooks de build/teste.
 - **Status:** Aplicada (Fase 0)
+
+### AP-004 — Plano grande aprovado sem revisão independente e sem resumo no chat
+
+- **Data / US:** 2026-10-17 / US-001
+- **Quem errou:** orquestrador (fluxo sem a etapa) e orquestrador (resumo omitido)
+- **O que aconteceu:** no `/us US-001`, o plano do Planejador (11 tarefas, 9 perguntas em aberto, ADR-004) foi direto para a aprovação humana e, aprovado, o orquestrador delegou ao Executor. O usuário interrompeu e perguntou se o plano não deveria passar pelo Revisor antes. O fluxo atual (skill `/us`, ADR-003, `CLAUDE.md` "Fluxo obrigatório") só usa o Revisor depois da execução, sobre o diff. O Executor chegou a commitar a T1 (648f510) antes da interrupção. Além disso, no passo 2.4 o orquestrador não escreveu no chat o resumo do plano antes de pedir aprovação, contrariando a skill `/us` (reincidência do AP-001).
+- **Por que importa:** um plano grande revisado só pelo humano não tem checagem independente de rastreabilidade BDD→teste, conformidade com `RN-*`/`ARCHITECTURE.md` e verificabilidade da DoD antes de existir código; erros de plano custam mais caro depois da execução.
+- **Correção (proposta):** inserir a etapa "Revisão do plano" no fluxo: Planejador → Revisor (revisa o `plan.md`, somente leitura, relatório salvo em `tasks/US-XXX/plan-review.md`; se REPROVADO, o Planejador corrige, máximo 3 rodadas) → aprovação do usuário → Executor → Revisor (código) → Documentador. Arquivos a alterar se aprovada: `.claude/skills/us/SKILL.md` (nova etapa e linha na tabela de detecção), `.claude/agents/revisor.md` (modo "revisão de plano" com checklist próprio), possivelmente a skill `checklist-revisao`, `CLAUDE.md` (linha do fluxo obrigatório) e ADR-003 (ou um ADR novo que o complemente).
+- **Status:** Proposta (aguardando aprovação do usuário)
