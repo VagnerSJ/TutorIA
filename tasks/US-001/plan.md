@@ -223,7 +223,7 @@ Pré-condição do Executor: `dotnet --list-sdks` mostra um SDK 10.0.x. Satisfei
 - [x] T10 — Red: `RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile` (lê o arquivo CLEF, faz parse JSON por linha e procura `EventId.Name` = `ApplicationStarted` com `Provider`/`Mode` e `ApplicationStopped` com `ExitCode`). Green: Serilog (`ReadFrom.Configuration`, sink de arquivo, `CompactJsonFormatter`), `AppLog` (1000–1002), `TimeProvider` para `ElapsedMs`. (commits: `test(console): structured start and stop log events` + `feat(console): add serilog file logging`)
 - [x] T11 — Red: `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter`) e `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` (`PendingTextReader`; o teste espera o sinal de leitura iniciada e então cancela o `CancellationTokenSource` passado a `RunAsync`). Ambos falham antes: a exceção e o `OperationCanceledException` escapam de `RunAsync`. Green: token da sessão ligado a `ApplicationStopping`, `catch (OperationCanceledException) when (...IsCancellationRequested)` → 0, `catch` genérico → log `UnexpectedError` (1003) + mensagem curta + `ExitCodes.UnexpectedError`, `ApplicationStopped` em `finally`. (commits: `test(console): unexpected error and cancellation exit codes` + `feat(console): handle cancellation and unexpected errors on exit`)
 - [x] T12 — CI: `.github/workflows/ci.yml` (`ubuntu-latest`, `setup-dotnet@v4` com `global-json-file`, `dotnet --version`, build, testes sem LiveBrain com cobertura, ReportGenerator no step summary, upload do artefato). (commit: `ci(infra): add build and test workflow with coverage`)
-- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`)
+- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; **falta o D13 (usuário)**; D5 com ressalva (P12).
 
 ## 6. Pacotes NuGet
 
@@ -284,6 +284,8 @@ P1–P9 foram respondidas em 2026-10-17 (ver "Respostas do usuário" abaixo). No
 - **P10 — `Microsoft.Extensions.Primitives` no Core** (S6). É dependência transitiva do `Microsoft.Extensions.Options` e pode aparecer em `GetReferencedAssemblies` se o Core usar tipos como `IChangeToken`. **Padrão proposto:** aceitar no teste de reflexão só como transitiva; proibir como `PackageReference` direto (teste do `.csproj` e D9); sem mudança na ARCHITECTURE §2, que trata de dependências diretas.
 - **P11 — Runner do CI** (S12). **Padrão proposto:** `ubuntu-latest` (mais rápido; nada específico de Windows nesta US). Rever quando entrar um adaptador só para Windows (ex.: TTS do sistema). Alternativa: `windows-latest`, igual à máquina de desenvolvimento.
 
+- **P12 — BOM no início da entrada redirecionada** (encontrada pelo Executor no D5, 2026-10-17). O Windows PowerShell 5.1 envia o BOM UTF-8 antes do texto em `"/quit" | dotnet run ...`. O `Console.In` entrega `"﻿/quit"`, `Trim()` não remove `U+FEFF` e o `/quit` vira texto livre: na US-001 mostra "not connected"; a partir da US-003/004, iria para o cérebro, violando RN-CONV06. **Proposta:** o `ChatSession` (UI, porque é um detalhe da entrada padrão) remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado). Alternativa: o `LocalCommandParser` ignora `U+FEFF` no `Trim` (regra no Core, vale para qualquer UI). O Executor não implementou: é comportamento fora do plano e aguarda decisão.
+
 Perguntas anteriores (respondidas):
 
 - **P1 — Novo projeto `tests/EnglishTutor.Console.Tests`.** Criar e atualizar ARCHITECTURE §3 (feito em 798050a).
@@ -330,6 +332,27 @@ Reaprovação (2026-10-17), no chat, do plano revisado com S1–S14 (commit 250b
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+### DoD (2026-10-17, commit d21deae, PowerShell 5.1, SDK 10.0.402)
+
+| # | Resultado | Status |
+|---|---|---|
+| D1 | `dotnet build` → `0 Aviso(s)`, `0 Erro(s)`, 1,5 s | ✅ |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` → Core.Tests 27 passed / 0 failed; Console.Tests 17 passed / 0 failed (44 casos, 31 métodos); 4,1 s no total, sem rede nem GPU | ✅ |
+| D3 | `TestResults/` apagado antes; gerou 2 `coverage.cobertura.xml` (um por projeto de teste); 44 passed | ✅ |
+| D3b | ReportGenerator 5.5.11 (TextSummary): `EnglishTutor.Core 100%`; `EnglishTutor.Console 92.7%`; geral 94,3% (235/249 linhas) | ✅ |
+| D4 | `dotnet format --verify-no-changes` → saída vazia, exit 0. Na primeira execução falhou com IDE1006 (constantes privadas sem `_`); corrigido em 03d87d5 e d21deae | ✅ |
+| D5 | `"/quit" \| dotnet run ...` → cabeçalho `Brain: ClaudeCode \| Mode: free-conversation` e a linha de dicas `/help`/`/quit`; `exit: 0`. **Ressalva:** a saída também mostra `The tutor is not connected yet.`, porque o Windows PowerShell 5.1 coloca BOM UTF-8 (`EF BB BF`, conferido com `od -c`) no texto enviado ao processo. A linha chega como `"﻿/quit"`, não é reconhecida como comando e o processo termina com 0 pelo EOF. Sem BOM (`printf '/quit\nhello\n' \| EnglishTutor.Console.exe` no Git Bash), o `/quit` encerra com 0 e `hello` não é lido. Ver **P12** | ⚠️ resultado esperado obtido, defeito encontrado |
+| D6 | `Invalid configuration:` / `  Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.`; `exit: 2`; `Env:Brain__Provider` removida | ✅ |
+| D7 | `logs/englishtutor-20261017.log` (CLEF); linhas com `"EventId":{"Id":1000,"Name":"ApplicationStarted"}` (`Provider`, `Mode`) e `{"Id":1001,"Name":"ApplicationStopped"}` (`ExitCode`, `ElapsedMs`); D6 gerou `StartupFailed` (1002) + `ApplicationStopped` com `ExitCode` 2 | ✅ |
+| D8 | `dotnet test --filter "FullyQualifiedName~CoreDependencyTests"` → 3 passed (Core.Tests); Console.Tests: nenhum teste corresponde (esperado) | ✅ |
+| D9 | `dotnet list ... package` → só `Microsoft.Extensions.DependencyInjection.Abstractions 10.0.13` e `Microsoft.Extensions.Options 10.0.13`; `reference` → "Não há nenhuma referência Projeto para Projeto" | ✅ |
+| D10 | `ci.yml`: `push`/`pull_request` em `[develop, main]`; `runs-on: ubuntu-latest`; `setup-dotnet@v4` com `global-json-file: global.json`; passo `dotnet --version`; `dotnet build`; `dotnet test --no-build --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults`; ReportGenerator `MarkdownSummaryGithub` → `$GITHUB_STEP_SUMMARY` (nome `SummaryGithub.md` conferido localmente); `upload-artifact@v4`. Primeira execução no GitHub: pendente de push do usuário | ✅ (inspeção) |
+| D11 | `"hello" \| dotnet run ...` → `The tutor is not connected yet.`; `exit: 0` | ✅ |
+| D12 | `git status --short` vazio após D3–D7 e D11; `git check-ignore` confirma `logs`, `TestResults` e `coverage` | ✅ (repetir após D13) |
+| D13 | **Pendente do usuário** (manual, exige terminal interativo). O Ctrl+C/cancelamento é coberto automaticamente por `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` | ⏳ |
+
+Contagem final: 31 métodos / 44 casos, como previsto no §4. Pacotes: nenhuma versão mudou.
 
 ### T2 — Red de demonstração (2026-10-17, revertido sem commit)
 
