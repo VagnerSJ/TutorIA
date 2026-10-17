@@ -200,7 +200,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** com `TreatWarningsAsErrors`, `result.IsValid.Should().BeTrue();` seguido de `result.Reply.Reply` gera CS8602, porque o `[MemberNotNullWhen]` de `IsValid` só vale em `if (result.IsValid)` ou `Debug.Assert`. Foi preciso `!` depois de verificar `IsValid` (ex.: `result.Reply!.IsRawFallback`).
 - **Por que importa:** cada teste novo sobre `TutorReplyParseResult` (US-003 em diante) repete o tropeço e o Red vira erro de compilação (AP-013).
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "FluentAssertions 7 não propaga nulidade; depois de `result.IsValid.Should().BeTrue()`, acesse `result.Reply!` (o `!` é seguro porque a asserção anterior falha o teste). Não usar `if` no teste para contornar".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17; `.claude/skills/tdd-dotnet/SKILL.md`, seção Organização)
 
 ### AP-021 — PowerShell 5.1: `git commit -m @'...'@` quebra os argumentos
 

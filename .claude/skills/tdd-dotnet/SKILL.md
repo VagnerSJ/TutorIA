@@ -32,6 +32,7 @@ tests/EnglishTutor.Infrastructure.Tests/
 - Método: `Metodo_Cenario_ResultadoEsperado` (ex.: `SendAsync_WhenBrainReturnsInvalidFormatTwice_ReturnsRawFallback`).
 - Cite a regra/US no topo do teste: `// US-003 / RN-BRAIN04`.
 - Estrutura Arrange / Act / Assert separada por linha em branco (sem comentários `// Arrange`).
+- FluentAssertions 7 não informa a análise de nulidade: depois de `result.IsValid.Should().BeTrue()`, o `[MemberNotNullWhen]` não vale e `result.Reply.Reply` gera CS8602 (erro, com `TreatWarningsAsErrors`). Acesse `result.Reply!` (o `!` é seguro porque a asserção anterior já falha o teste); idem `result.Rejection!` depois de `IsValid.Should().BeFalse()`. Não use `if` no teste para contornar (AP-020).
 
 ## Fakes x mocks
 
