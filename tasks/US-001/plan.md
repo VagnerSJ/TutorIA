@@ -1,6 +1,6 @@
 # Plano — US-001 Fundação da solução e configuração
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-17
 Branch: feature/US-001_fundacao-solucao
 Spec: specs/sprints/SPRINT_1.md#us-001
 Regras: RN-CONV01 (modo padrão), RN-CONV06, ARCHITECTURE §2 (R1–R4), §3, §9, §10; ADR-003, ADR-004 (Proposto)
@@ -245,6 +245,12 @@ Executar a partir da raiz do repositório, em PowerShell.
 | D12 | `git status --short` após D5–D7 e D11 | nenhum arquivo de `logs/`, `TestResults/` ou `coverage/` aparece (ignorados) |
 
 E também (DoD comum): todo cenário BDD com teste escrito antes do código (exceto os testes de guarda de T2, com Red demonstrado e registrado); `review.md` sem bloqueantes; `docs/us/US-001.md` criado; ADR-004 aceito pelo usuário e `ARCHITECTURE.md` atualizado; merge em `develop`.
+
+### Respostas do usuário (2026-10-17)
+
+Aprovadas no chat as respostas padrão de P1–P9 e o ADR-004 (Aceito): P1 criar `tests/EnglishTutor.Console.Tests`; P2 listar só os comandos implementados; P3 modo padrão fixo (RN-CONV01), sem chave de configuração; P4 `Brain:Provider` sem diferenciar maiúsculas; P5 porta `IChatInputHandler` com fake nos testes; P6 FluentAssertions 7.x; P7 logs só em arquivo; P8 códigos de saída 0/1/2; P9 incluir o CI agora.
+
+Nota do orquestrador: o SDK 10.0.402 já está instalado (`dotnet --list-sdks`); a pré-condição do §5 está satisfeita.
 
 ## 11. Evidências
 

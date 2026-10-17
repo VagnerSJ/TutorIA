@@ -1,6 +1,6 @@
 # ADR-004 — Fundação da solução: Generic Host, configuração validada no Core, logs só em arquivo e testes do console em processo
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-17)
 - **Data:** 2026-10-17
 - **US relacionadas:** US-001 (base para todas as seguintes)
 
