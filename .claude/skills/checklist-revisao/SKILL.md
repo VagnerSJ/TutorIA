@@ -20,6 +20,9 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Riscos técnicos e ambiguidades que travariam o Executor estão tratados ou viraram pergunta em aberto.
 - Viabilidade técnica no SDK e nas bibliotecas em uso.
 
+## Como escrever bloqueantes e sugestões
+- Descreva o **efeito esperado** e onde está o problema, não a técnica de implementação ou de teste. Ex.: "a mensagem de configuração inválida não pode se perder se o cancelamento chegar durante a escrita", e não "teste com token já cancelado". Cabe ao Executor escolher a técnica e confirmar que o Red falha pelo motivo certo (AP-010).
+
 ## 1. Spec e regras
 - [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código).
 - [O] Comportamento implementado bate com os cenários (valores, mensagens, códigos de saída).
