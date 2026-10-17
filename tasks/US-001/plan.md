@@ -191,7 +191,7 @@ Alternativas descartadas (detalhes no ADR-004):
 | (apoio: texto livre não é comando) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenUserTypesText_ForwardsItToInputHandler` | Componente |
 | (apoio: linha em branco não vai ao cérebro, RN-CONV05) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenLineIsBlank_IgnoresItAndForwardsNothing` (`[Theory]`: `""`, `"   "`, `"\t"`) | Componente |
 | (apoio: pipe sem `/quit`, D5/D11) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenInputEnds_ReturnsZero` | Componente |
-| (apoio: BOM da entrada redirecionada, P12, D5) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado) | Componente |
+| (apoio: BOM da entrada redirecionada, P12, D5) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"FEFF/quit"` → 0, nada encaminhado) | Componente |
 | (apoio: só a primeira linha perde o BOM, P12) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenLaterLineStartsWithByteOrderMark_ForwardsItUnchanged` (`"hello"`, `"﻿/quit"` → os dois encaminhados sem alteração) | Componente |
 | (apoio: implementação provisória sem cérebro, D11) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenUserTypesText_ShowsTutorNotConnected` (entrada `"hello"`) | Componente |
 | (apoio: erro inesperado, P8) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter` na saída; código 1, mensagem curta em `Error`, evento `UnexpectedError` no arquivo) | Componente |
@@ -286,7 +286,7 @@ P1–P9 foram respondidas em 2026-10-17 (ver "Respostas do usuário" abaixo). No
 - **P10 — `Microsoft.Extensions.Primitives` no Core** (S6). É dependência transitiva do `Microsoft.Extensions.Options` e pode aparecer em `GetReferencedAssemblies` se o Core usar tipos como `IChangeToken`. **Padrão proposto:** aceitar no teste de reflexão só como transitiva; proibir como `PackageReference` direto (teste do `.csproj` e D9); sem mudança na ARCHITECTURE §2, que trata de dependências diretas.
 - **P11 — Runner do CI** (S12). **Padrão proposto:** `ubuntu-latest` (mais rápido; nada específico de Windows nesta US). Rever quando entrar um adaptador só para Windows (ex.: TTS do sistema). Alternativa: `windows-latest`, igual à máquina de desenvolvimento.
 
-- **P12 — BOM no início da entrada redirecionada** (encontrada pelo Executor no D5, 2026-10-17). O Windows PowerShell 5.1 envia o BOM UTF-8 antes do texto em `"/quit" | dotnet run ...`. O `Console.In` entrega `"﻿/quit"`, `Trim()` não remove `U+FEFF` e o `/quit` vira texto livre: na US-001 mostra "not connected"; a partir da US-003/004, iria para o cérebro, violando RN-CONV06. **Proposta:** o `ChatSession` (UI, porque é um detalhe da entrada padrão) remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado). Alternativa: o `LocalCommandParser` ignora `U+FEFF` no `Trim` (regra no Core, vale para qualquer UI). **Resolvido** (2026-10-17): proposta aprovada (ver "Respostas do usuário") e implementada em 388afee (teste) + e71b316 (correção); D5 refeito sem ressalva.
+- **P12 — BOM no início da entrada redirecionada** (encontrada pelo Executor no D5, 2026-10-17). O Windows PowerShell 5.1 envia o BOM UTF-8 antes do texto em `"/quit" | dotnet run ...`. O `Console.In` entrega `"﻿/quit"`, `Trim()` não remove `U+FEFF` e o `/quit` vira texto livre: na US-001 mostra "not connected"; a partir da US-003/004, iria para o cérebro, violando RN-CONV06. **Proposta:** o `ChatSession` (UI, porque é um detalhe da entrada padrão) remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"FEFF/quit"` → 0, nada encaminhado). Alternativa: o `LocalCommandParser` ignora `U+FEFF` no `Trim` (regra no Core, vale para qualquer UI). **Resolvido** (2026-10-17): proposta aprovada (ver "Respostas do usuário") e implementada em 388afee (teste) + e71b316 (correção); D5 refeito sem ressalva.
 
 Perguntas anteriores (respondidas):
 
@@ -331,7 +331,7 @@ Nota do orquestrador: o SDK 10.0.402 já está instalado (`dotnet --list-sdks`);
 
 Reaprovação (2026-10-17), no chat, do plano revisado com S1–S14 (commit 250b065) e das respostas padrão: P10 aceitar `Microsoft.Extensions.Primitives` no Core só como dependência transitiva do Options (proibido como `PackageReference` direto); P11 CI em `ubuntu-latest`, revendo quando entrar adaptador só para Windows.
 
-Decisão P12 (2026-10-17), no chat: aprovada a proposta — o `ChatSession` remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado). O `LocalCommandParser` não muda. O Executor implementa em TDD (par `test(console)` + `fix(console)`), atualiza a contagem de testes no §4/D2 e refaz D2, D3b, D4 e D5 nas Evidências.
+Decisão P12 (2026-10-17), no chat: aprovada a proposta — o `ChatSession` remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"FEFF/quit"` → 0, nada encaminhado). O `LocalCommandParser` não muda. O Executor implementa em TDD (par `test(console)` + `fix(console)`), atualiza a contagem de testes no §4/D2 e refaz D2, D3b, D4 e D5 nas Evidências.
 
 ## 11. Evidências
 
@@ -426,3 +426,14 @@ Pedido do usuário no chat (transcrito pelo orquestrador): incorporar ao plano *
   → Incorporado em §2.5: assinatura com `[NotNullWhen(true)]`; `Name` como digitado, com barra; `"/"` → `true`, `Unknown`, `Name = "/"`, mensagem `Unknown command "/".`. §4: `TryParse_WhenSlashCommandIsUnknown_ReturnsUnknownCommand` virou `[Theory]` com `/xyz`, `/` e `/mode interview`.
 - **S14** — `Program.cs` como "Alterar" (já existe desde a T1) no §3 e na T7.
   → Incorporado no §3 ("Alterar (T8)") e no §5. Com a renumeração, a tarefa de composição do host passou a ser a T8.
+
+### 2026-10-17 — Aplicar as sugestões S1–S4 da revisão de código (review.md, Rodada 1)
+
+Pedido do usuário no chat (transcrito pelo orquestrador): aplicar S1–S4 de [review.md](review.md) em TDD antes da documentação; S5–S7 ficam para depois (pendências registradas na documentação). Depois, nova rodada do Revisor.
+
+- **R1-S1** — Trocar o caractere U+FEFF literal por escape `'\uFEFF'` / `"\uFEFF/quit"` em `src/EnglishTutor.Console/Ui/ChatSession.cs` e `tests/EnglishTutor.Console.Tests/Ui/ChatSessionTests.cs` (refactor, sem mudança de comportamento; também no texto da decisão P12 neste plano).
+- **R1-S2** — Falha ao montar o host (`BuildHost`, ex.: `appsettings.json` inválido ou seção `Serilog` mal configurada) deve resultar em mensagem curta em `Error` e `ExitCodes.UnexpectedError` (1), sem stack trace (P8). Teste novo em `EnglishTutorAppTests`.
+- **R1-S3** — A escrita da mensagem de configuração inválida usa `CancellationToken.None`, como o caminho de erro inesperado. Teste novo: configuração inválida com token já cancelado ainda escreve a mensagem e retorna 2.
+- **R1-S4** — `ApplicationStopped` não deve registrar `ExitCode` 1 quando um `OperationCanceledException` externo propaga: registrar o código real ou indicar saída anormal. Teste novo cobrindo o evento logado nesse caminho.
+
+Executor: atualizar §3/§4/§5 (contagens, nova tarefa T14 para S1–S4), D2 e Evidências (refazer D1–D4 e D5); aproveitar para corrigir o texto do §3 sobre `RepositoryRoot.cs` (já commitado em 1ca6aed).
