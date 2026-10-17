@@ -61,47 +61,7 @@ public sealed partial class TutorReplyParser(ILogger<TutorReplyParser> logger)
         var feedbackMatch = FeedbackBlock().Match(rawText);
         if (feedbackMatch.Success)
         {
-            foreach (var rawLine in feedbackMatch.Groups[1].Value.Split('\n'))
-            {
-                var line = rawLine.Trim();
-                if (line.Length > 0 && line[0] is '-' or '*' or '•')
-                {
-                    line = line[1..].Trim();
-                }
-
-                if (line.Length == 0)
-                {
-                    continue;
-                }
-
-                var label = _labels.FirstOrDefault(l => line.StartsWith(l + ":", StringComparison.OrdinalIgnoreCase));
-                if (label is not null)
-                {
-                    if (!labeled.TryGetValue(label, out var values))
-                    {
-                        values = [];
-                        labeled[label] = values;
-                    }
-
-                    values.Add(line[(label.Length + 1)..].Trim());
-                    continue;
-                }
-
-                var arrow = line.IndexOf('→', StringComparison.Ordinal);
-                var ascii = line.IndexOf("->", StringComparison.Ordinal);
-                var (index, length) = arrow >= 0 && (ascii < 0 || arrow < ascii) ? (arrow, 1) : (ascii, 2);
-                if (index < 0)
-                {
-                    continue;
-                }
-
-                var original = line[..index].Trim();
-                var right = line[(index + length)..].Trim();
-                var explained = CorrectedWithExplanation().Match(right);
-                corrections.Add(explained.Success
-                    ? new Correction(original, explained.Groups[1].Value.Trim(), explained.Groups[2].Value.Trim())
-                    : new Correction(original, right, string.Empty));
-            }
+            ReadFeedbackLines(feedbackMatch.Groups[1].Value, corrections, labeled);
         }
 
         var candidate = new TutorReply(
@@ -113,6 +73,74 @@ public sealed partial class TutorReplyParser(ILogger<TutorReplyParser> logger)
             IsRawFallback: false,
             RawText: rawText);
         return ValidateAndLog(candidate);
+    }
+
+    // Each line: optional "-", "*" or "•" marker; "Label: value" or "original → corrected (explanation)".
+    // Any other line is ignored.
+    private static void ReadFeedbackLines(
+        string feedback,
+        List<Correction> corrections,
+        Dictionary<string, List<string>> labeled)
+    {
+        foreach (var rawLine in feedback.Split('\n'))
+        {
+            var line = StripMarker(rawLine.Trim());
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (TryReadLabeled(line, labeled))
+            {
+                continue;
+            }
+
+            if (TryReadCorrection(line, out var correction))
+            {
+                corrections.Add(correction);
+            }
+        }
+    }
+
+    private static string StripMarker(string line) =>
+        line.Length > 0 && line[0] is '-' or '*' or '•' ? line[1..].Trim() : line;
+
+    private static bool TryReadLabeled(string line, Dictionary<string, List<string>> labeled)
+    {
+        var label = _labels.FirstOrDefault(l => line.StartsWith(l + ":", StringComparison.OrdinalIgnoreCase));
+        if (label is null)
+        {
+            return false;
+        }
+
+        if (!labeled.TryGetValue(label, out var values))
+        {
+            values = [];
+            labeled[label] = values;
+        }
+
+        values.Add(line[(label.Length + 1)..].Trim());
+        return true;
+    }
+
+    private static bool TryReadCorrection(string line, [NotNullWhen(true)] out Correction? correction)
+    {
+        var arrow = line.IndexOf('→', StringComparison.Ordinal);
+        var ascii = line.IndexOf("->", StringComparison.Ordinal);
+        var (index, length) = arrow >= 0 && (ascii < 0 || arrow < ascii) ? (arrow, 1) : (ascii, 2);
+        if (index < 0)
+        {
+            correction = null;
+            return false;
+        }
+
+        var original = line[..index].Trim();
+        var right = line[(index + length)..].Trim();
+        var explained = CorrectedWithExplanation().Match(right);
+        correction = explained.Success
+            ? new Correction(original, explained.Groups[1].Value.Trim(), explained.Groups[2].Value.Trim())
+            : new Correction(original, right, string.Empty);
+        return true;
     }
 
     private static string? Join(Dictionary<string, List<string>> labeled, string label) =>
