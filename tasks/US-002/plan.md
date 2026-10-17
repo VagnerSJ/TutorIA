@@ -210,7 +210,7 @@ Repetições das regras do parser em `CLAUDE.md` e skills (Grep por `parser|Tuto
 | Criar | `src/EnglishTutor.Core/Brain/TutorReplyRejection.cs` | Motivo + mensagem | Criado em 877fbe6 |
 | Criar | `src/EnglishTutor.Core/Brain/TutorReplyRejections.cs` | Catálogo de motivos e mensagens | Criado em 877fbe6 (esqueleto), implementado em dbe7b8a |
 | Criar | `src/EnglishTutor.Core/Brain/TutorReplyParseResult.cs` | Resultado válido/inválido + avisos (`IsValid` armazenada, §2.1) | Criado em 877fbe6 (esqueleto), fábricas em dbe7b8a |
-| Criar | `src/EnglishTutor.Core/Brain/TutorReplyValidator.cs` | Regras RN-FEED01/02 verificáveis | Criado em 68c5c73 (esqueleto), implementado em 933199b e df0f68a |
+| Criar | `src/EnglishTutor.Core/Brain/TutorReplyValidator.cs` | Regras RN-FEED01/02 verificáveis | Criado em 68c5c73 (esqueleto), implementado em 933199b e df0f68a; `IsRawFallback` preservado em f17a5ed (S4) |
 | Criar | `src/EnglishTutor.Core/Brain/FeedbackFormatter.cs` | Linhas de feedback exibidas | Criado em 3e7705d (esqueleto), implementado em 731399b |
 | Criar | `src/EnglishTutor.Infrastructure/Brain/TutorReplyParser.cs` | `sealed partial class`: detecção JSON/tags, extração, `[GeneratedRegex]`, delegação ao validador, log dos avisos | Criado em 6c9a49f (esqueleto); JSON em ea150a5; tags em 2ee4cb0; refactor em 2507990 |
 | Criar | `src/EnglishTutor.Infrastructure/Brain/TutorReplyParserLog.cs` | `[LoggerMessage]` 2000 | Criado em 6c9a49f |
@@ -218,9 +218,9 @@ Repetições das regras do parser em `CLAUDE.md` e skills (Grep por `parser|Tuto
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/RecordingLogger.cs` | Logger fake que registra entradas | Criado em d5694e5 |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/Fixture.cs` | Leitura de fixtures | Criado em d5694e5 |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/TutorReply/*` | 7 fixtures (§2.3) | Criadas em d5694e5 |
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/TutorReplyParserTests.cs` | Cenários da US pelo parser | Criado em 6c9a49f (JSON); tags em fb7fdeb |
-| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyRejectionsTests.cs` | Mensagens dizem o que falta e o que se espera (D6) | Criado em 877fbe6 |
-| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyValidatorTests.cs` | Regras de conteúdo | Criado em 68c5c73; ampliado em c1024be |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/TutorReplyParserTests.cs` | Cenários da US pelo parser | Criado em 6c9a49f (JSON); tags em fb7fdeb; asserções de `invalid JSON` reforçadas em f3c8b36 (S1) |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyRejectionsTests.cs` | Mensagens dizem o que falta e o que se espera (D6) | Criado em 877fbe6; corte do reply e ponto final em e8f5f00 (S3) |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyValidatorTests.cs` | Regras de conteúdo | Criado em 68c5c73; ampliado em c1024be e 4a5df2b (S4) |
 | Criar | `tests/EnglishTutor.Core.Tests/Brain/FeedbackFormatterTests.cs` | Texto do feedback | Criado em 3e7705d |
 
 ## 4. Mapa cenário BDD → testes
@@ -281,7 +281,7 @@ Pré-condição (ponto único, S7): na aprovação do plano e **antes da T1**, o
 - [x] T6 — Red: esqueleto de `TutorReplyParser` (`sealed partial class`, + `TutorReplyParserLog`) e testes JSON: `JsonIsValid`, `JsonHasLeadingWhitespace` (P7), `JsonReplyIsMissingNullOrEmpty`, `JsonIsMalformed`, `JsonHasTrailingText` (P5), `JsonCorrectionsIsNotArray`, `JsonReplyHasNoFinalQuestion`, `JsonHasThreeCorrections` (log), `JsonHasNoCorrectionsAndPraise`, `KeepsRawTextAndIsNotRawFallback` (entrada JSON, `json-valid.json`, S11) (10 métodos, todos com entrada que começa com `{` após `Trim()`). Green: detecção + caminho JSON + log dos avisos. **Estado do caminho não-JSON ao fim da T6:** o ramo "senão → tags" chama um método privado `ParseTags(string rawText)` cujo corpo é só `throw new NotImplementedException("Tag format: implemented in T7.")`; o Green da T6 não monta candidato nem chama o validador nesse ramo. Assim `JsonHasLeadingWhitespace` só passa se a detecção fizer `Trim()` antes de olhar o `{` (sem o `Trim`, cai no ramo de tags e lança). Os `[GeneratedRegex]` das tags ainda não existem na T6. (commits: `test(infra): parse canonical json tutor reply` + `feat(infra): parse json tutor reply with shared validation`) — feito: 6c9a49f (Red: 13 casos com NotImplementedException), ea150a5
 - [x] T7 — Red: testes de tags e fora do formato: `TagsAreValid`, `TagsCorrectionLineVaries`, `TagsHaveLabeledFeedbackLines`, `TagsRepeatLabeledLine` (P9), `TagsHaveNoFeedbackBlock`, `TagsReplyHasNoFinalQuestion`, `TextHasNoJsonNorTags`, `JsonIsInFenceOrAfterText` (P5) (8 métodos). Todos passam pelo ramo de tags, então no Red todos falham com a `NotImplementedException` de `ParseTags` deixada pela T6, inclusive `TextHasNoJsonNorTags` e `JsonIsInFenceOrAfterText` (nenhum é teste de regressão). Antes do Green, o Executor confere no Red que a falha de cada um é essa exceção e não outra. Green: caminho tags com `[GeneratedRegex]` (métodos `static partial` na própria `TutorReplyParser`), substituindo o `throw`. Refactor: extrair a leitura de linhas de feedback em método privado. (commits: `test(infra): parse tagged tutor reply` + `feat(infra): parse tagged tutor reply`) — feito: fb7fdeb (Red: os 11 casos dos 8 métodos falharam com `NotImplementedException: Tag format: implemented in T7.`), 2ee4cb0, refactor 2507990
 - [x] T8 — DoD: rodar D1–D11, colar em §11, atualizar §3/§5 com os commits (AP-005). (commit: `docs(ai): add DoD evidence for US-002`) — feito: evidências em §11 (commit `docs(ai): add DoD evidence for US-002`)
-- [ ] T9 — Sugestões S1, S3 e S4 da revisão de código (`review.md`, Rodada 1; pedido do usuário na §12). S1: asserções mais fortes nos dois testes `invalid JSON` do parser, com Red mostrado por mutação temporária não commitada (mensagem só `"invalid JSON: " + ex.Message`). S3: 3 testes no `TutorReplyRejectionsTests`, Red por mutação temporária (o código já se comporta assim). S4: teste no validador (Red real) e remoção do `IsRawFallback = false` forçado. Depois, DoD D1–D11 de novo e §11 atualizada. (commits: `test(infra): ...`, `test(core): ...`, `test(core): ...` + `fix(core): ...`, `docs(ai): ...`)
+- [x] T9 — Sugestões S1, S3 e S4 da revisão de código (`review.md`, Rodada 1; pedido do usuário na §12). S1: asserções mais fortes nos dois testes `invalid JSON` do parser, com Red mostrado por mutação temporária não commitada (mensagem só `"invalid JSON: " + ex.Message`). S3: 3 testes no `TutorReplyRejectionsTests`, Red por mutação temporária (o código já se comporta assim). S4: teste no validador (Red real) e remoção do `IsRawFallback = false` forçado. Depois, DoD D1–D11 de novo e §11 atualizada. (commits: `test(infra): ...`, `test(core): ...`, `test(core): ...` + `fix(core): ...`, `docs(ai): ...`) — feito: escolhas na §12 em 053779d; S1 f3c8b36 (Red por mutação: os 2 testes falharam em `to contain "Expected a single JSON object {"reply": string"`); S3 e8f5f00 (Red por mutação: sem corte e sem `TrimEnd` → 2 falhas; `>=` no lugar de `>` → falha o teste dos 80 caracteres); S4 4a5df2b (Red real: `Expected result.Reply!.IsRawFallback to be True, but found False`) + f17a5ed
 
 ## 6. Pacotes NuGet
 
@@ -364,17 +364,17 @@ E também (DoD comum): todo cenário BDD com teste escrito antes do código; `re
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
 
-Todos os comandos rodados em 2026-10-17 sobre o commit `2507990` (último commit de código da US), na raiz do repositório.
+**Rodada 2 (após a T9, sugestões S1/S3/S4 da revisão):** todos os comandos rodados de novo em 2026-10-17 sobre o commit `f17a5ed` (último commit de código), na raiz do repositório. Os resultados abaixo substituem os da rodada 1 (commit `2507990`); o que mudou foi D2/D3 (93 → 97 casos) e D6 (4 → 7 casos).
 
 | # | Comando | Resultado | Status |
 |---|---|---|---|
-| D1 | `dotnet build` (e `dotnet build --no-incremental`) | `Compilação com êxito. 0 Aviso(s) 0 Erro(s)`; sem CS8775 em `TutorReplyParseResult` | ✅ |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | 93 casos verdes: Core.Tests 47/47 (114 ms), Infrastructure.Tests 24/24 (132 ms), Console.Tests 22/22 (404 ms); comando inteiro 6,5 s (`Measure-Command`), sem rede nem GPU | ✅ |
-| D3 | `Remove-Item ...; dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` | 93 verdes; 3 arquivos `coverage.cobertura.xml` gerados (um por projeto de teste) | ✅ |
-| D3b | `dotnet tool restore; dotnet reportgenerator ... -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | `EnglishTutor.Core 100%` (todas as classes de `Brain/` a 100%); `EnglishTutor.Infrastructure 81.6%` (informativo: `TutorReplyParser` 94.8%, `TutorReplyParserLog` 100%, código gerado do `[GeneratedRegex]` 79%); total 86.2% | ✅ |
+| D1 | `dotnet build --no-incremental` | `0 Aviso(s) 0 Erro(s)`; sem CS8775 em `TutorReplyParseResult` | ✅ |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | 97 casos verdes: Core.Tests 51/51 (192 ms), Infrastructure.Tests 24/24 (187 ms), Console.Tests 22/22 (494 ms); comando inteiro 6,8 s (`Measure-Command`), sem rede nem GPU | ✅ |
+| D3 | `Remove-Item ...; dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` | 97 verdes; 3 arquivos `coverage.cobertura.xml` gerados (um por projeto de teste) | ✅ |
+| D3b | `dotnet tool restore; dotnet reportgenerator ... -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | `EnglishTutor.Core 100%` (todas as classes de `Brain/` a 100%); `EnglishTutor.Infrastructure 81.6%` (informativo: `TutorReplyParser` 94.8%, `TutorReplyParserLog` 100%, código gerado do `[GeneratedRegex]` 79–83%); total 86.2% (sem mudança: a T9 não acrescentou linha de produção, só removeu uma) | ✅ |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças, código de saída 0 | ✅ |
 | D5 | `dotnet test --filter "FullyQualifiedName~TutorReplyParser"` | Infrastructure.Tests: 24/24 verdes (18 métodos: 14 `[Fact]` + 4 `[Theory]` com 3, 3, 2 e 2 casos), incluindo fixtures JSON e tags e os casos de P5, P7 e P9; Core/Console: "Nenhum teste corresponde ao filtro" (esperado) | ✅ |
-| D6 | `dotnet test --filter "FullyQualifiedName~TutorReplyRejectionsTests"` | 4/4 verdes. Mensagens geradas (abaixo) | ✅ |
+| D6 | `dotnet test --filter "FullyQualifiedName~TutorReplyRejectionsTests"` | 7/7 verdes (4 casos do D6 + 3 da S3). Mensagens geradas (abaixo, sem mudança de texto) | ✅ |
 | D7 | `dotnet test --filter "FullyQualifiedName~CoreDependencyTests"`; `dotnet list src/EnglishTutor.Core package` | 3/3 verdes; pacotes: `Microsoft.Extensions.DependencyInjection.Abstractions 10.0.13`, `Microsoft.Extensions.Options 10.0.13` | ✅ |
 | D8 | `dotnet list src/EnglishTutor.Infrastructure package` | só `Microsoft.Extensions.Logging.Abstractions 10.0.13` | ✅ |
 | D9 | `dotnet sln EnglishTutor.slnx list` | lista os 6 projetos, inclusive `tests\EnglishTutor.Infrastructure.Tests\EnglishTutor.Infrastructure.Tests.csproj` | ✅ |
@@ -391,7 +391,7 @@ invalid JSON: Expected depth to be zero at the end of the JSON payload. There is
 invalid corrections: "corrections" is a string. Expected an array of objects {"original", "corrected", "explanation"} (an empty array when there are no errors).
 ```
 
-Observação: o detalhe da `JsonException` às vezes já começa com "Expected ..." (como acima). Por isso os testes de parser que conferem `Contain("Expected ")` no caso `invalid JSON` são fracos para garantir o sufixo do catálogo; o sufixo é garantido pelo `TutorReplyRejectionsTests`, cujo detalhe não contém "Expected".
+Observação: o detalhe da `JsonException` às vezes já começa com "Expected ..." (como acima). Por isso os testes de parser que conferem `Contain("Expected ")` no caso `invalid JSON` são fracos para garantir o sufixo do catálogo; o sufixo é garantido pelo `TutorReplyRejectionsTests`, cujo detalhe não contém "Expected". **Resolvido na T9 (S1, f3c8b36):** os dois testes do parser conferem agora `Expected a single JSON object {"reply": string` e o final `with no text around it.`, que só o catálogo produz.
 
 ## 12. Comentários do usuário
 
@@ -462,3 +462,4 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
   - **S3** — limite do corte: reply com **até 80** caracteres é citado inteiro; com 81 ou mais, os 80 primeiros + `...` (o que a tabela da §2.1 já diz e o código já faz). Detalhe terminado em `.` gera `<detalhe>. Expected ...`, sem `..`. Nomes: `ReplyMustEndWithQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis`, `ReplyMustEndWithQuestion_WhenReplyHas80Characters_QuotesItWhole`, `InvalidJson_WhenDetailEndsWithPeriod_HasSinglePeriodBeforeExpected`. Red por mutação temporária (sem corte; sem `TrimEnd('.')`), porque o código já tem o comportamento.
   - **S4** — §2.1 regra 6 reescrita: `RawText` e `IsRawFallback` preservados como vieram no candidato. Teste `Validate_WhenCandidateIsRawFallback_PreservesRawFallbackAndRawText` (Red real) e remoção da linha `IsRawFallback = false` do `with` no `TutorReplyValidator`.
   - Contagens: §4 passa a 35 métodos / 48 casos; D2 a 97 casos (Core.Tests 51); D6 a 7 casos; D5 continua 18 / 24.
+  - Status (confirmação fica para a próxima rodada do Revisor): S1 aplicada em f3c8b36; S3 em e8f5f00; S4 em 4a5df2b + f17a5ed. DoD D1–D11 rodada de novo sobre f17a5ed, toda verde (§11).
