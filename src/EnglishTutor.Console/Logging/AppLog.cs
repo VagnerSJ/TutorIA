@@ -23,4 +23,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1003, Level = LogLevel.Critical,
         Message = "Unexpected error; the application will exit")]
     public static partial void UnexpectedError(this ILogger logger, Exception exception);
+
+    // A cancellation that did not come from the app's tokens propagates: the process exit code is not known here.
+    [LoggerMessage(EventId = 1004, Level = LogLevel.Warning,
+        Message = "Application stopped abnormally after {ElapsedMs} ms; a cancellation not requested by the app propagated")]
+    public static partial void ApplicationAborted(this ILogger logger, long elapsedMs);
 }

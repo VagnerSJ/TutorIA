@@ -39,7 +39,8 @@ public static class EnglishTutorApp
         var timeProvider = host.Services.GetRequiredService<TimeProvider>();
         var startedAt = timeProvider.GetTimestamp();
 
-        var exitCode = ExitCodes.UnexpectedError;
+        // Stays null only when an exception propagates out of RunAsync (a foreign cancellation).
+        int? exitCode = null;
         var hostStarted = false;
         CancellationTokenSource? session = null;
         try
@@ -81,10 +82,17 @@ public static class EnglishTutorApp
             }
 
             var elapsedMs = ElapsedMs(timeProvider, startedAt);
-            logger.ApplicationStopped(exitCode, elapsedMs);
+            if (exitCode is { } code)
+            {
+                logger.ApplicationStopped(code, elapsedMs);
+            }
+            else
+            {
+                logger.ApplicationAborted(elapsedMs);
+            }
         }
 
-        return exitCode;
+        return exitCode.Value;
     }
 
     private static Task<int> RunSessionAsync(
