@@ -8,4 +8,8 @@ public sealed record TutorReply(
     string? Vocabulary,
     string? Praise,
     bool IsRawFallback,
-    string RawText);
+    string RawText)
+{
+    // RN-BRAIN04: after the second invalid answer the raw text is shown without feedback (P13).
+    public static TutorReply RawFallback(string rawText) => throw new NotImplementedException();
+}

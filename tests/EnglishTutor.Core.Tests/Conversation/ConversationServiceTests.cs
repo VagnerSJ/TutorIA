@@ -15,6 +15,9 @@ public sealed class ConversationServiceTests
     // Rejected first answer (raw1), different from every accepted answer (AP-017, S2).
     private const string _rejectedRawText = "rejected answer one";
 
+    // Second rejected answer (raw2), with surrounding spaces to show Reply is trimmed and RawText is not (P5, P13).
+    private const string _secondRawText = "  Plain answer without tags.\n";
+
     private readonly FakeTutorPromptSource _promptSource = new(_systemPrompt);
 
     private readonly RecordingLogger<ConversationService> _logger = new();
@@ -303,6 +306,62 @@ public sealed class ConversationServiceTests
         brain.Requests.Should().HaveCount(2);
         await sut.SendAsync("It was sunny", ct);
         brain.Requests[2].Messages.Should().Equal(UserTurn("It was sunny"));
+    }
+
+    // US-003 — Cenário: resposta crua após duas falhas — RN-BRAIN04 (P13)
+    [Fact]
+    public async Task SendAsync_WhenReplyIsInvalidTwice_ReturnsRawSecondAnswerWithoutFeedback()
+    {
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .ReturnsInvalid(_secondRawText, TutorReplyRejections.MissingReply());
+        var sut = CreateService(brain);
+
+        var result = await sut.SendAsync("I goed to the park", TestContext.Current.CancellationToken);
+
+        result.IsReplied.Should().BeTrue();
+        result.Reply!.Reply.Should().Be("Plain answer without tags.");
+        result.Reply!.Corrections.Should().BeEmpty();
+        FeedbackFormatter.Format(result.Reply!).Should().BeEmpty();
+        result.Reply!.IsRawFallback.Should().BeTrue();
+        result.Reply!.RawText.Should().Be(_secondRawText);
+    }
+
+    // US-003 — Cenário: resposta crua após duas falhas (apoio: log) — RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_WhenReplyIsInvalidTwice_LogsRawFallbackWarning()
+    {
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .ReturnsInvalid(_secondRawText, TutorReplyRejections.MissingReply());
+        var sut = CreateService(brain);
+
+        await sut.SendAsync("I goed to the park", TestContext.Current.CancellationToken);
+
+        _logger.Entries.Select(entry => entry.EventId.Id).Should().Equal(3000, 3001);
+        _logger.Entries.Should().OnlyContain(entry => entry.Level == LogLevel.Warning);
+        _logger.Entries.Should().NotContain(entry =>
+            entry.Message.Contains(_rejectedRawText, StringComparison.Ordinal)
+            || entry.Message.Contains(_secondRawText.Trim(), StringComparison.Ordinal));
+    }
+
+    // US-003 — Cenário: resposta crua após duas falhas (apoio) — RN-BRAIN04 (P5)
+    [Fact]
+    public async Task SendAsync_AfterRawFallbackTurn_SendsRawAnswerAsTutorMessage()
+    {
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .ReturnsInvalid(_secondRawText, TutorReplyRejections.MissingReply())
+            .Returns(TutorReplies.Valid("t2"));
+        var sut = CreateService(brain);
+        var ct = TestContext.Current.CancellationToken;
+        await sut.SendAsync("I goed to the park", ct);
+
+        await sut.SendAsync("It was sunny", ct);
+
+        brain.Requests[2].Messages[1].Should().Be(new BrainMessage(BrainRole.Assistant, _secondRawText));
+        brain.Requests[2].Messages.Should().NotContain(message =>
+            message.Content.Contains(_rejectedRawText, StringComparison.Ordinal));
     }
 
     private static BrainMessage UserTurn(string studentText) =>
