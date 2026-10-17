@@ -56,7 +56,8 @@ public static class EnglishTutorApp
         catch (OptionsValidationException exception)
         {
             logger.StartupFailed(string.Join(" ", exception.Failures));
-            await WriteInvalidConfigurationAsync(options.Error, exception, ct);
+            // CancellationToken.None: a cancellation arriving now must not hide the explanation.
+            await WriteInvalidConfigurationAsync(options.Error, exception, CancellationToken.None);
             exitCode = ExitCodes.InvalidConfiguration;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested || session is { IsCancellationRequested: true })
