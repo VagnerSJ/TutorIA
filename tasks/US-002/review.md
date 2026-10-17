@@ -96,3 +96,92 @@ Arquivos relevantes:
 - C:\Crescimento\TutorIA\tests\EnglishTutor.Core.Tests\Brain\TutorReplyRejectionsTests.cs
 - C:\Crescimento\TutorIA\.claude\agents\executor.md
 - C:\Crescimento\TutorIA\docs\aprendizados.md
+
+## Rodada 2
+
+Data: 2026-10-17
+Commits revisados: 053779d..d1c9128 (pedido do usuário em 8ab0b69; rodada 1 cobriu d5694e5..a7ecdd0)
+Resultado: APROVADO
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| Build sem warnings | ✅ (`dotnet build --no-incremental`: 0 avisos, 0 erros) |
+| Testes (exceto LiveBrain) | ✅ 97 passaram (Core.Tests 51, Infrastructure.Tests 24, Console.Tests 22) |
+| Cobertura de linhas do Core | 100% (Infrastructure 81,6%, informativo; total 86,2%) |
+| Cenários BDD com teste | 6/6 (sem mudança em relação à rodada 1) |
+| Teste antes do código (ordem de commits) | ✅ |
+| Evidências da DoD conferem | ✅ |
+| Intenção antes do código (spec/ADR → código) | ✅ (escolhas da T9 registradas na §12 e na §2.1 regra 6 em 053779d, antes de f3c8b36) |
+
+#### Detalhe das verificações
+
+- **Escopo da rodada.** O diff desde 8ab0b69 mexe em 5 arquivos: 1 linha removida em `TutorReplyValidator.cs`, testes novos ou reforçados em 3 arquivos de teste e o `plan.md` (§2.1 regra 6, §3, §4, §5 T9, §10 D2/D6, §11, §12). Nenhum código de produção mudou além da S4. S2 e S5 não foram tocadas, como o usuário pediu.
+- **Ordem.** O registro das escolhas (053779d, 15:43) vem antes de todos os testes. Depois vêm S1 com teste só (f3c8b36), S3 com teste só (e8f5f00), o Red da S4 (4a5df2b) seguido do fix (f17a5ed) e, por último, as evidências (d1c9128). Desta vez o AP-009 foi respeitado.
+- **Os testes novos falhariam sem o comportamento que fixam?** Fiz a análise lendo o código, sem rodar mutações, porque não edito arquivos.
+  - **S1.** A mutação `"invalid JSON: " + ex.Message` elimina o trecho `Expected a single JSON object {"reply": string` e o final `with no text around it.`. Esses dois trechos só existem em `TutorReplyRejections.cs:37-39`. Os dois testes do parser falham com ela.
+  - **S3, corte.**
+    - O reply de 81 caracteres termina o 80º caractere em `b`. Por isso, um corte em 79 também quebraria o `Contain`, e não só a ausência de corte.
+    - Trocar `>` por `>=` faz o teste dos 80 caracteres falhar no `NotContain("...")`. O texto fixo da mensagem não tem `...`, então essa asserção discrimina.
+  - **S3, ponto final.** Sem `TrimEnd('.')`, a mensagem traz `data.. Expected`, e tanto o `Contain` quanto o `NotContain("..")` falham. O catálogo não tem `..` em nenhum outro lugar.
+  - **S4.** Com a linha `IsRawFallback = false` de volta, o `with` força `false` e `result.Reply!.IsRawFallback.Should().BeTrue()` falha. Isso bate com o Red real colado na T9.
+- **Contagens.** A §4 fala em 35 métodos e 48 casos (31+4 e 44+4). D2 dá 97, igual ao que obtive. D5 dá 24/24, igual. D6 dá 7/7: com o filtro `FullyQualifiedName~TutorReplyRejectionsTests`, obtive 7 casos só no Core.Tests (4 do `[Theory]` + 3 `[Fact]` da S3).
+- **Documentação alinhada.** A §2.1 regra 6 agora diz "preservados como vieram no candidato", o que bate com o código. A `ARCHITECTURE.md` (linhas 100 e 130) e a `RN-BRAIN04` não afirmavam que o validador força `false`, então não há outra fonte a atualizar.
+- **Qualidade e segurança.** A rodada não trouxe `catch` novo, I/O, pacote ou configuração. O comentário novo em `TutorReplyParserTests.cs:11` está em inglês, como pede a regra de código.
+- **Caracteres invisíveis.** `git diff develop...HEAD | LC_ALL=C grep -c ...` imprime `0`.
+- **Git.** Os commits são convencionais, com escopo (`test(infra)`, `test(core)`, `fix(core)`, `docs(ai)`). A T9 está marcada `[x]` com os hashes, e a §3 foi atualizada (AP-005).
+
+#### Evidências (§11, rodada 2 sobre f17a5ed) × o que eu obtive
+
+| # | Evidência do Executor | Minha execução |
+|---|---|---|
+| D1 | 0 avisos, 0 erros | Igual |
+| D2 | 97 verdes (51/24/22) | Igual |
+| D3/D3b | Core 100%, Infrastructure 81,6%, total 86,2% | Igual. Todas as classes de `EnglishTutor.Core.Brain` a 100%. Gerei o `reportgenerator` e os resultados em `%TEMP%\us002r2`, fora do repositório |
+| D4 | Sem diferenças | Igual (código de saída 0) |
+| D5 | 24/24 | Igual |
+| D6 | 7/7, mensagens sem mudança de texto | Igual. Nenhuma linha de mensagem do catálogo mudou no diff |
+| D7 (testes) | 3/3 | Não rodei de novo isoladamente. Está incluído no D2 verde, e o diff não toca os `.csproj` |
+| D7/D8 (`dotnet list package`), D9 (`dotnet sln list`) | Conforme §11 | Comando fora da minha lista permitida: **evidência do Executor, não reproduzida**. O diff da rodada não altera `.csproj` nem `EnglishTutor.slnx`, então isso é coerente com a rodada 1 |
+| D10 | `git status` vazio | Igual |
+| D11a/b | `0` / sem saída | Igual (D11a) |
+
+### Itens da rodada anterior
+
+- [x] **S1** — resolvida em f3c8b36. Os dois testes `invalid JSON` do parser conferem `Expected a single JSON object {"reply": string` e `EndWith("with no text around it.")`. Esses trechos só existem no catálogo, então os testes falham se a mensagem trouxer apenas o texto da `JsonException`.
+- [ ] **S2** — não pedida pelo usuário (desvio aceito na §12). Não reaberta.
+- [x] **S3** — resolvida em e8f5f00. Três testes em `TutorReplyRejectionsTests` fixam:
+  - o corte em 80 caracteres + `...`;
+  - o limite (80 caracteres citados inteiros);
+  - a ausência de `..` antes de `Expected`.
+- [x] **S4** — resolvida em 4a5df2b (Red real) + f17a5ed. O validador preserva `IsRawFallback` e `RawText` do candidato, e a §2.1 regra 6 foi reescrita em 053779d.
+- [ ] **S5** — não pedida pelo usuário. Não reaberta.
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+
+- **S6** — `tests/EnglishTutor.Core.Tests/Brain/TutorReplyValidatorTests.cs:136`. O teste novo da S4 troca o `RawText` padrão (`"raw text"`, diferente do reply) por um valor igual ao `Reply` (`"What did you do?"`). Com isso, a asserção de `RawText` desse teste não distinguiria um validador que copiasse o reply normalizado para `RawText`. Hoje não há risco: `Validate_WhenNoCorrectionsAndNoPraise_IsValidWithoutWarnings` (linha 75) já fixa `RawText == "raw text"`. Esperado, quando alguém mexer nesse teste: que a preservação do texto cru seja conferida com um valor que não coincida com o reply. Cosmético, e não precisa ser aplicada nesta US.
+
+### Pontos positivos
+
+- **AP-009 respeitado nesta rodada.** As escolhas de forma (trecho exclusivo do catálogo, limite "até 80", reescrita da regra 6) foram para a §12 e a §2.1 num `docs(ai)` antes do primeiro teste. É a correção que a rodada 1 pediu.
+- **Testes que só fixam comportamento existente com Red declarado.** S1 e S3 não precisavam de código novo, e o Executor mostrou o Red por mutação temporária não commitada, descrevendo cada mutação na T9. As asserções discriminam de verdade: o `b` no 80º caractere separa um corte em 79 de um corte em 80, e o `NotContain("...")` pega a troca de `>` por `>=`.
+- O comentário da constante `_catalogJsonExpectation` explica por que o trecho foi escolhido (a `JsonException` também diz "Expected"). Isso evita que alguém volte a enfraquecer a asserção.
+- As evidências da §11 foram refeitas inteiras sobre f17a5ed e dizem o que mudou em relação à rodada 1 (D2/D3 de 93 para 97, D6 de 4 para 7). Todas as contagens batem com a minha execução.
+
+### Aprendizados para o processo
+
+- **O registro na §12 antes do código funcionou** quando o pedido do usuário já listava as mudanças, como foi o caso da T9. Isso reforça a sugestão da rodada 1: um ponto de parada explícito antes de cada `feat`/`fix` (na `tdd-dotnet` ou no `executor.md`) cobre também o caso em que a escolha surge no meio do Green, sem um pedido prévio do usuário. Sugiro registrar em `docs/aprendizados.md`, junto da recorrência do AP-009, que a T9 seguiu a regra.
+- **Red por mutação para testes que fixam comportamento já existente** (S1 e S3). O padrão que funcionou foi: mutação temporária, não commitada, descrita no plano com a mensagem de falha obtida. Sugiro incluir esse procedimento na skill `tdd-dotnet`, para testes de caracterização pedidos em revisão, ligado ao AP-010 (o Red precisa falhar pelo motivo certo).
+- **Valor de teste que coincide com outro campo** (S6, padrão leve). Quando um teste confere que um campo é preservado, o valor escolhido não deve coincidir com o de outro campo que o código poderia copiar por engano. Pode virar uma linha na `tdd-dotnet`, sem AP novo.
+
+Arquivos relevantes:
+- C:\Crescimento\TutorIA\tasks\US-002\plan.md
+- C:\Crescimento\TutorIA\tasks\US-002\review.md
+- C:\Crescimento\TutorIA\src\EnglishTutor.Core\Brain\TutorReplyValidator.cs
+- C:\Crescimento\TutorIA\src\EnglishTutor.Core\Brain\TutorReplyRejections.cs
+- C:\Crescimento\TutorIA\tests\EnglishTutor.Core.Tests\Brain\TutorReplyRejectionsTests.cs
+- C:\Crescimento\TutorIA\tests\EnglishTutor.Core.Tests\Brain\TutorReplyValidatorTests.cs
+- C:\Crescimento\TutorIA\tests\EnglishTutor.Infrastructure.Tests\Brain\TutorReplyParserTests.cs
