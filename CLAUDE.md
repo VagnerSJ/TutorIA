@@ -33,7 +33,7 @@ Toda funcionalidade é conduzida por `/us US-XXX`:
 ## Regras rápidas
 
 - .NET 10 / C# com `Nullable` e `TreatWarningsAsErrors`; testes com xUnit + FluentAssertions + NSubstitute.
-- `EnglishTutor.Core` não referencia pacotes externos (só BCL e `Microsoft.Extensions.*.Abstractions`).
+- `EnglishTutor.Core` não referencia pacotes externos (só BCL, `Microsoft.Extensions.*.Abstractions` e `Microsoft.Extensions.Options`).
 - `CancellationToken` em todo método assíncrono público.
 - Commits convencionais com escopo: `feat(core):`, `feat(brain):`, `test(core):`, `docs(ai):`, `chore(infra):`.
 - Branches: `main` (estável) ← `develop` (integração) ← `feature/US-XXX_slug`.
