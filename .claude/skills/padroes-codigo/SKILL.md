@@ -26,6 +26,8 @@ A estrutura de pastas e as camadas estão em `ARCHITECTURE.md` §2–§3. Aqui f
 | Campo privado | `_camelCase` | `_brain` |
 | Testes | `Metodo_Cenario_Resultado` | ver skill `tdd-dotnet` |
 
+Caracteres não imprimíveis ou invisíveis (BOM, espaço sem quebra, zero-width etc.) aparecem em código e testes **sempre como escape** (`'\uXXXX'`), nunca como caractere literal (AP-007).
+
 Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens exibidas ao aluno em inglês (ele está praticando), exceto quando a spec disser outra coisa.
 
 ## Tipos

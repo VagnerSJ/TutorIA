@@ -39,6 +39,10 @@ Escopos: `core`, `brain`, `stt`, `tts`, `audio`, `persistence`, `console`, `infr
 
 Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, compila e roda os testes do projeto afetado; erros voltam para você como mensagem. Leia e corrija antes de seguir. Na fase **Red**, a falha do teste novo é esperada: confirme que é a falha certa e siga para o Green. Quando você terminar, um hook de parada roda build + testes completos e bloqueia o encerramento se algo estiver vermelho.
 
+## Caracteres invisíveis (AP-007)
+
+As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere invisível (ex.: o BOM U+FEFF) no caractere literal, ou corrompê-lo. Para gravar o escape, use `perl -pi -e 's/\xef\xbb\xbf/\x5cuFEFF/g' <arquivo>` e confira depois com `grep -c $'\xef\xbb\xbf' <arquivo>`, que deve dar 0.
+
 ## Definition of Done (você mesmo verifica)
 
 - Ao concluir todas as tarefas, rode **cada comando** da seção "Definition of Done" do `plan.md`.

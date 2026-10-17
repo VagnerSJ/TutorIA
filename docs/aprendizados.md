@@ -69,7 +69,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 
 - **Data / US:** 2026-10-17 / US-001 (P12)
 - **Quem errou:** planejador (não previu) e executor (achou na DoD manual D5)
-- **O que aconteceu:** `"/quit" | dotnet run ...` no Windows PowerShell 5.1 entrega `"﻿/quit"` ao processo. `Trim()` não remove U+FEFF, então o `/quit` virou texto livre. A partir da US-003/004 isso mandaria um comando local ao cérebro, violando RN-CONV06. Só a DoD manual pegou; nenhum teste automatizado previa a plataforma. Foi tratado pelo fluxo (decisão P12 no plano, teste 388afee, correção e71b316).
+- **O que aconteceu:** `"/quit" | dotnet run ...` no Windows PowerShell 5.1 entrega `"\uFEFF/quit"` ao processo. `Trim()` não remove U+FEFF, então o `/quit` virou texto livre. A partir da US-003/004 isso mandaria um comando local ao cérebro, violando RN-CONV06. Só a DoD manual pegou; nenhum teste automatizado previa a plataforma. Foi tratado pelo fluxo (decisão P12 no plano, teste 388afee, correção e71b316).
 - **Por que importa:** defeito de plataforma só aparece na execução real; sem regra, a próxima US com console repete.
 - **Correção (proposta):** na skill `padroes-codigo`, seção de entrada/console: "normalizar a entrada padrão redirecionada (remover BOM inicial) e ter um teste para isso". Na DoD de toda US com console, manter ao menos um comando com pipe no Windows PowerShell 5.1. Arquivo: `.claude/skills/padroes-codigo/SKILL.md` (e o modelo de DoD em `specs/sprints/`, a critério do usuário).
 - **Status:** Proposta (aguardando aprovação do usuário)
