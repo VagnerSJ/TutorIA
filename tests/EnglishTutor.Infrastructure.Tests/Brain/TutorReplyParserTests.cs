@@ -8,6 +8,9 @@ namespace EnglishTutor.Infrastructure.Tests.Brain;
 // US-002 — parser único da resposta do professor (JSON e tags) — RN-BRAIN03, RN-FEED01..05, ADR-002, ADR-005
 public sealed class TutorReplyParserTests
 {
+    // Only the TutorReplyRejections catalog produces this text; JsonException messages also say "Expected ..." (review S1).
+    private const string _catalogJsonExpectation = "Expected a single JSON object {\"reply\": string";
+
     private readonly RecordingLogger<TutorReplyParser> _logger = new();
 
     private readonly TutorReplyParser _sut;
@@ -64,7 +67,9 @@ public sealed class TutorReplyParserTests
 
         result.IsValid.Should().BeFalse();
         result.Rejection!.Reason.Should().Be("invalid JSON");
-        result.Rejection!.Message.Should().StartWith("invalid JSON: ").And.Contain("Expected ");
+        result.Rejection!.Message.Should().StartWith("invalid JSON: ")
+            .And.Contain(_catalogJsonExpectation)
+            .And.EndWith("with no text around it.");
     }
 
     // US-002 — Cenário: resposta fora do formato (apoio, P5: texto depois do objeto)
@@ -75,7 +80,8 @@ public sealed class TutorReplyParserTests
 
         result.IsValid.Should().BeFalse();
         result.Rejection!.Reason.Should().Be("invalid JSON");
-        result.Rejection!.Message.Should().Contain("Expected ");
+        result.Rejection!.Message.Should().Contain(_catalogJsonExpectation)
+            .And.EndWith("with no text around it.");
     }
 
     // US-002 — Cenário: resposta fora do formato (apoio)
