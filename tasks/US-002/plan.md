@@ -307,3 +307,8 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-17 — pedido do Revisor do plano (rodada 1, `plan-review.md`)
+
+- **B1** — P4, P5, P7 e P9 definem comportamento observável sem teste na §4: união com `"; "` de linhas repetidas do mesmo rótulo nas tags (P9); JSON em cerca ```` ```json ```` ou com texto em volta rejeitado com motivo e mensagem claros (P5); detecção pelo primeiro caractere não branco, com espaço/quebra antes do `{` (P7); resposta sem correções e sem `praise` aceita sem aviso, de forma explícita (P4). Esperado: cada efeito com teste nomeado na §4 e tarefa na §5, com contagens da §4, D2 e D5 atualizadas.
+- **B2** — §5, T6 → T7: dizer o estado do caminho não-JSON (tags) ao fim da T6, de modo que todos os testes da T7 (inclusive `Parse_WhenTextHasNoJsonNorTags_RejectsWithMissingReply`) falhem no Red pelo motivo certo; ou registrar e justificar que aquele teste é de regressão.
