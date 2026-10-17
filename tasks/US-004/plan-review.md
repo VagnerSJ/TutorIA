@@ -123,3 +123,52 @@ Nenhum.
 
 - **S1 (erro do próprio Revisor, propagado):** uma afirmação numérica da revisão ("a partir do turno N + 1") foi copiada para o ADR sem conferência contra o código. Proposta: no `checklist-revisao`, seção "Como escrever bloqueantes e sugestões", acrescentar "afirmação quantitativa sobre comportamento existente (limites, contagens, a partir de qual turno) cita o símbolo que a sustenta (ex.: `ConversationWindow.Add`)". No `.claude/agents/planejador.md`: "número vindo da revisão é conferido no código antes de ir para ADR ou spec".
 - **S2/S3 (variação do AP-016 em tabelas de decisão):** a linha 2 tem condição composta ("não é JSON" ou "não é `type: result`"), e o auxiliar de teste que monta a entrada decide em silêncio qual linha casa. Proposta: na skill `tdd-dotnet`, junto com a regra proposta na rodada 1 ("cada linha tem um caso que só ela satisfaz"), acrescentar: "condição composta de uma linha tem um caso por parte; auxiliares de teste que montam a entrada declaram os campos que decidem a linha".
+
+## Rodada 3
+
+Data: 2026-10-17
+Escopo revisado: `tasks/US-004/plan.md` e `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` no commit 40e2b4a (`docs(ai): revise plan for US-004`), comparados com 2cacfd7 (`git diff 2cacfd7 40e2b4a`). O 137981c só registra o pedido do usuário na §12. Conferi o plano contra o código de `develop` (`ConversationWindow.Add`, `ConversationService.SendAsync`, `ExitCodes`), contra `specs/sprints/SPRINT_1.md` (US-007) e contra `BUSINESS_RULES.md` (RN-BRAIN08). Ainda não há código na branch. Não rodei a suíte de novo, porque o 40e2b4a só mexe em documentos e a linha de base da rodada 1 (Core 102, Infrastructure 24, Console 25) continua valendo. A verificação de caracteres invisíveis no diff da rodada (forma do AP-019) deu 0.
+Resultado: APROVADO
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| [O] Todo cenário BDD da US está no mapa da §4 com projeto, classe e método `Metodo_Cenario_Resultado` | ✅ 9/9, sem mudança |
+| [O] Cada P* com efeito observável tem teste na §4 e tarefa na §5 | ✅ P5 agora cobre as duas partes da linha 2. A P17 ganhou uma consequência aceita, que usa o mecanismo de configuração inválida já testado |
+| [O] A DoD da §10 cobre a DoD da US, com comandos verificáveis e resultado esperado (inclui Core ≥ 80%) | ✅ D2 = 216 (103 + 41 + 72) e D11 = 31 casos / 20 métodos batem com a §4 |
+| [O] Conformidade com R1–R4, `RN-*`, regras rápidas do `CLAUDE.md`; ADR Proposto para decisão relevante | ✅ O ADR-007 continua Proposto. O item 5 e as "Consequências" estão alinhados com a §2.5 e a §7 |
+| [O] Escopo: nada além nem aquém; adiamentos registrados na spec de destino (AP-022) | ✅ A S4 foi registrada **sem** promessa para a US-007, então não há adiamento a conferir. A justificativa cita a US-007 de forma inexata (S1) |
+| [O] Consistência §3 × §4 × §5 × §6, contagens e nomes idênticos (AP-025) | ✅ Recontei. `ClaudeCodeTutorBrainTests` tem 14 `[Fact]` + 6 `[Theory]` (2+2+5+2+3+3) = 20 métodos / 31 casos. Por tarefa: T5 5/6 + T6 4/5 + T7 4/9 + T8 5/9 + T10 2/2. Infrastructure tem 34/48, Console 14/16, Core 1/1, total 49/65 e suíte 216. Não sobrou nenhuma contagem antiga (214, 63, 46, 70, 29) fora do histórico da §12 |
+| Transformações da §2 testadas nos dois lados do limite (AP-016); asserções com trecho do projeto (AP-015) | ✅ A linha 2 tem um caso por parte da condição, e o outro lado (objeto com `"type": "result"`) é exercitado por todos os testes do caminho feliz. O "objeto sem `type`" citado na tabela cai no mesmo ramo de "outro `type`" e não tem caso próprio. É aceitável, pelo mesmo critério do `session_id` ausente na rodada 2 |
+| [O] Ordem das tarefas preserva o Red de cada teste | ✅ Pelo estado descrito na T5, o caso `"other-type"` devolve `Reply t1?` sem exceção, o `"json-array"` lança `InvalidOperationException` (o `JsonElement` acessado por propriedade num array) e o `"not-json"` lança `JsonException`. Os três ficam vermelhos na T7 pelo motivo listado |
+| Alteração na `ARCHITECTURE.md` lista também `CLAUDE.md` e skills que repetem a regra | ✅ Sem mudança desde a rodada 2 |
+| Riscos e ambiguidades que travariam o Executor tratados | ✅ A T10 manda parar se as fixtures reais divergirem dos auxiliares de `ClaudeOutputs`. A §7 ganhou as linhas da S2 e da S4 |
+| Viabilidade técnica no SDK e nas bibliotecas | ✅ Os argumentos da §2.4 não incluem `--verbose`. Por isso a CLI imprime um objeto único, e tratar array como "não é resultado" não rejeita a saída legítima |
+
+### Itens da rodada anterior
+
+Sugestões (o usuário pediu a aplicação de S1–S4, §12):
+- [x] **S1**: resolvida em 40e2b4a. O ADR-007 ("Consequências") e a §7 dizem agora "turnos 2 a `MaxTurnsInWindow + 1` (padrão: 2 a 11)" retomam e "a partir do turno `MaxTurnsInWindow + 2` (padrão: 12)" abrem sessão nova. Conferi no código. `ConversationService.SendAsync` monta o request com `_window.ToMessages()` + a frase nova e só depois chama `_window.Add`. `ConversationWindow.Add` remove o turno mais antigo quando `_turns.Count > _maxTurns`. A §12 mostra a conta passo a passo e cita os símbolos, como pedia o aprendizado da rodada 2.
+- [x] **S2**: resolvida em 40e2b4a. A linha 2 da §2.5 tem a condição composta explícita. `SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation` virou `[Theory]` com `"not-json"`, `"other-type"` (com `structured_output` válido, então só passa se o `type` for conferido) e `"json-array"`. Também foram atualizados as contagens, a T5 (estado), a T7 (motivo do Red por caso), a §7, a P5, o D2, o D11 e o item 5 do ADR-007.
+- [x] **S3**: resolvida em 40e2b4a. A §3 declara que `Structured`, `Text` e `Error` produzem o objeto de resultado com `"type": "result"` e lista os campos que decidem a linha. A T10 confere as fixtures reais contra esse formato.
+- [x] **S4**: resolvida em 40e2b4a (§7, P17), com o ajuste de não prometer mudança na US-007, que está correto quanto ao AP-022. A justificativa tem um erro de leitura da spec (S1 abaixo).
+
+### Bloqueantes
+
+Nenhum.
+
+### Sugestões
+
+- **S1**: plano §7, linha "`Brain:ClaudeCode` inválido impede a partida também com `Brain:Provider = Ollama`"; §9 P17 ("lá o ClaudeCode pode ser o `FallbackProvider` de um Ollama principal"); e a resposta à S4 na §12 ("cenário 'fallback por limite de uso'"). O cenário citado da US-007 (`SPRINT_1.md`, `## US-007`) é o contrário: `Provider "ClaudeCode" e FallbackProvider "Ollama"`. Os gatilhos da RN-BRAIN08 (`UsageLimitReached`, `Timeout`, `CliNotFound`, `NotAuthenticated`) são falhas do Claude Code, o que indica Ollama como reserva, não como principal. A RN-BRAIN08 não proíbe a combinação inversa, então "pode ser" é defensável, mas atribuir isso ao cenário é inexato, e a US-007 pode herdar esse argumento como se viesse da spec. A decisão (aceito, sem pendência para outra US) não muda. **Esperado:** a justificativa se apoia no que a spec diz (registro fixo da P17; a US-007 decide a validação condicional na própria spec), sem citar o cenário de fallback como exemplo de ClaudeCode reserva de Ollama.
+
+### Pontos positivos
+
+- A resposta à S1 confere a contagem no código, citando `ConversationWindow.Add` e `ConversationService.SendAsync`, antes de alterar o ADR. É o que o aprendizado da rodada 2 propôs.
+- O caso `"other-type"` repete o padrão do teste de B3: um `structured_output` válido junto com o defeito, para que ignorar a condição devolva uma resposta e o teste falhe.
+- A T5 descreve até o comportamento provisório do array (`InvalidOperationException`), e o Red de cada caso da T7 fica previsível (AP-018(b)).
+- O planejador recusou, com motivo, a expressão "até a US-007" da S4, que criaria um adiamento sem registro na spec de destino (AP-022). Contestar a sugestão do Revisor com base nas regras do processo é o comportamento esperado.
+- As contagens foram atualizadas em todos os lugares (cabeçalho, detalhamento, T7, conferência por tarefa, D2, D11) e não sobrou número antigo.
+
+### Aprendizados para o processo
+
+- **S1 (variação do aprendizado da S1 da rodada 2):** desta vez a afirmação sem conferência veio do Planejador e cita a spec, não o código: um cenário da US-007 foi usado como argumento com os papéis invertidos. Proposta: no `.claude/agents/planejador.md`, estender a regra proposta na rodada 2 ("número vindo da revisão é conferido no código") para "argumento que cita cenário ou regra de outra US cita o nome do cenário e confere o `Dado` no `SPRINT_N.md` antes de escrever". No `checklist-revisao` §0, conferir também as justificativas que citam outras US, não só os textos a registrar na spec de destino.
