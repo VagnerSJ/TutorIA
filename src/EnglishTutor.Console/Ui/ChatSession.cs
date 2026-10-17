@@ -31,9 +31,10 @@ public sealed class ChatSession(TextReader input, TextWriter output, IChatInputH
                 isFirstLine = false;
             }
 
-            // RN-CONV05: blank lines never reach the brain (the warning arrives with US-003).
+            // RN-CONV05: blank lines never reach the brain; the student sees a local warning (US-003).
             if (string.IsNullOrWhiteSpace(line))
             {
+                await WriteLinesAsync([ConversationMessages.EmptyInput], ct);
                 continue;
             }
 
