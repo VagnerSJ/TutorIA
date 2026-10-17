@@ -329,6 +329,8 @@ Nota do orquestrador: o SDK 10.0.402 já está instalado (`dotnet --list-sdks`);
 
 Reaprovação (2026-10-17), no chat, do plano revisado com S1–S14 (commit 250b065) e das respostas padrão: P10 aceitar `Microsoft.Extensions.Primitives` no Core só como dependência transitiva do Options (proibido como `PackageReference` direto); P11 CI em `ubuntu-latest`, revendo quando entrar adaptador só para Windows.
 
+Decisão P12 (2026-10-17), no chat: aprovada a proposta — o `ChatSession` remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado). O `LocalCommandParser` não muda. O Executor implementa em TDD (par `test(console)` + `fix(console)`), atualiza a contagem de testes no §4/D2 e refaz D2, D3b, D4 e D5 nas Evidências.
+
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
