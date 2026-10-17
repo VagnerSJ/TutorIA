@@ -248,6 +248,7 @@ Repetições em `CLAUDE.md` e skills (Grep por `ConversationService|InvalidOutpu
     Dado "Conversation:MaxTurnsInWindow" igual a 0 na configuração
     Quando a aplicação inicia
     Então ela encerra antes do primeiro prompt com a mensagem do validador, que cita "Conversation:MaxTurnsInWindow" e o valor esperado
+    E o código de saída é o de configuração inválida (ExitCodes.InvalidConfiguration, diferente de 0)
   ```
 - Na tabela "DoD extra" da US-004, depois da linha `D7`, acrescentar:
   ```markdown
@@ -305,7 +306,7 @@ Se o usuário escolher o caminho (b) do B1 (trazer os itens para esta US), este 
 | Criar | `src/EnglishTutor.Core/Conversation/ConversationService.cs` | Orquestração do turno, modo, retentativa e fallback |
 | Criar | `src/EnglishTutor.Core/Conversation/ConversationLog.cs` | `[LoggerMessage]` 3000 e 3001 |
 | Alterar | `src/EnglishTutor.Console/Ui/ChatSession.cs` | Aviso local na linha em branco |
-| Criar | `tests/EnglishTutor.Core.Tests/Fakes/FakeTutorBrain.cs` | Fila de respostas (`Returns`, `ReturnsInvalid`, `Throws`) + `Requests` + `Tokens` |
+| Criar | `tests/EnglishTutor.Core.Tests/Fakes/FakeTutorBrain.cs` | `Name => "Fake"` (fixo; a asserção de `SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason` depende dele, S8) + fila de respostas (`Returns`, `ReturnsInvalid`, `Throws`) + `Requests` + `Tokens` |
 | Criar | `tests/EnglishTutor.Core.Tests/Fakes/FakeTutorPromptSource.cs` | Devolve um system prompt fixo; registra `Tokens` |
 | Criar | `tests/EnglishTutor.Core.Tests/Fakes/TutorReplies.cs` | `TutorReplies.Valid(string label)`: `Reply`, `RawText` e uma `Correction` únicos por rótulo (AP-017) |
 | Criar | `tests/EnglishTutor.Core.Tests/Support/RecordingLogger.cs` | Logger fake (cópia do da Infrastructure.Tests) |
@@ -386,7 +387,7 @@ Suíte inteira após a US: **148 casos** (Core.Tests 51 + 48 = 99; Console.Tests
 
 Pré-condição (ponto único): na aprovação e **antes da T1**, o orquestrador aplica a §2.6 (`ARCHITECTURE.md` §3/§4/§5, o trecho da `bdd-para-testes` e a US-004 do `specs/sprints/SPRINT_1.md`) num commit `docs(ai): update architecture and spec for US-003`, com o ADR-006 em "Aceito" se aprovado.
 
-Em toda tarefa, os esqueletos vêm antes dos testes (AP-013). Depois de `x.Should().BeTrue()` em propriedades com `[MemberNotNullWhen]`, use `!` (AP-020). Escolha de forma não prevista aqui → registro na §12 em commit `docs(ai)` **antes** do `feat` (AP-009/AP-014).
+Em toda tarefa, os esqueletos vêm antes dos testes (AP-013). Depois de `x.Should().BeTrue()` em propriedades com `[MemberNotNullWhen]`, use `!` (AP-020). Escolha de forma não prevista aqui → registro na §12 em commit `docs(ai)` **antes** do `feat` (AP-009/AP-014). Os nomes de teste nas tarefas são os mesmos da §4, por extenso (S10).
 
 - [ ] T1 — Pacote: mover a `PackageVersion` de `Microsoft.Extensions.Logging.Abstractions` para o `ItemGroup Label="Core"` do `Directory.Packages.props` (mesma versão), `PackageReference` a ela no Core e o nome em `CoreDependencyTests._allowedPackageReferences`, no mesmo commit (sem o último, `CoreProject_PackageAndProjectReferences_OnlyAllowedOnes` fica vermelho). `dotnet build` com 0 warnings e suíte verde (97 casos). (commit: `chore(core): allow logging abstractions in core`)
 - [ ] T2 — Red: esqueletos `LocalCommandKind.Mode`, `LocalCommands.Mode`, `TutorMode.TryParse` (lança `NotImplementedException`). Testes `TryParse_WithKnownName_ReturnsMode`, `TryParse_WithUnknownOrBlankName_ReturnsFalse` e `TryParse_WhenInputIsModeCommand_ReturnsModeWithArguments`, que falha por asserção: `Unknown` ≠ `Mode`. Troca de `"/mode interview"` por `"/foo bar"` no teste de desconhecido, que continua verde. Green: `KindOf` reconhece `/mode`; `TryParse` sobre `TutorMode.All`. O `ChatSession` não muda, e `Mode` cai no `default` (P12). (commits: `test(core): mode command and mode names` + `feat(core): parse mode command and mode names`)
@@ -394,28 +395,28 @@ Em toda tarefa, os esqueletos vêm antes dos testes (AP-013). Depois de `x.Shoul
 - [ ] T4 — Red: esqueletos `ConversationOptions` (padrão já 10, porque é dado e não regra), `ConversationOptionsValidator.Validate` (lança `NotImplementedException`) + `ConversationOptionsTests`, `ConversationOptionsValidatorTests`, `AddEnglishTutorCore_Always_RegistersConversationOptionsValidator`. `Constructor_Always_DefaultsMaxTurnsInWindowToTen` nasce verde com o esqueleto: é teste de caracterização de dado. Para provar que discrimina, mostrar o Red por mutação temporária não commitada (padrão `= 0`), registrando a falha na tarefa (AP-017). Os demais falham com `NotImplementedException` ou porque o validador não está registrado. Green: validador e registro no DI. (commits: `test(core): conversation options validation` + `feat(core): validate conversation window size`)
 - [ ] T5 — Red: esqueleto `TurnMessageBuilder` (`Build` e `BuildFormatCorrection` lançam `NotImplementedException`) + `TurnMessageBuilderTests` (4 métodos / 5 casos). Green: formato da §2.2. (commits: `test(core): turn message format` + `feat(core): build standard turn message`)
 - [ ] T6 — Red: esqueletos `ConversationTurn`, `ConversationWindow` (`Add` e `ToMessages` lançam `NotImplementedException`; construtor sem guarda) + `ConversationWindowTests` (3 / 5). Green: guarda, descarte do mais antigo e mensagens. (commits: `test(core): conversation window` + `feat(core): keep last turns in conversation window`)
-- [ ] T7 — Red: esqueletos `ITutorPromptSource`, `ConversationTurnResult` (fábricas), `ConversationMessages`, `ConversationLog` (3000 e 3001 já declarados, sem uso), `ConversationService` (`Mode` pronto; `ChangeMode` só atribui, **sem** a guarda de nulo; `SendAsync` lança `NotImplementedException`) e os fakes (`FakeTutorBrain` e `FakeTutorPromptSource` com `Tokens`, `TutorReplies.Valid(label)`, `RecordingLogger`). Testes, todos com respostas válidas ou com `BrainException(Timeout)`/`OperationCanceledException`, nunca `InvalidOutput`:
-  - `InJobInterviewMode_SendsStandardTurnMessageLast`
-  - `WhenWindowIsFull_...`
-  - `OnSecondTurn_...`
-  - `WhenInputIsBlank_...` (3 casos)
-  - `WithNullText_ThrowsArgumentNullException`
-  - `AfterModeCommand_...`
+- [ ] T7 — Red: esqueletos `ITutorPromptSource`, `ConversationTurnResult` (fábricas), `ConversationMessages`, `ConversationLog` (3000 e 3001 já declarados, sem uso), `ConversationService` (`Mode` pronto; `ChangeMode` só atribui, **sem** a guarda de nulo; `SendAsync` lança `NotImplementedException`) e os fakes (`FakeTutorBrain` com `Name => "Fake"` e `FakeTutorPromptSource`, ambos com `Tokens`, `TutorReplies.Valid(label)`, `RecordingLogger`). Testes, todos com respostas válidas ou com `BrainException(Timeout)`/`OperationCanceledException`, nunca `InvalidOutput`:
+  - `SendAsync_InJobInterviewMode_SendsStandardTurnMessageLast`
+  - `SendAsync_WhenWindowIsFull_SendsSystemPromptLastTurnsAndNewMessage`
+  - `SendAsync_OnSecondTurn_IncludesFirstTurnStudentAndTutorMessages`
+  - `SendAsync_WhenInputIsBlank_DoesNotCallBrainAndReturnsWarning` (3 casos)
+  - `SendAsync_WithNullText_ThrowsArgumentNullException`
+  - `SendAsync_AfterModeCommand_SendsNewModeInTurnMessage`
   - `ChangeMode_WithNull_ThrowsArgumentNullException`
-  - `WhenBrainFailsWithOtherKind_PropagatesWithoutRetry`
-  - `WhenCancelled_PropagatesAndDoesNotRecordTurn`
+  - `SendAsync_WhenBrainFailsWithOtherKind_PropagatesWithoutRetry`
+  - `SendAsync_WhenCancelled_PropagatesAndDoesNotRecordTurn`
 
-  São 9 métodos / 11 casos. `ChangeMode_WithNull_...` falha porque nada é lançado (esqueleto sem guarda); os 8 de `SendAsync` falham com a `NotImplementedException` (em `WithNullText_...`, por ser a exceção errada). Green: guarda do `ChangeMode` e passos 1–4 e 6 da §2.2, com o `await brain.SendAsync` direto e o `ct` repassado. **Estado do ramo `InvalidOutput` ao fim da T7:** não há `catch`, então `BrainException.InvalidOutput` propaga ao chamador como qualquer outra falha. Por isso `WhenBrainFailsWithOtherKind` já passa aqui e segue como regressão na T8/T9. (commits: `test(core): conversation service turn and window` + `feat(core): send turns with application-owned history`)
+  São 9 métodos / 11 casos. `ChangeMode_WithNull_ThrowsArgumentNullException` falha porque nada é lançado (esqueleto sem guarda); os 8 de `SendAsync` falham com a `NotImplementedException` (em `SendAsync_WithNullText_ThrowsArgumentNullException`, por ser a exceção errada). Green: guarda do `ChangeMode` e passos 1–4 e 6 da §2.2, com o `await brain.SendAsync` direto e o `ct` repassado. **Estado do ramo `InvalidOutput` ao fim da T7:** não há `catch`, então `BrainException.InvalidOutput` propaga ao chamador como qualquer outra falha. Por isso `SendAsync_WhenBrainFailsWithOtherKind_PropagatesWithoutRetry` já passa aqui e segue como regressão na T8/T9. (commits: `test(core): conversation service turn and window` + `feat(core): send turns with application-owned history`)
 - [ ] T8 — Red (6 métodos / 7 casos), todos com um `InvalidOutput(raw1)` na 1ª chamada:
-  - `WhenFirstReplyIsInvalid_RetriesWithFormatCorrection`
-  - `WhenFirstReplyIsInvalid_ReturnsSecondReplyWithFeedback`
-  - `WhenFirstReplyIsInvalid_LogsRetryWarningWithReason`
-  - `AfterRetriedTurn_KeepsOnlyFinalAnswerInWindow`
-  - `WhenRetrying_PassesCallerTokenToPromptSourceAndBothBrainCalls`
-  - `WhenRetryFailsWithOtherKindOrIsCancelled_PropagatesAndDoesNotRecordTurn` (2 casos; a 2ª chamada lança `Timeout` ou `OperationCanceledException`)
+  - `SendAsync_WhenFirstReplyIsInvalid_RetriesWithFormatCorrection`
+  - `SendAsync_WhenFirstReplyIsInvalid_ReturnsSecondReplyWithFeedback`
+  - `SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason`
+  - `SendAsync_AfterRetriedTurn_KeepsOnlyFinalAnswerInWindow`
+  - `SendAsync_WhenRetrying_PassesCallerTokenToPromptSourceAndBothBrainCalls`
+  - `SendAsync_WhenRetryFailsWithOtherKindOrIsCancelled_PropagatesAndDoesNotRecordTurn` (2 casos; a 2ª chamada lança `Timeout` ou `OperationCanceledException`)
 
   Todos falham porque a `BrainException` de `InvalidOutput` propaga (estado da T7): nos 5 primeiros, por exceção inesperada; no último, porque a exceção recebida não é a esperada (`Kind` ≠ `Timeout` ou tipo ≠ `OperationCanceledException`) e `Requests` tem 1 item, não 2. O Executor confere esse motivo antes do Green. Green: `catch` de `IsInvalidOutput`, log 3000 e nova chamada com as mensagens extras e o mesmo `ct`. **Estado ao fim da T8:** se a segunda chamada também lançar `InvalidOutput`, a exceção propaga, sem `catch` interno; outras falhas da segunda chamada propagam (e continuam propagando na T9). (commits: `test(core): retry once on invalid tutor reply` + `feat(core): retry with format correction on invalid reply`)
-- [ ] T9 — Red: esqueleto `TutorReply.RawFallback` (lança `NotImplementedException`) + `WhenReplyIsInvalidTwice_ReturnsRawSecondAnswerWithoutFeedback`, `WhenReplyIsInvalidTwice_LogsRawFallbackWarning`, `AfterRawFallbackTurn_SendsRawAnswerAsTutorMessage` (3). Todos falham porque a segunda `BrainException` propaga (estado da T8). Green: `catch` interno só de `IsInvalidOutput`, log 3001 e `RawFallback`. Refactor: extrair a montagem do `BrainRequest` num método privado. (commits: `test(core): raw fallback after second invalid reply` + `feat(core): fall back to raw reply after second failure` + `refactor(core): ...` se houver)
+- [ ] T9 — Red: esqueleto `TutorReply.RawFallback` (lança `NotImplementedException`) + `SendAsync_WhenReplyIsInvalidTwice_ReturnsRawSecondAnswerWithoutFeedback`, `SendAsync_WhenReplyIsInvalidTwice_LogsRawFallbackWarning`, `SendAsync_AfterRawFallbackTurn_SendsRawAnswerAsTutorMessage` (3). Todos falham porque a segunda `BrainException` propaga (estado da T8). Green: `catch` interno só de `IsInvalidOutput`, log 3001 e `RawFallback`. Refactor: extrair a montagem do `BrainRequest` num método privado. (commits: `test(core): raw fallback after second invalid reply` + `feat(core): fall back to raw reply after second failure` + `refactor(core): ...` se houver)
 - [ ] T10 — Red: `ChatSessionTests.RunAsync_WhenLineIsBlank_ShowsEmptyInputWarning` (3 casos), que falha porque hoje nada é escrito. Green: `ChatSession` escreve `ConversationMessages.EmptyInput` na linha em branco e atualiza o comentário da RN-CONV05. `RunAsync_WhenLineIsBlank_IgnoresItAndForwardsNothing` continua verde (2 prompts). (commits: `test(console): warn on blank input` + `feat(console): show local warning for blank input`)
 - [ ] T11 — DoD: rodar D1–D11, colar em §11, marcar §5 com os hashes. (commit: `docs(ai): add DoD evidence for US-003`)
 
@@ -529,3 +530,10 @@ Aprovo o plano com as respostas padrão para P1–P14 e o ADR-006. Incorporar as
 - **S8** — §3: deixar explícito que o `Name` do `FakeTutorBrain` é `"Fake"` (a asserção de `SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason` depende disso).
 - **S9** — §2.6, cenário novo da US-004 "janela de turnos configurável": dizer que a aplicação encerra com o código de saída de configuração inválida (`ExitCodes.InvalidConfiguration`, ≠ 0), no cenário ou num D da US-004.
 - **S10** — §5 T7 e T8: usar os nomes completos dos métodos de teste (com o prefixo `SendAsync_`/`ChangeMode_` e sem `...`), idênticos aos da §4.
+
+→ Incorporado. Respostas no formato "item → seções tocadas":
+
+- S8 → §3 (linha `FakeTutorBrain.cs`: `Name => "Fake"`, fixo, com a dependência do teste de log), §5 T7 (lista de esqueletos dos fakes cita `Name => "Fake"`).
+- S9 → §2.6 (bloco `gherkin` da US-004, cenário "janela de turnos configurável": nova linha `E o código de saída é o de configuração inválida (ExitCodes.InvalidConfiguration, diferente de 0)`; `ExitCodes.InvalidConfiguration = 2` em `src/EnglishTutor.Console/ExitCodes.cs:10`). Nenhum D novo na US-004; `specs/` só muda pelo orquestrador antes da T1, como já previsto.
+- S10 → §5 (frase no parágrafo de abertura das tarefas), §5 T7 (9 nomes completos na lista e nos textos de motivo do Red e do estado do ramo), §5 T8 (6 nomes completos), §5 T9 (3 nomes completos, pela mesma razão). Os nomes conferem um a um com a §4.
+- Sem mudança em contagens (35/51; `ConversationServiceTests` 18/21; suíte 148), escopo, tarefas, testes, P* ou DoD.
