@@ -5,7 +5,7 @@
 
 | US | Título | Fase | Depende de | Status |
 |---|---|---|---|---|
-| US-001 | Fundação da solução e configuração | 1 | — | Planejamento |
+| US-001 | Fundação da solução e configuração | 1 | — | Revisada (aguarda D13 e merge) |
 | US-002 | Contrato do professor e parser único da resposta | 1 | US-001 | A fazer |
 | US-003 | ConversationService dono do histórico | 1 | US-002 | A fazer |
 | US-004 | Conversar por texto com o professor via Claude Code | 2 | US-003 | A fazer |
