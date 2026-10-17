@@ -13,19 +13,37 @@ public sealed class ConversationService(
     IOptions<ConversationOptions> options,
     ILogger<ConversationService> logger)
 {
-    private readonly ITutorBrain _brain = brain;
-
-    private readonly ITutorPromptSource _promptSource = promptSource;
-
     private readonly ConversationWindow _window = new(options.Value.MaxTurnsInWindow);
 
     private readonly ILogger<ConversationService> _logger = logger;
 
     public TutorMode Mode { get; private set; } = TutorMode.Default;
 
-    public void ChangeMode(TutorMode mode) => Mode = mode;
+    // Takes effect on the next turn (RN-CONV01).
+    public void ChangeMode(TutorMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(mode);
+        Mode = mode;
+    }
 
-    public Task<ConversationTurnResult> SendAsync(string text, CancellationToken ct) =>
-        throw new NotImplementedException(
-            $"{_brain.Name} {_promptSource} {_window} {_logger}");
+    public async Task<ConversationTurnResult> SendAsync(string text, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return ConversationTurnResult.Ignored(ConversationMessages.EmptyInput);
+        }
+
+        // Text mode has no transcription, so there are no low-confidence words (RN-CONV02).
+        var studentMessage = TurnMessageBuilder.Build(text, [], Mode);
+        var systemPrompt = await promptSource.GetSystemPromptAsync(ct);
+        List<BrainMessage> messages = [.. _window.ToMessages(), new(BrainRole.User, studentMessage)];
+
+        // P11: any failure propagates and the turn is not recorded.
+        var reply = await brain.SendAsync(new BrainRequest(systemPrompt, messages, SessionHint: null), ct);
+
+        _window.Add(new ConversationTurn(studentMessage, reply));
+        return ConversationTurnResult.Replied(reply);
+    }
 }
