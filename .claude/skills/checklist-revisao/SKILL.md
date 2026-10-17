@@ -13,6 +13,9 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Comportamento implementado bate com os cenários (valores, mensagens, códigos de saída).
 - [O] Regras `RN-*` citadas pela US são respeitadas; testes citam a regra no comentário.
 - [O] Nada fora do escopo da US foi implementado sem registro no plano.
+- [O] Mudanças de comportamento estão primeiro na spec/plano e decisões técnicas relevantes têm ADR commitado **antes** do código que as implementa.
+- [O] Todos os comandos da Definition of Done foram rodados pelo Executor, com resultado colado em "Evidências" no `plan.md`, e o resultado confere com o seu.
+- Comentários do usuário no `plan.md` foram respondidos e respeitados.
 
 ## 2. Arquitetura (`ARCHITECTURE.md`)
 - [O] `EnglishTutor.Core` sem referência a Infrastructure/Console/pacotes de terceiros (R1).
@@ -27,7 +30,9 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Cobertura de linhas do `EnglishTutor.Core` ≥ 80%.
 - [O] Nenhum teste apagado, ignorado (`Skip`) ou enfraquecido sem justificativa no plano.
 - Ordem de commits mostra teste antes do código (Red → Green). Desvio pontual = sugestão; ausência geral = bloqueante.
-- Testes determinísticos: sem `Thread.Sleep`, sem dependência de relógio real, rede ou processo real fora de `LiveBrain`.
+- [O] Testes unitários sem rede, sem GPU e sem processo real fora de `Category=LiveBrain`; a suíte unitária roda em segundos (alvo < 30 s).
+- Testes determinísticos: sem `Thread.Sleep` nem dependência de relógio real.
+- Mensagens de erro (parser, validação de Options, exceções de domínio) dizem o que está errado e o que se espera.
 - Nomes `Metodo_Cenario_Resultado`; um comportamento por teste.
 
 ## 4. Qualidade do código

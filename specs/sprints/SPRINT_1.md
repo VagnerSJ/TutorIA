@@ -15,7 +15,22 @@
 | US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | A fazer |
 | US-009 | Avaliação comparativa dos cérebros (golden set + `eval`) | 2b | US-007 | A fazer |
 
-**Definição de pronto (todas as US):** cenários BDD cobertos por testes escritos antes do código; build sem warnings; `dotnet test` verde; cobertura do Core ≥ 80%; `review.md` sem bloqueantes; `docs/us/US-XXX.md` atualizado; merge em `develop`.
+## Definition of Done comum (todas as US)
+
+Comandos que o Executor roda e cola em "Evidências" do `plan.md`:
+
+| # | Comando | Esperado |
+|---|---|---|
+| D1 | `dotnet build` | 0 warnings, 0 erros |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s, sem rede nem GPU |
+| D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | linhas do `EnglishTutor.Core` ≥ 80% |
+| D4 | `dotnet format --verify-no-changes` | sem diferenças |
+
+E também: todo cenário BDD com teste escrito antes do código; `review.md` sem bloqueantes; `docs/us/US-XXX.md` criado; merge em `develop`.
+
+**Cérebros:** a partir da US-009, toda US que mexe em cérebro, prompt ou parser inclui na DoD o `eval` do golden set com nota mínima (ver US-009). Antes disso, as US de cérebro usam um teste `LiveBrain` de fumaça.
+
+Cada US abaixo lista apenas os itens **extras** da DoD (D5 em diante).
 
 ---
 
@@ -75,6 +90,15 @@ Cenário: integração contínua (opcional)
   Então ele roda build, testes (exceto Category=LiveBrain) e publica o relatório de cobertura
 ```
 
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `"/quit" \| dotnet run --project src/EnglishTutor.Console` | cabeçalho com provedor e modo; código de saída 0 |
+| D6 | `$env:Brain__Provider="Inexistente"; dotnet run --project src/EnglishTutor.Console` | código de saída ≠ 0; mensagem cita "Inexistente" e os provedores aceitos |
+| D7 | `Get-ChildItem logs` após D5 | arquivo de log com eventos de início e fim |
+| D8 | Teste de arquitetura do Core (incluído em D2) | verde |
+
 ---
 
 ## US-002 — Contrato do professor e parser único da resposta
@@ -119,6 +143,13 @@ Cenário: sem erros
   Quando o parser processa a resposta
   Então o feedback exibido contém o elogio
 ```
+
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test --filter "FullyQualifiedName~TutorReplyParser"` | verde, incluindo fixtures JSON e tags |
+| D6 | Inspeção dos testes de formato inválido | cada motivo de rejeição tem mensagem que diz o que faltou e o que se espera (usada na instrução de correção da RN-BRAIN04) |
 
 ---
 
@@ -178,6 +209,13 @@ Cenário: troca de modo
   Então a próxima mensagem enviada ao cérebro tem "Mode: job-interview"
 ```
 
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test tests/EnglishTutor.Core.Tests` | verde em < 10 s, só com fakes |
+| D6 | Cobertura do namespace `EnglishTutor.Core.Conversation` (relatório de D3) | ≥ 90% de linhas |
+
 ---
 
 ## US-004 — Conversar por texto com o professor via Claude Code
@@ -219,6 +257,14 @@ Cenário: medição de latência
   Então vejo a latência média e p95 de cada modo
 ```
 
+**DoD extra** (requer Claude Code CLI instalado e autenticado)
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ClaudeCode"` | verde: 5 frases de fumaça com erros conhecidos, ≥ 4 com a correção esperada e 5/5 no formato |
+| D6 | `"I have worked with C# since five years" \| dotnet run --project src/EnglishTutor.Console` | reply terminando em pergunta + correção "since five years → for five years" |
+| D7 | Medição de latência JsonSchema × Tags | tabela com média e p95 colada nas Evidências e no ADR-002 |
+
 ---
 
 ## US-005 — Erros do Claude Code com mensagens claras
@@ -252,6 +298,13 @@ Cenário: tempo esgotado
   E vejo uma mensagem de tempo esgotado
 ```
 
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test --filter "FullyQualifiedName~ClaudeCode"` | um teste por `BrainErrorKind`, com fixtures de stdout/stderr gravadas |
+| D6 | `$env:Brain__ClaudeCode__ExecutablePath="nao-existe"; "hi" \| dotnet run --project src/EnglishTutor.Console` | mensagem "Claude Code CLI not found" com instrução; sessão continua |
+
 ---
 
 ## US-006 — Professor local via Ollama
@@ -284,6 +337,13 @@ Cenário: modelo não baixado
   Então vejo o comando "ollama pull <modelo>"
 ```
 
+**DoD extra** (requer Ollama com o modelo baixado)
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` | verde: 5 frases de fumaça, 5/5 no formato |
+| D6 | `nvidia-smi` durante o teste D5 | VRAM do modelo registrada em ARCHITECTURE §7 |
+
 ---
 
 ## US-007 — Troca de cérebro por configuração e fallback
@@ -314,6 +374,13 @@ Cenário: sem fallback configurado
   Então vejo a mensagem de limite de uso e continuo na sessão
 ```
 
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde |
+| D6 | `$env:Brain__Provider="Ollama"; "/quit" \| dotnet run --project src/EnglishTutor.Console` | cabeçalho mostra "Ollama" |
+
 ---
 
 ## US-008 — Suíte de contrato do ITutorBrain
@@ -337,6 +404,12 @@ Cenário: testes live opcionais
   E quando executo "dotnet test --filter Category=LiveBrain" eles rodam contra os provedores reais
 ```
 
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet test --filter "FullyQualifiedName~ContractTests" --logger "console;verbosity=normal"` | os mesmos testes do contrato listados para ClaudeCode e Ollama, todos verdes |
+
 ---
 
 ## US-009 — Avaliação comparativa dos cérebros
@@ -359,3 +432,13 @@ Cenário: provedor indisponível na avaliação
   Quando executo o eval com os dois provedores
   Então o relatório marca o Ollama como "unavailable" e os resultados do Claude Code continuam válidos
 ```
+
+**DoD extra**
+
+| # | Comando | Esperado |
+|---|---|---|
+| D5 | `dotnet run --project src/EnglishTutor.Console -- eval --providers ClaudeCode,Ollama` | relatório em `eval/reports/` |
+| D6 | Nota do provedor principal (ClaudeCode) no relatório | correções esperadas encontradas ≥ 80%; formato válido ≥ 90% |
+| D7 | `eval/golden-set.json` | ≥ 30 frases, cada uma com erro e correção esperada revisados pelo usuário |
+
+Esses limiares (D6) passam a ser a **nota mínima do eval** na DoD das US de cérebro das sprints seguintes.

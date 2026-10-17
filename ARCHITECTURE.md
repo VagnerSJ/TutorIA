@@ -241,3 +241,16 @@ SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala tran
 | Avaliação | comando `eval` + `eval/golden-set.json` | relatório em `eval/reports/` |
 
 Meta: cobertura de linhas do Core ≥ 80% (coverlet).
+
+### Feedback rápido
+
+- Suíte unitária (tudo exceto `LiveBrain`) em < 30 s; `EnglishTutor.Core.Tests` em < 10 s. Sem rede, GPU, processo real ou relógio real.
+- Hooks do Claude Code (`.claude/settings.json` e frontmatter do `executor`):
+
+  | Hook | Quando | O que faz |
+  |---|---|---|
+  | `post-edit-dotnet.mjs` | `PostToolUse` em `Edit`/`Write` de `.cs`/`.csproj`/`.props` | `dotnet format whitespace` no arquivo → build do projeto de teste correspondente (`src/X` → `tests/X.Tests`) → testes desse projeto. Falha devolve o resumo ao agente (exit 2) |
+  | `executor-stop-gate.mjs` | `SubagentStop` do executor | build + testes da solução; bloqueia uma vez o encerramento se algo estiver vermelho |
+
+  Os testes por edição podem ser desligados com `ENGLISHTUTOR_HOOK_TESTS=0`.
+- Erros de validação (parser, Options, `BrainException`) dizem **o que** está errado e **o que** se espera, para que o próprio agente (e a retentativa da RN-BRAIN04) saiba o que corrigir.

@@ -47,7 +47,7 @@ Estimativa em sessões de trabalho de ~2 h, já incluindo o fluxo completo de ag
 
 | Fase | Conteúdo | US | Estimativa |
 |---|---|---|---|
-| 0 | Governança e agentes: `CLAUDE.md`, `ARCHITECTURE.md`, specs, Sprint 1, subagentes, skills, `/us`, ADRs. Piloto do fluxo na US-001 | — | 1–2 |
+| 0 | Governança e agentes: `CLAUDE.md`, `ARCHITECTURE.md`, specs, Sprint 1 com DoD verificável, subagentes, skills (incl. `revisar-contexto`), `/us`, hooks de build/teste, `docs/aprendizados.md`, ADRs. Piloto do fluxo na US-001 | — | 1–2 |
 | 1 | Fundação: solução, DI, Options, Serilog, CI; contrato do professor; `ConversationService` dono do histórico | US-001, US-002, US-003 | 3–4 |
 | 2 | Cérebro Claude Code (processo por chamada), erros e mensagens claras, chat por texto no console | US-004, US-005 | 2–3 |
 | 2b | Ollama, `BrainFactory` + fallback, testes de contrato, golden set + `eval` | US-006 a US-009 | 3–4 |

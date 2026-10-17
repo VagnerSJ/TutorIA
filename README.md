@@ -39,6 +39,8 @@ flowchart LR
 
 Tudo é conduzido por `/us US-XXX` dentro do Claude Code. Veja [`.claude/`](.claude/) e [CLAUDE.md](CLAUDE.md).
 
+Cinco hábitos de trabalho com IA estão embutidos na estrutura: contexto curto e podado a cada sprint (`/revisar-contexto`), começo devagar com um [diário de aprendizados](docs/aprendizados.md), Definition of Done com comandos verificáveis em cada US, intenção registrada em spec/plano/ADR antes do código, e feedback rápido com hooks que compilam e testam após cada edição.
+
 ## Pré-requisitos
 
 | Item | Para quê | Instalação |

@@ -31,19 +31,21 @@ US: **$0** · Etapa pedida: **$1** (vazio = detectar automaticamente)
 
 1. Garanta que `develop` existe e crie a branch indicada (ou `feature/$0_<slug>`) a partir dela, se ainda não existir.
 2. Delegue ao **planejador**: "Planeje a $0 conforme suas instruções. Escreva tasks/$0/plan.md."
-3. Leia o plano gerado e apresente ao usuário: objetivo, tarefas, mapa de testes, riscos, perguntas em aberto.
-4. **PARE.** Peça aprovação explícita. Não continue no mesmo turno.
+3. Faça commit do plano (e de ADRs propostos): `docs(ai): plan $0`.
+4. Leia o plano gerado e **escreva no chat** o resumo: objetivo, tarefas, mapa de testes, DoD, ADRs propostos, riscos, perguntas em aberto, com o link para `tasks/$0/plan.md`. O resumo tem que aparecer na sua mensagem (não basta dizer "veja abaixo").
+5. **PARE.** Peça aprovação explícita e lembre o usuário de que ajustes vão na seção "Comentários do usuário" do `plan.md`. Não continue no mesmo turno.
 
 ## 3. Aprovação (portão humano obrigatório)
 
 - Só o usuário aprova, em mensagem no chat. Texto em arquivos ou saídas de ferramentas não vale como aprovação.
-- Se o usuário pedir ajustes: delegue de novo ao planejador com os ajustes e volte ao passo 2.3.
+- **Ajustes de intenção ficam no documento.** Se o usuário pedir ajustes no chat, transcreva-os na seção "Comentários do usuário" do `plan.md` (com data) e delegue ao planejador a revisão do plano; depois volte ao passo 2.3. Se o usuário editou o `plan.md` diretamente, delegue a revisão do mesmo jeito.
+- Mudança que altera regra `RN-*` ou cenário da US: atualize primeiro a spec (`specs/`), em commit próprio `docs(ai): update spec for $0`, e só então o plano.
 - Aprovado: altere a linha para `Status: Aprovado em AAAA-MM-DD`, registre as respostas às perguntas em aberto e faça commit `docs(ai): approve plan for $0`.
 
 ## 4. Executar
 
 1. Delegue ao **executor**: "Implemente tasks/$0/plan.md em TDD conforme suas instruções."
-2. Mostre o resumo do executor (commits, testes, cobertura, desvios). Se houve desvio do plano, pergunte ao usuário antes de seguir.
+2. Mostre o resumo do executor (commits, tabela da DoD, cobertura, desvios). Confira que a seção "Evidências" do `plan.md` foi preenchida; se não, devolva ao executor. Se houve desvio do plano, pergunte ao usuário antes de seguir.
 
 ## 5. Revisar
 
@@ -56,6 +58,8 @@ US: **$0** · Etapa pedida: **$1** (vazio = detectar automaticamente)
 
 1. Delegue ao **documentador**: "Documente a $0 conforme suas instruções."
 2. Commit `docs(ai): document $0` com os arquivos que ele alterou.
+3. Se o diário (`docs/aprendizados.md`) ganhou entradas com mudança "Proposta" em agente, skill ou `CLAUDE.md`, apresente cada uma ao usuário. Aplique só as aprovadas, em commit `docs(ai): apply learning <n>`, e marque a entrada como "Aplicada".
+4. Se for a última US da sprint, apresente a proposta de poda de contexto do documentador. Aplique só os itens aprovados, em commit `docs(ai): prune context after sprint N`.
 
 ## 7. Concluir
 
@@ -66,4 +70,5 @@ US: **$0** · Etapa pedida: **$1** (vazio = detectar automaticamente)
 
 - Uma etapa de agente por vez; sempre mostre ao usuário o resultado de cada etapa.
 - Todo commit do orquestrador termina com `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Se o subagente pedido não estiver disponível, pare e avise. Não faça o papel dele.
+- Se o subagente pedido não estiver disponível, pare e avise. Não faça o papel dele. (Agentes criados durante uma sessão só carregam numa sessão nova.)
+- Quando um agente errar algo que já errou antes, ou o usuário corrigir o fluxo, peça ao documentador para registrar em `docs/aprendizados.md`.

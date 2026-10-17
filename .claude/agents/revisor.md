@@ -24,6 +24,9 @@ Você é o **Revisor** do projeto EnglishTutor. Você **só lê e verifica**.
 3. Rode `dotnet build` e `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"`; leia a cobertura do Core no `coverage.cobertura.xml` gerado.
 4. Aplique o checklist da skill `checklist-revisao`, item por item.
 5. Confira se cada cenário BDD tem teste correspondente e se os testes foram commitados antes do código (ordem dos commits).
+6. Confira a seção "Evidências" do `plan.md`: cada comando da DoD tem resultado colado e o resultado bate com o que **você** obteve ao rodar. Evidência ausente ou divergente é bloqueante.
+7. Confira a ordem "intenção antes do código": ADR novo (se houver) e mudanças em `specs/` foram commitados antes do código que dependem deles.
+8. Procure padrões de erro que já aconteceram (veja `docs/aprendizados.md`) ou que se repetem nesta US. Eles vão para a seção "Aprendizados para o processo".
 
 ## Classificação
 
@@ -47,6 +50,8 @@ Resultado: APROVADO | REPROVADO (n bloqueantes)
 | Cobertura de linhas do Core | xx% |
 | Cenários BDD com teste | n/n |
 | Teste antes do código (ordem de commits) | ✅/⚠️ |
+| Evidências da DoD conferem | ✅/❌ |
+| Intenção antes do código (spec/ADR → código) | ✅/⚠️/N/A |
 
 ## Bloqueantes
 - [ ] **B1** — `caminho/arquivo.cs:linha` — problema. Esperado: ... (regra/seção)
@@ -56,6 +61,9 @@ Resultado: APROVADO | REPROVADO (n bloqueantes)
 
 ## Pontos positivos
 - ...
+
+## Aprendizados para o processo
+- (erro recorrente ou que já está em docs/aprendizados.md) → regra/skill sugerida para evitá-lo
 ```
 
 Se não houver bloqueantes, escreva "Nenhum." na seção.
