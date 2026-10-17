@@ -8,6 +8,18 @@ user-invocable: false
 
 Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌ neles é **Bloqueante**. Os demais viram **Sugestão**, salvo se o problema também violar uma regra `RN-*` ou o `ARCHITECTURE.md`.
 
+## 0. Revisão de plano (modo revisão de plano, antes do código)
+- [O] Todo cenário BDD da US aparece no mapa da §4 com projeto, classe e método no padrão `Metodo_Cenario_Resultado`.
+- [O] Cada resposta P* com efeito observável (texto exibido, código de saída, normalização, evento de log) tem teste mapeado na §4 e tarefa na §5.
+- [O] A DoD da §10 cobre a DoD da US na sprint, com comandos verificáveis e resultado esperado (inclui cobertura do Core ≥ 80%).
+- [O] Conformidade com R1–R4, `RN-*` citadas e regras rápidas do `CLAUDE.md`; decisões técnicas relevantes têm ADR Proposto.
+- [O] Escopo: nada além nem aquém do que a US pede; fora de escopo explícito.
+- [O] Consistência interna: §3 (arquivos) × §4 (testes) × §5 (tarefas) × §6 (pacotes), com contagens que batem.
+- [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
+- Alteração proposta na `ARCHITECTURE.md` lista também as linhas do `CLAUDE.md` e das skills que repetem a mesma regra.
+- Riscos técnicos e ambiguidades que travariam o Executor estão tratados ou viraram pergunta em aberto.
+- Viabilidade técnica no SDK e nas bibliotecas em uso.
+
 ## 1. Spec e regras
 - [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código).
 - [O] Comportamento implementado bate com os cenários (valores, mensagens, códigos de saída).

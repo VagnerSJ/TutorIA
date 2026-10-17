@@ -21,6 +21,7 @@ O projeto é um laboratório para o mesmo fluxo usado no trabalho: Planejador �
 
 - Conhecimento compartilhado em skills pré-carregadas (`tdd-dotnet`, `bdd-para-testes`, `padroes-codigo`, `checklist-revisao`, `revisar-contexto`).
 - Orquestração pela skill `/us US-XXX` na conversa principal, com **portão humano** obrigatório entre Planejador e Executor.
+- **Revisão do plano** (acrescentada em 2026-10-17, AP-004): antes do portão humano, o revisor avalia o `plan.md` (rastreabilidade BDD → teste, P* com efeito observável testado, DoD verificável, conformidade com `RN-*`/`ARCHITECTURE.md`); relatório em `tasks/US-XXX/plan-review.md`, até 3 rodadas automáticas com o planejador. Na US-001 a etapa gerou 14 sugestões incorporadas antes do código.
 - Specs em `specs/` (concluídas → `specs/archive/`), planos e revisões em `tasks/US-XXX/`, documentação modular em `docs/us/US-XXX.md`.
 
 ### Como cada hábito virou estrutura
@@ -43,7 +44,7 @@ O projeto é um laboratório para o mesmo fluxo usado no trabalho: Planejador �
 
 ## Consequências
 
-- Rastreabilidade: cenário BDD → linha do plano → teste → evidência → item do review.
+- Rastreabilidade: cenário BDD → linha do plano → item do plan-review → teste → evidência → item do review.
 - Custo: o hook por edição adiciona alguns segundos a cada alteração em `.cs` (desligável com `ENGLISHTUTOR_HOOK_TESTS=0`).
 - Limitação: Write/Edit não podem ser restritos por caminho no frontmatter; o revisor confere violações. Evolução possível: hook `PreToolUse` por agente bloqueando escrita fora das pastas permitidas.
 - Hooks de projeto só rodam depois que a pasta é marcada como confiável no Claude Code; agentes novos só carregam numa sessão nova (AP-002).

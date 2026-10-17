@@ -16,7 +16,7 @@ Também é um laboratório de **Spec-Driven Development (SDD)** com 4 agentes.
 ## Fluxo obrigatório (SDD)
 
 Toda funcionalidade é conduzida por `/us US-XXX`:
-**Planejador** → aprovação do usuário → **Executor** (TDD) → **Revisor** → correção dos bloqueantes → **Documentador**.
+**Planejador** → **Revisor** (revisão do plano) → aprovação do usuário → **Executor** (TDD) → **Revisor** → correção dos bloqueantes → **Documentador**.
 
 - Nada de código de produção sem US e sem `tasks/US-XXX/plan.md` aprovado.
 - Cada cenário BDD vira pelo menos um teste escrito **antes** do código (Red → Green → Refactor).
