@@ -329,3 +329,8 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 - **B2** — §5, T6 → T7: dizer o estado do caminho não-JSON (tags) ao fim da T6, de modo que todos os testes da T7 (inclusive `Parse_WhenTextHasNoJsonNorTags_RejectsWithMissingReply`) falhem no Red pelo motivo certo; ou registrar e justificar que aquele teste é de regressão.
 
   → Incorporado em §5 (T6 e T7). Ao fim da T6, o ramo "senão → tags" chama `ParseTags(string rawText)`, que só lança `NotImplementedException("Tag format: implemented in T7.")`. Nesse ramo não se monta candidato nem se chama o validador. Os 8 testes da T7 passam todos pelo ramo de tags, então falham no Red com essa exceção. Isso inclui `TextHasNoJsonNorTags` e o novo `JsonIsInFenceOrAfterText`. Nenhum deles é de regressão, e o Executor confere o motivo da falha antes do Green. O Green da T7 troca o `throw` pela implementação.
+
+### 2026-10-17 — pedido do usuário (no chat, após a rodada 2 da revisão do plano)
+
+- Incorporar as sugestões S1, S2, S3, S5, S7, S8, S11 e S12 de `plan-review.md` (rodadas 1 e 2). As demais (S4, S6, S9, S10, S13) não foram pedidas.
+- Respostas padrão de P1–P9 aceitas como estão.
