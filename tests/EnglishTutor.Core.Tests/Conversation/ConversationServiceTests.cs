@@ -2,6 +2,7 @@ using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.Tests.Fakes;
 using EnglishTutor.Core.Tests.Support;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace EnglishTutor.Core.Tests.Conversation;
@@ -10,6 +11,9 @@ namespace EnglishTutor.Core.Tests.Conversation;
 public sealed class ConversationServiceTests
 {
     private const string _systemPrompt = "SYSTEM PROMPT";
+
+    // Rejected first answer (raw1), different from every accepted answer (AP-017, S2).
+    private const string _rejectedRawText = "rejected answer one";
 
     private readonly FakeTutorPromptSource _promptSource = new(_systemPrompt);
 
@@ -177,6 +181,128 @@ public sealed class ConversationServiceTests
         await send.Should().ThrowAsync<OperationCanceledException>();
         await sut.SendAsync("It was sunny", ct);
         brain.Requests[1].Messages.Should().Equal(UserTurn("It was sunny"));
+    }
+
+    // US-003 — Cenário: nova tentativa em resposta inválida — RN-BRAIN04 (P2, P3)
+    [Fact]
+    public async Task SendAsync_WhenFirstReplyIsInvalid_RetriesWithFormatCorrection()
+    {
+        var rejection = TutorReplyRejections.MissingReply();
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, rejection)
+            .Returns(TutorReplies.Valid("t1"));
+        var sut = CreateService(brain);
+
+        await sut.SendAsync("I goed to the park", TestContext.Current.CancellationToken);
+
+        brain.Requests.Should().HaveCount(2);
+        brain.Requests[1].Messages.Should().Equal(
+            UserTurn("I goed to the park"),
+            new BrainMessage(BrainRole.Assistant, _rejectedRawText),
+            new BrainMessage(BrainRole.User, TurnMessageBuilder.BuildFormatCorrection(rejection)));
+        brain.Requests[1].Messages[^1].Content.Should().Contain("format").And.Contain(rejection.Message);
+        brain.Requests[1].SystemPrompt.Should().Be(_systemPrompt);
+        brain.Requests[0].Messages.Should().Equal(UserTurn("I goed to the park"));
+    }
+
+    // US-003 — Cenário: nova tentativa em resposta inválida — RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_WhenFirstReplyIsInvalid_ReturnsSecondReplyWithFeedback()
+    {
+        var accepted = TutorReplies.Valid("t1");
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .Returns(accepted);
+        var sut = CreateService(brain);
+
+        var result = await sut.SendAsync("I goed to the park", TestContext.Current.CancellationToken);
+
+        result.IsReplied.Should().BeTrue();
+        result.Reply!.Should().BeSameAs(accepted);
+        result.Reply!.IsRawFallback.Should().BeFalse();
+        FeedbackFormatter.Format(result.Reply!).Should().NotBeEmpty();
+    }
+
+    // US-003 — Cenário: nova tentativa em resposta inválida (apoio: log) — RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason()
+    {
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .Returns(TutorReplies.Valid("t1"));
+        var sut = CreateService(brain);
+
+        await sut.SendAsync("I goed to the park", TestContext.Current.CancellationToken);
+
+        var entry = _logger.Entries.Should().ContainSingle().Subject;
+        entry.Level.Should().Be(LogLevel.Warning);
+        entry.EventId.Id.Should().Be(3000);
+        entry.Message.Should().Contain("Fake").And.Contain("missing reply");
+        entry.Message.Should().NotContain(_rejectedRawText).And.NotContain("I goed to the park");
+    }
+
+    // US-003 — Cenário: nova tentativa em resposta inválida (apoio) — RN-BRAIN04 (P6)
+    [Fact]
+    public async Task SendAsync_AfterRetriedTurn_KeepsOnlyFinalAnswerInWindow()
+    {
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .Returns(TutorReplies.Valid("t1"))
+            .Returns(TutorReplies.Valid("t2"));
+        var sut = CreateService(brain);
+        var ct = TestContext.Current.CancellationToken;
+        await sut.SendAsync("I goed to the park", ct);
+
+        await sut.SendAsync("It was sunny", ct);
+
+        brain.Requests[2].Messages.Should().Equal(
+            UserTurn("I goed to the park"),
+            new BrainMessage(BrainRole.Assistant, "raw answer t1"),
+            UserTurn("It was sunny"));
+        brain.Requests[2].Messages.Should().NotContain(message =>
+            message.Content.Contains(_rejectedRawText, StringComparison.Ordinal)
+            || message.Content.Contains("could not be used", StringComparison.Ordinal));
+    }
+
+    // US-003 — Cenário: nova tentativa em resposta inválida (apoio: cancelamento repassado) — RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_WhenRetrying_PassesCallerTokenToPromptSourceAndBothBrainCalls()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var token = cancellation.Token;
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .Returns(TutorReplies.Valid("t1"));
+        var sut = CreateService(brain);
+
+        await sut.SendAsync("I goed to the park", token);
+
+        _promptSource.Tokens.Should().Equal(token);
+        brain.Tokens.Should().Equal(token, token);
+    }
+
+    // US-003 — Cenário: nova tentativa em resposta inválida (apoio: falha na retentativa) — RN-BRAIN04 (P11)
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("cancelled")]
+    public async Task SendAsync_WhenRetryFailsWithOtherKindOrIsCancelled_PropagatesAndDoesNotRecordTurn(string failure)
+    {
+        Exception retryFailure = failure == "timeout"
+            ? new BrainException(BrainErrorKind.Timeout, "The brain timed out.")
+            : new OperationCanceledException();
+        var brain = new FakeTutorBrain()
+            .ReturnsInvalid(_rejectedRawText, TutorReplyRejections.MissingReply())
+            .Throws(retryFailure)
+            .Returns(TutorReplies.Valid("t2"));
+        var sut = CreateService(brain);
+        var ct = TestContext.Current.CancellationToken;
+
+        var send = () => sut.SendAsync("I goed to the park", ct);
+
+        (await send.Should().ThrowAsync<Exception>()).Which.Should().BeSameAs(retryFailure);
+        brain.Requests.Should().HaveCount(2);
+        await sut.SendAsync("It was sunny", ct);
+        brain.Requests[2].Messages.Should().Equal(UserTurn("It was sunny"));
     }
 
     private static BrainMessage UserTurn(string studentText) =>
