@@ -33,7 +33,7 @@ public sealed class LocalCommandParserTests
     [Theory]
     [InlineData("/xyz", "/xyz", "")]
     [InlineData("/", "/", "")]
-    [InlineData("/mode interview", "/mode", "interview")]
+    [InlineData("/foo bar", "/foo", "bar")]
     public void TryParse_WhenSlashCommandIsUnknown_ReturnsUnknownCommand(
         string input, string expectedName, string expectedArguments)
     {
@@ -61,5 +61,19 @@ public sealed class LocalCommandParserTests
 
         recognized.Should().BeTrue();
         command.Should().Be(new LocalCommand(LocalCommandKind.Help, "/help", string.Empty));
+    }
+
+    // US-003 — Cenário: troca de modo — RN-CONV01, RN-CONV06, P12
+    [Theory]
+    [InlineData("/mode job-interview", "/mode", "job-interview")]
+    [InlineData("/MODE  free-conversation ", "/MODE", "free-conversation")]
+    [InlineData("/mode", "/mode", "")]
+    public void TryParse_WhenInputIsModeCommand_ReturnsModeWithArguments(
+        string input, string expectedName, string expectedArguments)
+    {
+        var recognized = LocalCommandParser.TryParse(input, out var command);
+
+        recognized.Should().BeTrue();
+        command.Should().Be(new LocalCommand(LocalCommandKind.Mode, expectedName, expectedArguments));
     }
 }
