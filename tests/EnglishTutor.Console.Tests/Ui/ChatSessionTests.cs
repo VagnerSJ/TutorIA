@@ -107,7 +107,7 @@ public sealed class ChatSessionTests : IDisposable
     [Fact]
     public async Task RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand()
     {
-        var sut = CreateSession("﻿/quit", "I should never be read");
+        var sut = CreateSession("\uFEFF/quit", "I should never be read");
 
         var exitCode = await sut.RunAsync(TestContext.Current.CancellationToken);
 
@@ -119,12 +119,12 @@ public sealed class ChatSessionTests : IDisposable
     [Fact]
     public async Task RunAsync_WhenLaterLineStartsWithByteOrderMark_ForwardsItUnchanged()
     {
-        var sut = CreateSession("hello", "﻿/quit");
+        var sut = CreateSession("hello", "\uFEFF/quit");
 
         var exitCode = await sut.RunAsync(TestContext.Current.CancellationToken);
 
         exitCode.Should().Be(0);
-        _handler.Inputs.Should().Equal("hello", "﻿/quit");
+        _handler.Inputs.Should().Equal("hello", "\uFEFF/quit");
     }
 
     public void Dispose() => _output.Dispose();

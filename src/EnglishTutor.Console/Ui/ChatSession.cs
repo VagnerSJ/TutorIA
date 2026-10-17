@@ -5,7 +5,7 @@ namespace EnglishTutor.Console.Ui;
 // Console shell: shows the state, handles local commands (RN-CONV06) and forwards free text to the input handler.
 public sealed class ChatSession(TextReader input, TextWriter output, IChatInputHandler inputHandler, string provider, TutorMode mode)
 {
-    private const char _byteOrderMark = '﻿';
+    private const char _byteOrderMark = '\uFEFF';
 
     public async Task<int> RunAsync(CancellationToken ct)
     {
