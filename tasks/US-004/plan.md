@@ -1,9 +1,9 @@
 # Plano — US-004 Conversar por texto com o professor via Claude Code
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-17
 Branch: feature/US-004_conversa-texto-claude-code
 Spec: specs/sprints/SPRINT_1.md#us-004
-Regras: RN-BRAIN01, RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-CONV01, RN-CONV03, RN-CONV05, RN-CONV06, RN-FEED01–05 (RN-BRAIN07/09 só no limite descrito em §8); ARCHITECTURE §2 (R1–R4), §3, §5, §6.1, §6.3, §9, §10; ADR-001, ADR-002, ADR-004, ADR-005, ADR-006, ADR-007 (Proposto, novo)
+Regras: RN-BRAIN01, RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-CONV01, RN-CONV03, RN-CONV05, RN-CONV06, RN-FEED01–05 (RN-BRAIN07/09 só no limite descrito em §8); ARCHITECTURE §2 (R1–R4), §3, §5, §6.1, §6.3, §9, §10; ADR-001, ADR-002, ADR-004, ADR-005, ADR-006, ADR-007 (Aceito, novo)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Ligar o console ao `ConversationService` com o primeiro cérebro real, o `Claude
 
 ## 2. Abordagem
 
-A decisão central está no **ADR-007 (Proposto)**: `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md`. Em resumo:
+A decisão central está no **ADR-007 (Aceito)**: `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md`. Em resumo:
 
 - processo por turno atrás de `IProcessRunner`;
 - histórico renderizado num texto único no stdin;
@@ -395,7 +395,7 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` | Decisão (Proposto), criada junto com este plano; itens 3 e 5 e "Consequências" revisados na rodada 1; item 5 e contagem de turnos em "Consequências" revisados na rodada 2 |
+| Criar | `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` | Decisão (Aceito em 2026-10-17), criada junto com este plano; itens 3 e 5 e "Consequências" revisados na rodada 1; item 5 e contagem de turnos em "Consequências" revisados na rodada 2 |
 | Alterar | `ARCHITECTURE.md` | §3, §5, §6.3 (texto em §2.8), pelo orquestrador antes da T1 |
 | Alterar | `.claude/skills/padroes-codigo/SKILL.md` | 2 linhas de "DI e configuração" (§2.8), pelo orquestrador antes da T1 |
 | Alterar | `.claude/skills/tdd-dotnet/SKILL.md` | Caminho da fixture (§2.8), pelo orquestrador antes da T1 |
@@ -882,3 +882,12 @@ Incorporar as sugestões S1–S4 da Rodada 2 (texto completo e "Esperado" em [pl
   → Incorporado com um ajuste. S4 → §7 (linha nova), §9 P17. O ajuste: o plano registra o comportamento como aceito **sem** "até a US-007". Se o texto prometesse uma mudança na US-007, seria um adiamento que precisaria entrar na spec da US-007 (AP-022). E a US-007 tem um bom motivo para manter a validação: lá o ClaudeCode pode ser o `FallbackProvider` de um Ollama principal (cenário "fallback por limite de uso"). Se a US-007 quiser validar a seção só quando o ClaudeCode estiver em uso, decide isso na própria spec. A saída nesse caso é a de configuração inválida que já tem teste (`Invalid configuration:` + a mensagem com a chave e os valores aceitos, código 2). Sem teste novo: o mecanismo é o mesmo de `RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration` e dos testes de configuração inválida da US-001.
 
 Depois desses ajustes e de uma revisão do plano sem bloqueantes, o plano está aprovado pelo usuário.
+
+### 2026-10-17 — aprovação do usuário
+
+Plano aprovado pelo usuário no chat, com as sugestões S1–S4 da rodada 2 incorporadas e a rodada 3 da revisão do plano sem bloqueantes.
+
+- Perguntas em aberto P1–P19: valem as respostas padrão propostas na §9.
+- ADR-007: Aceito (2026-10-17).
+- §2.8 aplicada antes da T1: `docs(ai): update spec for US-004` (f42d0d7) e `docs(ai): update architecture for US-004` (5917a1d).
+- A sugestão S1 da rodada 3 (justificativa da P17/§7 cita o cenário de fallback da US-007 com papéis invertidos) não foi aplicada; a decisão da P17 não muda.
