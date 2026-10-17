@@ -1,6 +1,7 @@
 using EnglishTutor.Console.Ui;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,7 +17,17 @@ public static class EnglishTutorApp
         ArgumentNullException.ThrowIfNull(options);
 
         using var host = BuildHost(options);
-        await host.StartAsync(ct);
+        try
+        {
+            // Triggers ValidateOnStart: an invalid Brain:Provider fails here, before the session opens.
+            await host.StartAsync(ct);
+        }
+        catch (OptionsValidationException exception)
+        {
+            await WriteInvalidConfigurationAsync(options.Error, exception, ct);
+            return ExitCodes.InvalidConfiguration;
+        }
+
         try
         {
             var session = new ChatSession(
@@ -47,9 +58,22 @@ public static class EnglishTutorApp
         AddConfigurationSources(builder, options);
 
         builder.Services.Configure<ConsoleLifetimeOptions>(lifetime => lifetime.SuppressStatusMessages = true);
-        builder.Services.AddOptions<BrainOptions>().Bind(builder.Configuration.GetSection(BrainOptions.SectionName));
+        builder.Services.AddEnglishTutorCore();
+        builder.Services.AddOptions<BrainOptions>()
+            .Bind(builder.Configuration.GetSection(BrainOptions.SectionName))
+            .ValidateOnStart();
 
         return builder.Build();
+    }
+
+    private static async Task WriteInvalidConfigurationAsync(
+        TextWriter error, OptionsValidationException exception, CancellationToken ct)
+    {
+        await error.WriteLineAsync(ConsoleText.InvalidConfiguration.AsMemory(), ct);
+        foreach (var failure in exception.Failures)
+        {
+            await error.WriteLineAsync($"  {failure}".AsMemory(), ct);
+        }
     }
 
     private static void AddConfigurationSources(HostApplicationBuilder builder, AppRunOptions options)
