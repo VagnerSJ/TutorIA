@@ -102,3 +102,58 @@ Nenhum.
 ### Aprendizados para o processo
 - O padrão "P* termina com `Teste: ...` ou `Sem efeito observável`", sugerido na rodada 1, resolveu o B1 assim que foi aplicado. Mas o planejador só o aplicou às P* citadas no bloqueante (P2 e P3 ficaram de fora, S13). Isso reforça a regra sugerida para `.claude/agents/planejador.md`: valer para todas as P* desde a primeira versão do plano, e não só como resposta à revisão.
 - O B2 foi resolvido com "o outro ramo lança `NotImplementedException` até a tarefa seguinte". Isso confirma a sugestão da rodada 1 para a skill `tdd-dotnet`: quando uma tarefa cria um desvio cujo outro ramo pertence à tarefa seguinte, o plano diz o estado desse ramo. A S11 mostra o complemento: os testes da tarefa atual precisam declarar a entrada que os mantém no ramo já implementado.
+
+## Rodada 3
+
+Data: 2026-10-17
+Escopo revisado: `tasks/US-002/plan.md` na revisão do commit e702c74 (`docs(ai): revise plan for US-002`), branch `feature/US-002_contrato-parser-resposta`. O commit mexe só no `plan.md` (+81/−24). Ainda não há código na branch: o `git diff develop...HEAD` tem só o ADR-005, o `plan-review.md` e o `plan.md`. Também conferi `ARCHITECTURE.md:241`, `.claude/skills/tdd-dotnet/SKILL.md:28,90`, uma busca por `saídas reais|gravad` em `CLAUDE.md`, `ARCHITECTURE.md`, `.claude/`, `docs/` e `specs/`, o AP-007 em `docs/aprendizados.md` e o item de caracteres invisíveis do `checklist-revisao` §4. Rodei a D11a no diff atual da branch e o resultado foi `0`.
+Resultado: APROVADO
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| [O] Todo cenário BDD aparece no mapa da §4 com projeto, classe e método `Metodo_Cenario_Resultado` | ✅ Os 6 cenários continuam com teste no parser (Infrastructure.Tests) e no Core. O mapa não mudou, só a descrição da entrada de `KeepsRawTextAndIsNotRawFallback` (S11) |
+| [O] Cada P* com efeito observável tem teste na §4 e tarefa na §5 | ✅ Nada mudou desde a rodada 2. A S3 tirou um ramo que não tinha teste e não criou efeito novo sem teste |
+| [O] A DoD da §10 cobre a DoD da US, com comandos verificáveis e Core ≥ 80% | ✅ D1 agora também confere a ausência de CS8775. O D11 passou a dois comandos que de fato detectam os bytes (ver S1 abaixo) |
+| [O] Conformidade com R1–R4, RN-* citadas e regras rápidas do `CLAUDE.md`; ADR Proposto | ✅ Nada mudou. O desvio das "fixtures reais" agora está declarado e tem texto proposto para a `ARCHITECTURE.md` e a `tdd-dotnet` (S5) |
+| [O] Escopo: nada além nem aquém; fora de escopo explícito | ✅ A §8 separa extrair o JSON (fora) de rejeitar o caso (dentro, com teste) (S12) |
+| [O] Consistência interna §3 × §4 × §5 × §6 com contagens que batem | ✅ Recontei. Core.Tests tem 13 métodos / 20 casos: validador 8/11, formatador 4/5, rejeições 1/4. Infrastructure.Tests tem 18 métodos / 24 casos: 14 `[Fact]` e `[Theory]` de 2, 3, 3 e 2 casos. T3+T4 = 5+3 e T6+T7 = 10+8. D2 = 93 (47+22+24) e D5 = 18/24. A §3 tem a linha nova da `tdd-dotnet` e as notas `partial` e "`IsValid` armazenada". Não sobrou nenhuma menção a "antes da T2" nem ao ramo "the root is …" |
+| [O] Ordem das tarefas preserva o Red de cada teste | ✅ Os 10 testes da T6 têm entrada que começa com `{` depois do `Trim()`, inclusive `KeepsRawTextAndIsNotRawFallback`, que agora lê `json-valid.json`. Nenhum depende do ramo de tags, que lança até a T7. Na T6, `JsonHasNoCorrectionsAndPraise` usa o `FeedbackFormatter` já pronto (T5), mas falha no Red porque o `Parse` ainda é esqueleto. A T2 só compila o esqueleto de `TutorReplyParseResult`, sem antecipar teste da T3 |
+| Alteração na `ARCHITECTURE.md` lista as linhas do `CLAUDE.md` e das skills que repetem a regra | ✅ A busca confirma que a regra das "saídas reais gravadas" só aparece em `ARCHITECTURE.md:241` e em `tdd-dotnet/SKILL.md:28,90`. As menções em `SPRINT_1.md:249-250` (US-004) e no ADR-001 batem com a ressalva "a partir da US-004" |
+| Riscos e ambiguidades que travariam o Executor | ✅ A S2 e a S3 foram resolvidas. O caso de CS8775 aparecer mesmo assim tem caminho definido: parar e registrar no §12 (AP-009) |
+| Viabilidade técnica no SDK e nas bibliotecas | ✅ Ver a análise abaixo (CS8775 e D11 no Git Bash) |
+
+Análise dos dois pontos técnicos pedidos:
+
+- **CS8775 na forma escolhida.** O CS8775 é emitido quando o compilador analisa o corpo de um getter ou método que tem `MemberNotNullWhen`. Uma auto-propriedade só com `get` tem acessor gerado pelo compilador, sem corpo do usuário para analisar, então a forma da §2.1 não deve gerar o aviso. O construtor privado só atribui um `TutorReply?` e um `TutorReplyRejection?` a propriedades anuláveis e `Warnings` a uma propriedade não anulável, o que também não gera aviso de nulidade. Como a classe é `sealed record`, o compilador gera um construtor de cópia privado, usado pelo `with`. Ele copia os campos de apoio como estão, e sem `init` não há como mudar uma propriedade sozinha. A coerência entre `IsValid`, `Reply` e `Rejection` fica garantida pelas duas fábricas. O build do esqueleto na T2 é o lugar certo para confirmar. Não reproduzi esse build porque não posso criar arquivos.
+- **D11 no Git Bash do Windows.** `$'\xef\xbb\xbf'` (ANSI-C quoting) vira bytes crus no Bash, e o `grep` do Git Bash é um binário MSYS que recebe os argumentos sem conversão. `LC_ALL=C` antes do `grep` na pipeline é sintaxe válida. `--include`/`--exclude-dir` depois dos caminhos funcionam no GNU grep. O `-c` conta linhas e imprime `0` com código de saída 1, como o plano avisa. Rodei a D11a no diff atual e o resultado foi `0`.
+
+### Itens da rodada anterior
+- [x] **S1** — resolvido em e702c74. O D11 virou D11a (mesma forma do `checklist-revisao` §4, com `LC_ALL=C`, esperado `0`) e D11b (busca recursiva em `src`/`tests`, esperado não listar nada). O `grep -P '\xEF…'` saiu, e a linha do BOM na §7 foi atualizada. A forma é viável no Git Bash (ver a análise acima).
+- [x] **S2** — resolvido em e702c74. A §2.1 traz o código e o parágrafo "Forma de `TutorReplyParseResult`": auto-propriedade armazenada atribuída no construtor privado, fábricas como único caminho de criação, `ArgumentNullException` para argumento nulo e `TryGet…` descartado com o motivo. A forma também aparece nas alternativas descartadas, na §3, na §5 T2, na §7 e no D1, e há caminho definido se o aviso aparecer (AP-009).
+- [x] **S3** — resolvido em e702c74. O ramo "raiz que não é objeto" saiu da §2.2, com a justificativa e o destino de um texto que começa com `[` (caminho de tags → `missing reply`). A mensagem de `invalid JSON` na tabela da §2.1 não tem mais o exemplo "the root is an array", e "Detectar `[` como JSON" entrou nas alternativas descartadas.
+- [x] **S5** — resolvido em e702c74. A §2.3 declara o desvio e a §2.4 traz o texto novo para `ARCHITECTURE.md:241` e `tdd-dotnet/SKILL.md:28,90`, com os números de linha conferidos. A busca de repetições foi registrada, e a §3, a pré-condição da §5, a §7 e a DoD comum estão coerentes.
+- [x] **S7** — resolvido em e702c74. Agora há um ponto único de aplicação, antes da T1, num commit `docs(ai)` do orquestrador, e ele é o mesmo no título da §2.4, na pré-condição da §5, na §3 e na DoD comum. Não sobrou "antes da T2".
+- [x] **S8** — resolvido em e702c74. `public sealed partial class TutorReplyParser`, com exemplo de `[GeneratedRegex]` `static partial` na própria classe e uma nota explicando. Coerente na §3 e na §5 (T6 e T7).
+- [x] **S11** — resolvido em e702c74. A entrada é o conteúdo de `json-valid.json`, com `RawText` igual byte a byte e `IsRawFallback == false`. A T6 diz que as 10 entradas começam com `{` depois do `Trim()`. O plano diz por que não entrou um teste de texto cru com tags (opcional e mudaria as contagens).
+- [x] **S12** — resolvido em e702c74. A §8 separa **extrair** (fora de escopo) de **rejeitar** (no escopo, com os dois testes citados).
+- **S4, S6, S9, S10, S13** — recusadas pelo usuário. Não foram reabertas.
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S14** — `plan.md` §10, texto logo abaixo do bloco do D11. O plano avisa que o `grep -c` da D11a sai com código 1 quando conta 0, mas não diz o mesmo da D11b: o `grep -rl` também sai com código 1 quando não acha nada, e esse é justamente o resultado esperado. Ao colar a evidência, o Executor não deve ler esse código 1 como falha. Basta estender a frase final para os dois comandos.
+
+### Pontos positivos
+- Cada sugestão aplicada tem na §12 uma entrada que aponta todas as seções tocadas. Isso deixou a conferência mecânica, e não encontrei nenhuma seção esquecida.
+- A decisão sobre o CS8775 vem com o porquê técnico, a alternativa descartada e o que fazer se a premissa falhar no build da T2. É a aplicação direta do AP-009.
+- O D11 reaproveita a forma do `checklist-revisao` §4 em vez de inventar uma variante, e explica por que o `grep -P '\xNN'` falhava. Isso atende ao aprendizado da rodada 1.
+- A S3 foi resolvida removendo o ramo, não criando teste para código morto, e o destino da entrada que começa com `[` ficou declarado.
+- As contagens (§4, §5, D2, D5) continuam corretas mesmo com uma revisão grande do texto.
+
+### Aprendizados para o processo
+- O D11 agora usa `LC_ALL=C grep …`, e o `checklist-revisao` §4 usa `grep …` sem `LC_ALL=C`. Hoje os dois dão o mesmo resultado, porque os três padrões são sequências UTF-8 válidas, mas são duas formas do mesmo comando, que é o que o aprendizado da rodada 1 queria evitar. Sugestão: adotar uma forma só (com `LC_ALL=C`, que não depende do locale) no `checklist-revisao` §4, no AP-007 e em `.claude/agents/executor.md`, e o Planejador copiar dali.
+- Quando o usuário pede para aplicar um conjunto de sugestões, a resposta da §12 no formato "sugestão → seções tocadas" permitiu conferir tudo numa rodada. Vale tornar esse formato padrão em `.claude/agents/planejador.md` para respostas a revisões de plano.
+
+Arquivos relevantes: `C:\Crescimento\TutorIA\tasks\US-002\plan.md`, `C:\Crescimento\TutorIA\tasks\US-002\plan-review.md`, `C:\Crescimento\TutorIA\ARCHITECTURE.md` (linha 241), `C:\Crescimento\TutorIA\.claude\skills\tdd-dotnet\SKILL.md` (linhas 28 e 90), `C:\Crescimento\TutorIA\.claude\skills\checklist-revisao\SKILL.md`.
