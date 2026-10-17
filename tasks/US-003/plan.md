@@ -303,7 +303,7 @@ Se o usuário escolher o caminho (b) do B1 (trazer os itens para esta US), este 
 | Criar | `src/EnglishTutor.Core/Conversation/ConversationWindow.cs` | Últimos N turnos → mensagens | criado em `f7dafc8`/`9858f6d` |
 | Criar | `src/EnglishTutor.Core/Conversation/ConversationTurnResult.cs` | Resposta ou aviso local | criado em `f75cc4b` |
 | Criar | `src/EnglishTutor.Core/Conversation/ConversationMessages.cs` | Texto do aviso de entrada vazia | criado em `f75cc4b` |
-| Criar | `src/EnglishTutor.Core/Conversation/ConversationService.cs` | Orquestração do turno, modo, retentativa e fallback | criado em `f75cc4b`; `24106f2`, `a401b33`, `88aa8eb`, `3206913` |
+| Criar | `src/EnglishTutor.Core/Conversation/ConversationService.cs` | Orquestração do turno, modo, retentativa e fallback | criado em `f75cc4b`; `24106f2`, `a401b33`, `88aa8eb`, `3206913`; review S2 em `d00a61f` |
 | Criar | `src/EnglishTutor.Core/Conversation/ConversationLog.cs` | `[LoggerMessage]` 3000 e 3001 | criado em `f75cc4b` |
 | Alterar | `src/EnglishTutor.Console/Ui/ChatSession.cs` | Aviso local na linha em branco | feito em `232693a` |
 | Criar | `tests/EnglishTutor.Core.Tests/Fakes/FakeTutorBrain.cs` | `Name => "Fake"` (fixo; a asserção de `SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason` depende dele, S8) + fila de respostas (`Returns`, `ReturnsInvalid`, `Throws`) + `Requests` + `Tokens` | criado em `f75cc4b` |
@@ -312,8 +312,8 @@ Se o usuário escolher o caminho (b) do B1 (trazer os itens para esta US), este 
 | Criar | `tests/EnglishTutor.Core.Tests/Support/RecordingLogger.cs` | Logger fake (cópia do da Infrastructure.Tests) | criado em `f75cc4b` |
 | Alterar | `tests/EnglishTutor.Core.Tests/Conversation/TutorModeTests.cs` | `TryParse` | feito em `89dd1f6` |
 | Alterar | `tests/EnglishTutor.Core.Tests/Conversation/LocalCommandParserTests.cs` | `/mode`; caso `"/mode interview"` do desconhecido trocado por `"/foo bar"` | feito em `89dd1f6` |
-| Criar | `tests/EnglishTutor.Core.Tests/Brain/BrainExceptionTests.cs` | Fábrica e guarda do construtor; guardas de nulo da fábrica (review S3) | criado em `3bb384f`; review S3 em (T13) |
-| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyTests.cs` | Guarda de nulo de `RawFallback` (review S3) | (T13) |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/BrainExceptionTests.cs` | Fábrica e guarda do construtor; guardas de nulo da fábrica (review S3) | criado em `3bb384f`; review S3 em `e704924` |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyTests.cs` | Guarda de nulo de `RawFallback` (review S3) | criado em `e704924` |
 | Criar | `tests/EnglishTutor.Core.Tests/Conversation/ConversationOptionsTests.cs` | Padrão 10 | criado em `513066e` |
 | Criar | `tests/EnglishTutor.Core.Tests/Conversation/ConversationOptionsValidatorTests.cs` | Limite ≥ 1 nos dois lados | criado em `513066e` |
 | Alterar | `tests/EnglishTutor.Core.Tests/DependencyInjection/CoreServiceCollectionExtensionsTests.cs` | Validador de `ConversationOptions` registrado | feito em `513066e` |
@@ -424,7 +424,7 @@ Em toda tarefa, os esqueletos vêm antes dos testes (AP-013). Depois de `x.Shoul
 - [x] T11 — DoD: rodar D1–D11, colar em §11, marcar §5 com os hashes. (commit: `docs(ai): add DoD evidence for US-003`) — feito: `3156357`.
 - [x] T12 — Review S2 (§12): `ConversationService` sem o campo `_logger`, usando o parâmetro `logger` do construtor primário. Sem mudança de comportamento; `ConversationServiceTests` 21 verdes antes e depois. (commit: `refactor(core): use primary constructor logger in conversation service (review S2)`)
 - [x] T13 — Review S3 (§12): `BrainExceptionTests.InvalidOutput_WithNullArgument_ThrowsArgumentNullException` (2 casos) e `TutorReplyTests.RawFallback_WithNullRawText_ThrowsArgumentNullException` (1). Testes de caracterização: Red por mutação temporária não commitada (remover cada guarda). (commit: `test(core): characterize null guards of brain contract (review S3)`) — feito: os 3 casos nascem verdes com as guardas. Red por mutação (uma por vez, não commitada, fonte restaurada com `git checkout`): sem `ThrowIfNull(rejection)` → 1 falha, "Expected a <System.ArgumentNullException> to be thrown, but found <System.NullReferenceException>" (o construtor privado lê `rejection.Message`); sem `ThrowIfNull(rawText)` em `InvalidOutput` → 1 falha, "Expected a <System.ArgumentNullException> to be thrown, but no exception was thrown"; sem `ThrowIfNull(rawText)` em `RawFallback` → 1 falha, "... but found <System.NullReferenceException>" (`rawText.Trim()`).
-- [ ] T14 — DoD afetada (D1, D2, D3/D3b, D4, D5, D6, D8, D10, D11) refeita e §11 atualizada. (commit: `docs(ai): update DoD evidence for US-003 review fixes`)
+- [x] T14 — DoD afetada (D1, D2, D3/D3b, D4, D5, D6, D8, D10, D11) refeita e §11 atualizada. (commit: `docs(ai): update DoD evidence for US-003 review fixes`) — feito: ver §11.1.
 
 Conferência das contagens por tarefa: `ConversationServiceTests` = T7 9/11 + T8 6/7 + T9 3/3 = 18 métodos / 21 casos.
 
@@ -526,6 +526,25 @@ Executado em 2026-10-17 sobre o commit `232693a` (todo o código da US commitado
 | D11 | `git diff develop...HEAD \| LC_ALL=C grep -c ...` (Git Bash) → `0`, código de saída 1 (esperado, AP-019) | ✅ |
 
 DoD comum: cada cenário BDD com teste escrito antes do código (pares `test`/`feat` em §5); §2.6 aplicada antes da T1 (`4b82f0a`, `f522128`); ADR-006 Aceito (`3e3d711`). Pendentes fora do Executor: `review.md`, `docs/us/US-003.md` e merge em `develop`.
+
+### 11.1 DoD refeita após as sugestões S2 e S3 do review (T14)
+
+Executado em 2026-10-17 sobre o commit `e704924` (S2 em `d00a61f`, S3 em `e704924`; todo o código commitado). D7 e D9 não foram refeitos: as mudanças não tocam pacotes do Core nem o console (o resultado acima vale).
+
+| # | Resultado | |
+|---|---|---|
+| D1 | `dotnet build` → "0 Aviso(s) 0 Erro(s)" (sem CS8775 nem CA1032) | ✅ |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` → Core.Tests 102/102, Console.Tests 25/25, Infrastructure.Tests 24/24 = **151 passed, 0 failed** (+3 casos do S3) | ✅ |
+| D3 | Cobertura com `--results-directory TestResults` → 151 verdes; 3 arquivos `coverage.cobertura.xml` | ✅ |
+| D3b | `coverage/Summary.txt` → `EnglishTutor.Core 100%` (geral da solução 87,8%) | ✅ |
+| D4 | `dotnet format --verify-no-changes` → sem diferenças, exit=0 | ✅ |
+| D5 | `dotnet test tests/EnglishTutor.Core.Tests --no-build` → 102 passed, Duração: 120 ms (< 10 s) | ✅ |
+| D6 | `coverage/conversation/Summary.txt` → `EnglishTutor.Core.Conversation.*`: **100% de linhas** (168/168, uma linha a menos pelo S2; ramos 85%, 17/20), 13 classes | ✅ |
+| D8 | `--filter "FullyQualifiedName~ConversationServiceTests"` → 21 passed (18 métodos), sem alteração nos testes | ✅ |
+| D10 | `git status --short` após D2–D8 → vazio | ✅ |
+| D11 | `git diff develop...HEAD \| LC_ALL=C grep -c ...` (Git Bash) → `0`, código de saída 1 (esperado, AP-019) | ✅ |
+
+Status dos itens do review (Rodada 1), para confirmação do Revisor: S2 → aplicado em `d00a61f`; S3 → aplicado em `e704924` (testes de `BrainException.InvalidOutput` e `TutorReply.RawFallback`; demais guardas registradas como defensivas na §12, `3a09c34`).
 
 ## 12. Comentários do usuário
 
