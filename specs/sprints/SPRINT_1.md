@@ -325,6 +325,16 @@ Cenário: tempo esgotado
   Quando envio uma frase
   Então o processo filho é encerrado
   E vejo uma mensagem de tempo esgotado
+
+Cenário: falha do cérebro no console não encerra a sessão
+  Dado o console com o provedor ClaudeCode
+  E um cérebro que falha num turno com BrainException de qualquer BrainErrorKind que chegue ao console, inclusive Unknown
+  Quando envio uma frase
+  Então vejo na saída de erro uma mensagem que diz o que deu errado e o que fazer
+  E, para Unknown, a mensagem inclui o detalhe da BrainException (ex.: "Claude Code failed (exit code 1): ...")
+  E não vejo "An unexpected error occurred. See the log file for details."
+  E a sessão continua: a frase seguinte é enviada ao cérebro
+  E ao digitar "/quit" o código de saída é 0
 ```
 
 **DoD extra**
@@ -333,6 +343,7 @@ Cenário: tempo esgotado
 |---|---|---|
 | D5 | `dotnet test --filter "FullyQualifiedName~ClaudeCode"` | um teste por `BrainErrorKind`, com fixtures de stdout/stderr gravadas |
 | D6 | `$env:Brain__ClaudeCode__ExecutablePath="nao-existe"; "hi" \| dotnet run --project src/EnglishTutor.Console` | mensagem "Claude Code CLI not found" com instrução; sessão continua |
+| D7 | `dotnet test --filter "FullyQualifiedName~EnglishTutorAppTests"` | verde; o teste `RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError` (US-004, P11) foi substituído pelo teste do cenário "falha do cérebro no console não encerra a sessão" |
 
 ---
 
@@ -364,6 +375,13 @@ Cenário: modelo não baixado
   Dado que o modelo configurado não existe no Ollama
   Quando envio uma frase
   Então vejo o comando "ollama pull <modelo>"
+
+Cenário: console conversa com o Ollama
+  Dado "Brain:Provider" igual a "Ollama"
+  Quando envio uma frase pelo console
+  Então o BrainRequest é enviado ao OllamaTutorBrain
+  E vejo a linha "Tutor: <reply>" e o feedback do turno, no mesmo formato do provedor ClaudeCode
+  E não vejo "The tutor is not connected yet."
 ```
 
 **DoD extra** (requer Ollama com o modelo baixado)
