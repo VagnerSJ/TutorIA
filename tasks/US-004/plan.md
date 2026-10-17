@@ -751,3 +751,12 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-17 — pedido do Revisor do plano (rodada 1, `plan-review.md`)
+
+Corrigir os bloqueantes abaixo (texto completo e "Esperado" em [plan-review.md](plan-review.md), Rodada 1):
+
+- **B1** — Com `BrainOptions`, `ClaudeCodeOptions` e `ConversationOptions` validadas na partida, falhas simultâneas de mais de uma seção viram `AggregateException` e caem no `catch (Exception)` (erro inesperado, código 1). Decidir numa P* como a saída mostra `Invalid configuration:` com a mensagem de cada validador e `ExitCodes.InvalidConfiguration`; mapear teste com duas seções inválidas (§4), tarefa (§5), contagens, D2 e risco (§7).
+- **B2** — A P11 adia para a US-005 "mensagem clara com a sessão continuando" para qualquer falha (inclusive `Unknown`), mas a spec da US-005 não tem isso. Trazer na §2.8 o texto exato a acrescentar na US-005 (commit `docs(ai): update spec for US-004` antes da T1) e corrigir a §8.
+- **B3** — A linha `is_error: true` com código de saída 0 da tabela de `ClaudeCodeOutput.Read` (§2.5) não é exercitada. Teste para "código 0 e `is_error: true`" → `BrainException(Unknown)` com detalhe, sem chamar o parser; definir o texto da mensagem; atualizar contagens, §5 e D11.
+- **B4** — `OutputMode` aceito sem diferenciar maiúsculas pelo validador, mas sem dono da normalização no adaptador. A P13 decide quem normaliza; §4/§5 mapeiam teste com valor aceito em outra caixa produzindo os argumentos e o arquivo de formato do modo correspondente.
