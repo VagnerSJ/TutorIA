@@ -12,7 +12,7 @@ A estrutura de pastas e as camadas estão em `ARCHITECTURE.md` §2–§3. Aqui f
 
 - `Directory.Build.props` na raiz: `TargetFramework` (o do `global.json`), `Nullable=enable`, `ImplicitUsings=enable`, `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-recommended`, `LangVersion=latest`.
 - Versões de pacotes centralizadas em `Directory.Packages.props` (Central Package Management).
-- `.editorconfig` da raiz é a referência de estilo; `dotnet format` não pode gerar diff.
+- `.editorconfig` da raiz é a referência de estilo; `dotnet format` não pode gerar diff. O build não aplica as regras de estilo (ex.: IDE1006); quem as verifica a cada edição é o hook `post-edit-dotnet` (`dotnet format style --verify-no-changes` no arquivo editado) e, no fim, o D4 (AP-012).
 
 ## Nomes
 

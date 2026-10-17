@@ -37,7 +37,7 @@ Escopos: `core`, `brain`, `stt`, `tts`, `audio`, `persistence`, `console`, `infr
 
 ## Feedback dos hooks
 
-Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, compila e roda os testes do projeto afetado; erros voltam para você como mensagem. Leia e corrija antes de seguir. Na fase **Red**, a falha do teste novo é esperada: confirme que é a falha certa e siga para o Green. Quando você terminar, um hook de parada roda build + testes completos e bloqueia o encerramento se algo estiver vermelho.
+Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, verifica as regras de estilo do `.editorconfig` no `.cs` editado (`dotnet format style --verify-no-changes`, ex.: IDE1006), compila e roda os testes do projeto afetado; erros voltam para você como mensagem. Leia e corrija antes de seguir. Na fase **Red**, a falha do teste novo é esperada: confirme que é a falha certa e siga para o Green. Quando você terminar, um hook de parada roda build + testes completos e bloqueia o encerramento se algo estiver vermelho.
 
 ## Caracteres invisíveis (AP-007)
 
