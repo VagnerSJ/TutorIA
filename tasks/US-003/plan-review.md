@@ -127,3 +127,57 @@ Nenhum.
 ### Aprendizados para o processo
 - **Os aprendizados da Rodada 1 ainda não estão em `docs/aprendizados.md`.** São o adiamento em cadeia sem dono na spec e a referência a documento só por número de linha. O plano já aplica os dois na prática: a §2.6 registra na spec de destino e cita o trecho pelo texto antigo. Mesmo assim, o registro como AP e a regra no `planejador.md` e no checklist de revisão de plano ("todo item da §8 que vai para a US-YYY é registrado na spec da US-YYY antes da T1; o trecho a substituir é citado pelo texto antigo") continuam pendentes para o Documentador.
 - **Cenário de spec criado para outra US herda critérios implícitos.** Na S9, o cenário novo da US-004 descreve o encerramento sem o código de saída, embora a US-001 já tenha fixado esse padrão. Proposta para o `planejador.md`: ao escrever cenário ou DoD para outra US, reutilizar os critérios observáveis que o projeto já fixou para o mesmo tipo de comportamento (código de saída, texto da mensagem, canal de saída).
+
+## Rodada 3
+
+Data: 2026-10-17
+Escopo revisado: `tasks/US-003/plan.md` no commit ea75e93 (`docs(ai): revise plan for US-003`) da branch `feature/US-003_conversation-service`. Comparei com a Rodada 2 (8efac37) pelo diff `8efac37..ea75e93`. Entre as duas rodadas só mudaram `plan.md` e `plan-review.md`: c7b3001 traz a revisão, 1061786 os comentários do usuário e ea75e93 a revisão do plano (+27/−19 no `plan.md`). Ainda não há código na branch. Também conferi:
+- a §4 inteira, para casar nome a nome os 18 métodos de `ConversationServiceTests` com as listas de T7, T8 e T9;
+- `src/EnglishTutor.Console/ExitCodes.cs`, onde `InvalidConfiguration = 2` está na linha 10;
+- `src/EnglishTutor.Console/EnglishTutorApp.cs:61-62,166-174`, o caminho atual de configuração inválida;
+- `.claude/skills/tdd-dotnet/SKILL.md:48`, onde está o `Name => "Fake"` do exemplo.
+
+Não há caracteres invisíveis no diff: `git diff develop...HEAD | LC_ALL=C grep -c ...` devolve 0.
+Resultado: APROVADO
+
+### Itens da rodada anterior
+| Item | Status |
+|---|---|
+| **S8** — `Name` do `FakeTutorBrain` explícito | Resolvido em ea75e93. A linha do `FakeTutorBrain.cs` na §3 agora diz `Name => "Fake"`, fixo, e cita a dependência de `SendAsync_WhenFirstReplyIsInvalid_LogsRetryWarningWithReason`. A lista de esqueletos da T7 repete o valor. Ele confere com a asserção "mensagem contém `Fake`" da §4 (linha 348) e com o exemplo da `tdd-dotnet` |
+| **S9** — código de saída no cenário novo da US-004 | Resolvido em ea75e93. O bloco `gherkin` da §2.6 ganhou a linha `E o código de saída é o de configuração inválida (ExitCodes.InvalidConfiguration, diferente de 0)` no cenário "janela de turnos configurável". Isso confere com `ExitCodes.cs:10` e com o caminho já existente em `EnglishTutorApp.cs:61-62`. O critério é verificável e reaproveita o padrão da US-001. A spec continua mudando só pelo commit único antes da T1 |
+| **S10** — nomes completos nas tarefas | Resolvido em ea75e93. A T7 lista 9 nomes, a T8 lista 6 e a T9 lista 3, todos por extenso, e os textos de motivo do Red e de estado do ramo também usam o nome completo. Conferi os 18 um a um contra a §4: todos idênticos. A regra "nomes iguais aos da §4, por extenso" entrou no parágrafo de abertura da §5 |
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| [O] Todo cenário BDD aparece no mapa da §4 com projeto, classe e método `Metodo_Cenario_Resultado` | ✅ 7/7. A §4 não mudou nesta rodada |
+| [O] Cada P* com efeito observável tem teste na §4 e tarefa na §5 | ✅ Os testes citados em P2–P13 têm o mesmo nome na §4 e na tarefa correspondente. Com os nomes completos, isso agora se confere por texto, não por dedução |
+| [O] DoD da §10 cobre a DoD da US, com Core ≥ 80% | ✅ D1–D11 não mudaram em relação à Rodada 2 |
+| [O] Conformidade com R1–R4, RN-* e `CLAUDE.md`; ADR Proposto | ✅ Nada mudou. O ADR-006 segue Proposto e vai para Aceito no commit anterior à T1 |
+| [O] Escopo: nada além nem aquém; fora de escopo explícito | ✅ A US-003 não ganhou comportamento. A S9 só torna explícito na spec da US-004 um critério que o console já cumpre |
+| [O] Consistência §3 × §4 × §5 × §6, com contagens que batem | ✅ Para `ConversationServiceTests`, as tarefas somam T7 9/11 + T8 6/7 + T9 3/3 = 18/21, o mesmo da §4. O Core.Tests fica em 34/48 e o total em 35/51. A suíte vai a 148 (Core 99, Console 25, Infra 24). D2, D5 e D8 não mudaram e continuam batendo. A §3 não ganhou nem perdeu arquivos |
+| [O] Ordem das tarefas preserva o Red | ✅ A ordem e os motivos de Red de T7, T8 e T9 continuam os da Rodada 2. Só mudou a grafia dos nomes. O `Name => "Fake"` no esqueleto da T7 não faz nenhum teste da T8 nascer verde, porque o log 3000 só existe no Green da T8 |
+| Alteração na `ARCHITECTURE.md` lista as linhas do `CLAUDE.md` e das skills que repetem a regra | ✅ Nada mudou |
+| Riscos e ambiguidades que travariam o Executor | ✅ A dependência do texto `Fake` deixou de ser implícita. Não encontrei ambiguidade nova |
+| Viabilidade técnica no SDK e nas bibliotecas | ✅ Nada mudou |
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+Nenhuma nova.
+
+### Pontos positivos
+- A §12 responde a S8, S9 e S10 no formato "item → seções tocadas" e declara que contagens, escopo, P* e DoD não mudaram. Recontando, a declaração se confirma.
+- A S10 foi aplicada além do pedido: a T9 e os textos de motivo do Red também usam os nomes completos. Agora há uma regra no topo da §5 que vale para as próximas revisões.
+- A linha da S9 cita o identificador do código e também o critério observável ("diferente de 0"). Assim a US-004 tem um critério verificável mesmo que a constante mude de nome.
+
+### Aprendizados para o processo
+- **Pendências das Rodadas 1 e 2 ainda fora de `docs/aprendizados.md`.** São quatro:
+  - adiamento em cadeia sem dono na spec;
+  - trecho de documento citado só pelo número da linha;
+  - cenário criado para outra US sem os critérios que o projeto já fixou (código de saída);
+  - reforço do AP-017 para valores distintos por turno.
+
+  O plano já aplica os quatro, mas o registro como AP e as regras no `planejador.md` e no checklist de revisão de plano continuam com o Documentador.
+- **Nome abreviado de teste nas tarefas (novo, origem S10).** Proposta para o `planejador.md`: nas tarefas da §5, os testes aparecem com o nome completo idêntico ao da §4, sem prefixo omitido nem `...`. Para o checklist de revisão de plano, item "Consistência interna": "nomes de teste da §5 idênticos aos da §4".
