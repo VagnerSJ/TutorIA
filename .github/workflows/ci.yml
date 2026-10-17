@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    # P11: Linux runner (nothing Windows-specific yet); revisit when a Windows-only adapter arrives.
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET SDK version
+        run: dotnet --version
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Build
+        run: dotnet build
+
+      - name: Test (without LiveBrain) with coverage
+        run: dotnet test --no-build --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:MarkdownSummaryGithub
+          cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: TestResults/**/coverage.cobertura.xml
