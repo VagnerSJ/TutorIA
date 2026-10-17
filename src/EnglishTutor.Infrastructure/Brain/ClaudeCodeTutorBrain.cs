@@ -6,7 +6,9 @@ using Microsoft.Extensions.Options;
 
 namespace EnglishTutor.Infrastructure.Brain;
 
-// One isolated "claude -p" process per turn (ADR-007). Handles one call at a time; not thread-safe.
+// One isolated "claude -p" process per turn (ADR-007). The application owns the history (RN-BRAIN01):
+// "--resume" is only an optimization, used when the request extends exactly the known session.
+// Handles one call at a time; not thread-safe.
 public sealed class ClaudeCodeTutorBrain(
     IProcessRunner processRunner,
     TutorReplyParser parser,
@@ -23,6 +25,8 @@ public sealed class ClaudeCodeTutorBrain(
     private readonly IOptions<ClaudeCodeOptions> _options = options;
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly ILogger<ClaudeCodeTutorBrain> _logger = logger;
+
+    private ClaudeCodeSession? _session;
 
     public string Name => BrainProviders.ClaudeCode;
 
@@ -43,14 +47,21 @@ public sealed class ClaudeCodeTutorBrain(
                 $"Expected one of: {string.Join(", ", BrainOutputModes.All)}.");
         }
 
-        var standardInput = request.Messages[^1].Content;
+        var resumeId = options.UseResume ? ResumableSessionId(request) : null;
+        // A failure or a cancellation must never leave a "known" session that the CLI may not have.
+        _session = null;
+
+        var standardInput = resumeId is not null
+            ? request.Messages[^1].Content
+            : ClaudeCodePromptRenderer.Render(request.Messages);
+
         var systemPromptPath = Path.Combine(Path.GetTempPath(), $"englishtutor-system-prompt-{Guid.NewGuid():N}.md");
-        await File.WriteAllTextAsync(systemPromptPath, request.SystemPrompt, _utf8WithoutBom, ct);
         ProcessResult result;
         var startedAt = _timeProvider.GetTimestamp();
         try
         {
-            var arguments = BuildArguments(options, mode, systemPromptPath);
+            await File.WriteAllTextAsync(systemPromptPath, request.SystemPrompt, _utf8WithoutBom, ct);
+            var arguments = BuildArguments(options, mode, systemPromptPath, resumeId);
             result = await _processRunner.RunAsync(
                 new ProcessRequest(options.ExecutablePath, arguments, workingDirectory, standardInput), ct);
         }
@@ -62,6 +73,14 @@ public sealed class ClaudeCodeTutorBrain(
         var elapsedMs = (long)_timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
 
         var output = ClaudeCodeOutput.Read(result);
+        // Valid or not, the answer is part of the CLI session, so the ADR-006 retry can extend it.
+        _session = output.SessionId is null
+            ? null
+            : new ClaudeCodeSession(
+                output.SessionId,
+                request.SystemPrompt,
+                [.. request.Messages, new BrainMessage(BrainRole.Assistant, output.RawText)]);
+
         var parsed = _parser.Parse(output.RawText);
         if (!parsed.IsValid)
         {
@@ -69,11 +88,21 @@ public sealed class ClaudeCodeTutorBrain(
             throw BrainException.InvalidOutput(parsed.Rejection, output.RawText);
         }
 
-        ClaudeCodeLog.Replied(_logger, Name, elapsedMs, mode, resumed: false);
+        ClaudeCodeLog.Replied(_logger, Name, elapsedMs, mode, resumed: resumeId is not null);
         return parsed.Reply;
     }
 
-    private List<string> BuildArguments(ClaudeCodeOptions options, string mode, string systemPromptPath)
+    // ADR-007: same system prompt, exactly the known messages, plus one new student message.
+    private string? ResumableSessionId(BrainRequest request) =>
+        _session is { } session
+        && request.SystemPrompt == session.SystemPrompt
+        && request.Messages.Count == session.Messages.Count + 1
+        && request.Messages[^1].Role == BrainRole.User
+        && request.Messages.Take(session.Messages.Count).SequenceEqual(session.Messages)
+            ? session.SessionId
+            : null;
+
+    private List<string> BuildArguments(ClaudeCodeOptions options, string mode, string systemPromptPath, string? resumeId)
     {
         List<string> arguments = ["-p", "--output-format", "json"];
         if (mode == BrainOutputModes.JsonSchema)
@@ -92,6 +121,13 @@ public sealed class ClaudeCodeTutorBrain(
             "--permission-mode", "dontAsk",
             "--model", options.Model,
         ]);
+        if (resumeId is not null)
+        {
+            arguments.AddRange(["--resume", resumeId]);
+        }
+
         return arguments;
     }
+
+    private sealed record ClaudeCodeSession(string SessionId, string SystemPrompt, IReadOnlyList<BrainMessage> Messages);
 }
