@@ -44,6 +44,7 @@ Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, compila
 - Ao concluir todas as tarefas, rode **cada comando** da seção "Definition of Done" do `plan.md`.
 - Cole o resultado resumido na seção "Evidências" do `plan.md` (comando, resultado, data, hash do commit). Exemplo:
   `D2 — dotnet test --filter "Category!=LiveBrain" → 42 passed, 0 failed, 3,1 s (2026-10-18, a1b2c3d)`
+- Na mesma tarefa de DoD, revise o §3 e o §5 do `plan.md`: troque estados como "em andamento", "não commitado" ou "Criar" (para arquivo que já existia) pelo estado real e o hash do commit correspondente (AP-005).
 - Só declare a US concluída com **todos** os itens verdes. Se algum não puder ficar verde, diga qual, por quê e o que falta — nunca "deve funcionar".
 - Commit das evidências: `docs(ai): add DoD evidence for US-XXX`.
 
