@@ -207,7 +207,7 @@ Conferência por classe: `CoreDependencyTests` 3, `BuildSettingsTests` 1, `Brain
 Pré-condição do Executor: `dotnet --list-sdks` mostra um SDK 10.0.x. Satisfeita: o orquestrador registrou o SDK 10.0.402.
 
 - [x] T1 — Esqueleto: `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `EnglishTutor.slnx`, os 3 projetos de `src/` e os 2 de `tests/` (vazios, com referências entre si e pacotes da §6), `.config/dotnet-tools.json`, `Program.cs` com `return 0;`. `dotnet build` com 0 warnings e `dotnet test` executando (0 testes). (commit 648f510: `chore(infra): scaffold solution, build props and test projects`)
-- [ ] T2 — Testes de guarda de arquitetura e build: `RepositoryRoot` (já existe, não commitado), `CoreDependencyTests` (Core via `Assembly.Load("EnglishTutor.Core")`, allowlist do §2.10), `BuildSettingsTests`. Passam com o Core vazio. **Red de demonstração** (reverter sem commitar e registrar nas Evidências qual teste falhou e a mensagem):
+- [x] T2 — Testes de guarda de arquitetura e build: `RepositoryRoot` (já existe, não commitado), `CoreDependencyTests` (Core via `Assembly.Load("EnglishTutor.Core")`, allowlist do §2.10), `BuildSettingsTests`. Passam com o Core vazio. **Red de demonstração** (reverter sem commitar e registrar nas Evidências qual teste falhou e a mensagem):
   - (a) `<PackageReference Include="Serilog.Sinks.File" />` no Core (já versionado no CPM, sem NU1010) → falha esperada **só** em `CoreProject_PackageAndProjectReferences_OnlyAllowedOnes` (referência não usada não aparece em `GetReferencedAssemblies`);
   - (b) mantendo (a), um arquivo temporário no Core que usa `typeof(Serilog.ILogger)` → falha também em `CoreAssembly_References_OnlyBclAndAllowedMicrosoftExtensions`;
   - (c) `TreatWarningsAsErrors=false` no `Directory.Build.props` → falha em `BuildSettingsTests`;
@@ -330,6 +330,15 @@ Reaprovação (2026-10-17), no chat, do plano revisado com S1–S14 (commit 250b
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+### T2 — Red de demonstração (2026-10-17, revertido sem commit)
+
+Com o Core vazio, os 4 testes de guarda passam. Cada passo foi aplicado, executado com `dotnet test tests/EnglishTutor.Core.Tests` e revertido:
+
+- (a) `<PackageReference Include="Serilog.Sinks.File" />` no Core → 1 falha, só `CoreProject_PackageAndProjectReferences_OnlyAllowedOnes`: `Expected packages to be a subset of {"Microsoft.Extensions.Options", "Microsoft.Extensions.DependencyInjection.Abstractions"} ... but items {"Serilog.Sinks.File"} are not part of the superset.`
+- (b) (a) + `src/EnglishTutor.Core/RedDemo.cs` com `typeof(Serilog.ILogger)` → 2 falhas: a de (a) e `CoreAssembly_References_OnlyBclAndAllowedMicrosoftExtensions`: `Expected forbidden to be empty because these assemblies are not allowed in the Core: [Serilog]. R1 (ARCHITECTURE §2): ...`
+- (c) `TreatWarningsAsErrors=false` no `Directory.Build.props` → 1 falha, `DirectoryBuildProps_Always_EnablesTreatWarningsAsErrorsAndNullable`: `Expected PropertyValue(props, "TreatWarningsAsErrors") to be "true" ... but "false" ...`
+- `CoreAssembly_References_DoNotIncludeInfrastructureOrConsole`: sem Red demonstrável (Core → Infrastructure/Console gera referência circular e o build falha antes do teste); fica como guarda explícita de R1.
 
 ## 12. Comentários do usuário
 
