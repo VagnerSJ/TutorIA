@@ -54,3 +54,51 @@ Resultado: REPROVADO (2 bloqueantes)
 - Perguntas em aberto que definem normalização ou comportamento de borda (P9, P5, P7) continuam saindo do planejador sem teste mapeado. É o mesmo padrão que o AP-004 registrou na US-001 (S1/S7 do `plan-review` daquela US) e que motivou o item [O] do checklist. Regra sugerida para `.claude/agents/planejador.md`: na §9, cada P* termina com "Teste: `<Classe>.<Método>`" ou "Sem efeito observável", e o Planejador confere isso antes de entregar.
 - Green que adianta um ramo inteiro (aqui, "detecção" fazendo existir o caminho de tags) é a forma mais comum de um teste da tarefa seguinte nascer verde. Sugestão para a skill `tdd-dotnet`: na §5 do plano, quando uma tarefa cria um desvio (if/switch) cujo outro ramo pertence à tarefa seguinte, o plano diz o estado desse ramo (ex.: lança `NotImplementedException`) até lá.
 - Comandos de verificação por bytes no Git Bash (`grep -P '\xNN'`) dependem do locale (AP-007). Sugestão para a skill `checklist-revisao` e `.claude/agents/executor.md`: padronizar uma única forma de checar BOM, zero-width e espaço sem quebra, e o planejador copiar essa forma na DoD em vez de escrever uma variante.
+
+## Rodada 2
+
+Data: 2026-10-17
+Escopo revisado: `tasks/US-002/plan.md` na revisão do commit 3b5a8ac (`docs(ai): revise plan for US-002`), branch `feature/US-002_contrato-parser-resposta`. O commit mexe só no `plan.md` (+34/−17). Ainda não há código na branch: o `git diff develop...HEAD` tem só o ADR-005, o `plan-review.md` e o `plan.md`. Conferi também a US-002 em `specs/sprints/SPRINT_1.md`, `prompts/format.tags.md` (layout `- Pronunciation:` / `- Vocabulary:` / `- Praise:`, base do novo teste da P9) e a busca por caracteres invisíveis no diff da branch (resultado 0).
+Resultado: APROVADO
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| [O] Todo cenário BDD aparece no mapa da §4 com projeto, classe e método `Metodo_Cenario_Resultado` | ✅ Os 6 cenários continuam com teste no parser (Infrastructure.Tests) e no Core |
+| [O] Cada P* com efeito observável tem teste na §4 e tarefa na §5 | ✅ P4 (T3), P5 (T6 e T7), P7 (T6) e P9 (T7) agora têm teste nomeado. P2, P3, P6 e P8 já tinham teste na rodada 1. P1 não tem efeito observável (é decisão de ADR) |
+| [O] A DoD da §10 cobre a DoD da US, com comandos verificáveis e Core ≥ 80% | ✅ D2 (93 casos) e D5 (18 métodos / 24 casos) atualizados. A ressalva sobre o D11 continua na S1 |
+| [O] Conformidade com R1–R4, RN-* citadas e regras rápidas do `CLAUDE.md`; ADR Proposto | ✅ Sem mudança desde a rodada 1. O `throw` temporário da T6 fica só na Infrastructure e some na T7 |
+| [O] Escopo: nada além nem aquém; fora de escopo explícito | ✅ Os testes da P5 fixam a rejeição atual e não criam extração de JSON. A §8 continua coerente (ver S12 sobre o texto) |
+| [O] Consistência interna §3 × §4 × §5 × §6 com contagens que batem | ✅ Recontei método a método. Core.Tests: validador com 8 métodos (6 `[Fact]`, mais `[Theory]` de 3 e de 2 casos = 11 casos), formatador com 4 métodos / 5 casos, rejeições com 1 método / 4 casos, total 13 métodos / 20 casos (27 + 20 = 47). Infrastructure.Tests: 18 métodos, 14 `[Fact]` mais `[Theory]` de 2, 3, 3 e 2 casos = 24 casos. T3 + T4 = 5 + 3 = 8 métodos e T6 + T7 = 10 + 8 = 18 métodos. Continuam 7 fixtures, e os casos de borda são strings inline (§2.3) |
+| [O] Ordem das tarefas preserva o Red de cada teste | ✅ A T6 deixa `ParseTags` lançando `NotImplementedException`, então os 8 testes da T7 falham no Red. `JsonHasLeadingWhitespace` só fica verde com o `Trim()` na detecção. O teste da P4 entra na T3, que é onde nasceria vermelho, e na T4 vira regressão declarada. `OptionalFieldsAreBlank` e `CorrectionLacksOriginalOrCorrected` continuam vermelhos depois do Green da T3 (as regras 3 a 5 ainda não existem) |
+| Alteração na `ARCHITECTURE.md` lista as linhas do `CLAUDE.md` e das skills que repetem a regra | ✅ (o desvio das "fixtures reais" segue na S5) |
+| Riscos e ambiguidades que travariam o Executor | ⚠️ Continuam pendentes a S2 (`MemberNotNullWhen`) e a S3 (ramo de raiz que não é objeto). Há uma pequena lacuna nova na entrada de `KeepsRawTextAndIsNotRawFallback` (S11) |
+| Viabilidade técnica no SDK e nas bibliotecas | ✅ `JsonDocument.Parse` lança `JsonException` quando há texto depois do valor e aceita espaço em branco antes dele. Isso confirma o comportamento fixado na P5 e na P7 |
+
+### Itens da rodada anterior
+- [x] **B1** — resolvido em 3b5a8ac. Cada efeito agora tem teste nomeado na §4 e tarefa na §5:
+  - P9: `Parse_WhenTagsRepeatLabeledLine_JoinsValuesWithSemicolon` (T7). Também fixa a comparação de rótulo sem diferenciar maiúsculas.
+  - P5: `Parse_WhenJsonHasTrailingText_RejectsWithInvalidJson` (T6) e `Parse_WhenJsonIsInFenceOrAfterText_RejectsWithMissingReply` (T7). Os dois conferem `Reason` e a presença de `Expected` na mensagem.
+  - P7: `Parse_WhenJsonHasLeadingWhitespace_DetectsJson` (T6), com os prefixos `"  "` e `"\r\n\t"`, e `RawText` preservado.
+  - P4: `Validate_WhenNoCorrectionsAndNoPraise_IsValidWithoutWarnings` (T3). O candidato de `ReturnsValidReplyWithoutWarnings` também ficou explícito.
+  - As contagens da §4, do D2 e do D5 foram atualizadas e batem.
+- [x] **B2** — resolvido em 3b5a8ac. A §5 da T6 diz o estado do ramo de tags (`ParseTags` só lança `NotImplementedException`, sem montar candidato nem chamar o validador). A T7 diz que os 8 testes falham no Red por essa exceção, inclusive `TextHasNoJsonNorTags` e `JsonIsInFenceOrAfterText`, e que o Executor confere o motivo da falha antes do Green.
+- **S1–S10** — pendentes, dependem de decisão do usuário. Nenhuma foi aplicada nem precisava ser nesta rodada. Elas continuam valendo como estão na Rodada 1. A S1 (o D11 não detecta de fato os bytes EF BB BF / E2 80 8B / C2 A0) segue sendo a mais relevante para a T8.
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S11** — `plan.md` §4, linha de `Parse_WhenValid_KeepsRawTextAndIsNotRawFallback`, e §5 T6. O teste está na T6, mas o plano não diz que a entrada é JSON. Se for uma resposta com tags, ele não fica verde no Green da T6 (o ramo de tags lança até a T7). O efeito esperado é que o teste da T6 só dependa do caminho JSON. A preservação do texto cru com tags pode ficar para a T7, se for desejada.
+- **S12** — `plan.md` §8, item "JSON dentro de cerca markdown ou com texto em volta (P5)". Agora existe teste que fixa a rejeição desses casos, e o item, lido isolado, sugere que eles não têm comportamento definido. O que fica fora de escopo é *extrair* o JSON. A rejeição com motivo e `Expected` está no escopo e tem teste (P5).
+- **S13** — `plan.md` §9, P2 e P3. O planejador adotou o padrão "cada P* termina com `Teste: ...`" para P4, P5, P7 e P9 (aprendizado da rodada 1), mas P2 e P3 não o seguem, embora tenham teste na §4 (`Parse_WhenJsonHasNoCorrectionsAndPraise_FeedbackContainsPraise` / `Format_WhenNoCorrectionsAndPraise_ContainsPraise` e `Validate_WhenCorrectionLacksOriginalOrCorrected_DropsItAndWarns`). Fechar o padrão em todas as P* deixa a conferência mecânica.
+
+### Pontos positivos
+- A resposta da §12 trata cada bloqueante, aponta as seções alteradas e explica por que a P5 virou dois métodos (cada caso passa por um ramo diferente).
+- O teste da P4 foi posto na tarefa onde ele nasce vermelho (T3), com a justificativa escrita, e não onde "seria natural" (T4). É a aplicação direta do item de Red do checklist.
+- O estado do ramo de tags ao fim da T6 virou uma instrução verificável, e o teste da P7 ficou com um Red que depende do `Trim()`. É o motivo certo de falha (AP-010).
+- As contagens foram refeitas de forma consistente nos quatro lugares (§4, §5, D2, D5) e batem com a minha recontagem.
+
+### Aprendizados para o processo
+- O padrão "P* termina com `Teste: ...` ou `Sem efeito observável`", sugerido na rodada 1, resolveu o B1 assim que foi aplicado. Mas o planejador só o aplicou às P* citadas no bloqueante (P2 e P3 ficaram de fora, S13). Isso reforça a regra sugerida para `.claude/agents/planejador.md`: valer para todas as P* desde a primeira versão do plano, e não só como resposta à revisão.
+- O B2 foi resolvido com "o outro ramo lança `NotImplementedException` até a tarefa seguinte". Isso confirma a sugestão da rodada 1 para a skill `tdd-dotnet`: quando uma tarefa cria um desvio cujo outro ramo pertence à tarefa seguinte, o plano diz o estado desse ramo. A S11 mostra o complemento: os testes da tarefa atual precisam declarar a entrada que os mantém no ramo já implementado.
