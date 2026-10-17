@@ -1,6 +1,6 @@
 # Plano — US-001 Fundação da solução e configuração
 
-Status: Aprovado em 2026-10-17
+Status: Em revisão (aprovado em 2026-10-17; reaprovação pendente após S1–S14)
 Branch: feature/US-001_fundacao-solucao
 Spec: specs/sprints/SPRINT_1.md#us-001
 Regras: RN-CONV01 (modo padrão), RN-CONV06, ARCHITECTURE §2 (R1–R4), §3, §9, §10; ADR-003, ADR-004 (Proposto)
@@ -259,3 +259,22 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-17 — Incorporar as sugestões S1–S14 da revisão do plano
+
+Pedido do usuário no chat (transcrito pelo orquestrador): incorporar ao plano **todas** as sugestões S1 a S14 de [plan-review.md](plan-review.md); o plano volta para reaprovação. Contexto: a T1 já está commitada (648f510) e há `tests/EnglishTutor.Core.Tests/Support/RepositoryRoot.cs` não commitado (início da T2); o plano revisado deve refletir esse estado.
+
+- **S1** — Dar dono e teste à normalização de `Brain:Provider` para o nome canônico (P4): ex. `BrainProviders.TryGetCanonical(string? value, [NotNullWhen(true)] out string? canonical)`, `BrainProvidersTests.TryGetCanonical_WhenCaseDiffers_ReturnsCanonicalName`, caso de cabeçalho com `claudecode` em `EnglishTutorAppTests`; incluir `BrainProvidersTests.cs` no §3.
+- **S2** — O `CLAUDE.md` foi alinhado pelo orquestrador (Core: só BCL, `Microsoft.Extensions.*.Abstractions` e `Microsoft.Extensions.Options`). Registrar no §2 do plano, junto das alterações da ARCHITECTURE, como já aplicado.
+- **S3** — Definir no §2.6 de onde vem o token do `ChatSession` (ex.: `CreateLinkedTokenSource(ct, lifetime.ApplicationStopping)`); restringir o `catch (OperationCanceledException)` a `when (token.IsCancellationRequested)`; tornar a verificação manual do Ctrl+C item obrigatório da DoD (D13).
+- **S4** — Deixar explícito que a T7 faz só `Bind` e que `ValidateOnStart` + `AddEnglishTutorCore` entram na T8, para preservar o Red da T8.
+- **S5** — T2 com Core vazio: usar `Assembly.Load("EnglishTutor.Core")` (ou mover a T2 para depois da T3). Red de demonstração com pacote já versionado no CPM (ex.: `Serilog.Sinks.File`) e registrar qual teste falhou.
+- **S6** — Definir a allowlist de `CoreAssembly_References_OnlyBclAndAllowedMicrosoftExtensions`: shared framework `Microsoft.NETCore.App` + `Microsoft.Extensions.Options` + `Microsoft.Extensions.*.Abstractions`; decidir sobre `Microsoft.Extensions.Primitives`.
+- **S7** — Mapear testes para: `TutorNotConnectedInputHandler` (ex.: entrada `"hello"` em `EnglishTutorAppTests`), caminho `UnexpectedError` → código 1 com evento 1003, e linha só com espaços (`IsNullOrWhiteSpace`, não vai ao handler).
+- **S8** — `AppRunOptions.Args` como `IReadOnlyList<string>` em vez de `string[]`.
+- **S9** — Resolver a divergência de `Microsoft.Extensions.DependencyInjection` no `Directory.Packages.props`: incluir no §6 com uso justificado ou remover.
+- **S10** — Atualizar as referências ao ADR-004 de "Proposto" para "Aceito".
+- **S11** — Explicitar no §2.6 como o nome do ambiente é obtido para `appsettings.{Environment}.json` com `DisableDefaults`.
+- **S12** — Especificar o runner do CI e confirmar a compatibilidade de `setup-dotnet` com o `global.json`.
+- **S13** — `[NotNullWhen(true)]` no `out` de `TryParse`; incluir `"/"` sozinho como caso do parser, com resultado definido.
+- **S14** — `Program.cs` como "Alterar" (já existe desde a T1) no §3 e na T7.
