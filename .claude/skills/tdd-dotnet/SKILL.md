@@ -25,7 +25,7 @@ tests/EnglishTutor.Infrastructure.Tests/
   Brain/TutorReplyParserTests.cs
   Contract/TutorBrainContractTests.cs          # abstrata
   Contract/ClaudeCodeTutorBrainContractTests.cs
-  Fixtures/claude-json-structured.json         # saídas reais gravadas a partir da US-004 (CopyToOutputDirectory)
+  Fixtures/ClaudeCode/claude-json-structured.json  # saídas reais gravadas a partir da US-004 (CopyToOutputDirectory)
 ```
 
 - Uma classe de teste por classe de produção; nome `<Classe>Tests`.

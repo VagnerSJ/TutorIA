@@ -1,6 +1,6 @@
 # ADR-007 — Provedor Claude Code: processo por turno, histórico no stdin e `--resume` só quando a janela é estendida
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-17)
 - **Data:** 2026-10-17 (revisado no mesmo dia, depois da rodada 1 da revisão do plano: itens 3 e 5 e "Consequências"; e depois da rodada 2: contagem de turnos em "Consequências")
 - **US relacionadas:** US-004 (e, como consumidoras, US-005, US-007, US-008)
 

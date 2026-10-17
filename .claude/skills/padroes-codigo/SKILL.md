@@ -39,8 +39,8 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 
 ## DI e configuração
 
-- Cada projeto expõe uma extensão de registro: `services.AddEnglishTutorCore()`, `services.AddEnglishTutorInfrastructure(configuration)`.
-- Options: `services.AddOptions<BrainOptions>().Bind(config.GetSection("Brain")).ValidateDataAnnotations().ValidateOnStart();` + `IValidateOptions<T>` quando a validação for condicional.
+- Cada projeto expõe uma extensão de registro: `services.AddEnglishTutorCore()`, `services.AddEnglishTutorInfrastructure(promptsDirectory)`. Cada uma registra os validadores das próprias Options; o bind das seções fica no composition root (ADR-004).
+- Options: `services.AddOptions<BrainOptions>().Bind(config.GetSection(BrainOptions.SectionName)).ValidateOnStart();` no composition root + um `IValidateOptions<T>` por classe de Options, com mensagens que dizem o que está errado e o que se espera.
 - Nada lê `IConfiguration` diretamente fora do composition root.
 
 ## Logs (Serilog via `ILogger<T>`)
