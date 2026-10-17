@@ -206,6 +206,94 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
         entry.Message.Should().Contain($"output mode {canonicalMode}").And.NotContain(configuredMode);
     }
 
+    // US-004 — leitura da saída (apoio) — ADR-006, RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_WhenAnswerIsOutOfFormat_ThrowsInvalidOutputWithRawText()
+    {
+        const string answer = "Sure! Here is my answer without tags.";
+        _processRunner.ReturnsOutput(ClaudeOutputs.Text("s-1", answer));
+        var sut = CreateSut(options => options.OutputMode = BrainOutputModes.Tags);
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.IsInvalidOutput.Should().BeTrue();
+        exception.Rejection!.Reason.Should().Be(TutorReplyRejections.MissingReplyReason);
+        exception.RawText.Should().Be(answer);
+    }
+
+    // US-004 — leitura da saída (apoio, P5, AP-015/016: linha 1 da §2.5)
+    [Theory]
+    [InlineData("exit-code", "Claude Code failed (exit code 1): boom stderr detail", "second stderr line")]
+    [InlineData("is-error", "Claude Code failed (exit code 1): boom result detail", "ignored stderr")]
+    public async Task SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail(
+        string failure, string expectedMessage, string unexpectedText)
+    {
+        string? promptPath = null;
+        _processRunner.OnRun = run => promptPath = ValueAfter(run, "--system-prompt-file");
+        _processRunner.Returns(failure switch
+        {
+            "exit-code" => new ProcessResult(1, string.Empty, "\n  boom stderr detail  \nsecond stderr line"),
+            _ => new ProcessResult(1, ClaudeOutputs.Error("boom result detail"), "ignored stderr"),
+        });
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Contain(expectedMessage).And.NotContain(unexpectedText);
+        promptPath.Should().NotBeNull();
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted even when the call fails");
+    }
+
+    // US-004 — leitura da saída (apoio, P5, B3: linha 3 da §2.5, só ela satisfaz)
+    [Theory]
+    [InlineData("boom result detail", "ignored stderr", "Claude Code reported an error: boom result detail", "ignored stderr")]
+    [InlineData("   ", "\nfirst stderr t2\nsecond stderr t2", "Claude Code reported an error: first stderr t2", "second stderr t2")]
+    [InlineData("", "", "Claude Code reported an error: no error details were printed", "Reply t1?")]
+    public async Task SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing(
+        string resultText, string standardError, string expectedMessage, string unexpectedText)
+    {
+        _processRunner.Returns(new ProcessResult(
+            0, ClaudeOutputs.Error(resultText, ClaudeOutputs.ValidReplyJson("t1")), standardError));
+        var sut = CreateSut(options => options.OutputMode = BrainOutputModes.JsonSchema);
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.IsInvalidOutput.Should().BeFalse();
+        exception.Message.Should().Contain(expectedMessage)
+            .And.NotContain(unexpectedText)
+            .And.NotContain("Reply t1?");
+    }
+
+    // US-004 — leitura da saída (apoio, P5: linha 2 da §2.5, as duas partes da condição)
+    [Theory]
+    [InlineData("not-json")]
+    [InlineData("other-type")]
+    [InlineData("json-array")]
+    public async Task SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation(string output)
+    {
+        var replyJson = ClaudeOutputs.ValidReplyJson("t1");
+        _processRunner.ReturnsOutput(output switch
+        {
+            "not-json" => "not json at all",
+            "other-type" =>
+                $$"""{"type":"system","subtype":"init","is_error":false,"session_id":"s-other","structured_output":{{replyJson}}}""",
+            _ => $"[{ClaudeOutputs.Structured("s-array", replyJson)}]",
+        });
+        var sut = CreateSut(options => options.OutputMode = BrainOutputModes.JsonSchema);
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.IsInvalidOutput.Should().BeFalse();
+        exception.Message.Should().Contain("is not a JSON result").And.Contain("Expected").And.NotContain("Reply t1?");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootDirectory))
