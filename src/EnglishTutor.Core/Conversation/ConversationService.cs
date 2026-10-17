@@ -57,7 +57,15 @@ public sealed class ConversationService(
                 new(BrainRole.Assistant, first.RawText),
                 new(BrainRole.User, TurnMessageBuilder.BuildFormatCorrection(first.Rejection)),
             ];
-            reply = await brain.SendAsync(new BrainRequest(systemPrompt, retryMessages, SessionHint: null), ct);
+            try
+            {
+                reply = await brain.SendAsync(new BrainRequest(systemPrompt, retryMessages, SessionHint: null), ct);
+            }
+            catch (BrainException second) when (second.IsInvalidOutput)
+            {
+                ConversationLog.ReplyRejectedAgainUsingRawFallback(_logger, brain.Name, second.Rejection.Reason);
+                reply = TutorReply.RawFallback(second.RawText);
+            }
         }
 
         _window.Add(new ConversationTurn(studentMessage, reply));
