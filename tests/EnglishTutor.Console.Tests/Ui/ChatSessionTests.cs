@@ -103,6 +103,30 @@ public sealed class ChatSessionTests : IDisposable
         _handler.Inputs.Should().Equal("hello");
     }
 
+    // US-001 — apoio: BOM da entrada redirecionada (Windows PowerShell 5.1) não esconde comando — RN-CONV06, P12
+    [Fact]
+    public async Task RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand()
+    {
+        var sut = CreateSession("﻿/quit", "I should never be read");
+
+        var exitCode = await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _handler.Inputs.Should().BeEmpty();
+    }
+
+    // US-001 — apoio: só a primeira linha perde o BOM — P12
+    [Fact]
+    public async Task RunAsync_WhenLaterLineStartsWithByteOrderMark_ForwardsItUnchanged()
+    {
+        var sut = CreateSession("hello", "﻿/quit");
+
+        var exitCode = await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _handler.Inputs.Should().Equal("hello", "﻿/quit");
+    }
+
     public void Dispose() => _output.Dispose();
 
     private ChatSession CreateSession(params string[] lines) =>
