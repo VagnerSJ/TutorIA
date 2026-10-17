@@ -65,7 +65,8 @@ public sealed class ClaudeCodeTutorBrain(
         var parsed = _parser.Parse(output.RawText);
         if (!parsed.IsValid)
         {
-            throw new NotImplementedException("US-004 T7");
+            // ADR-006: the ConversationService retries once with a format correction.
+            throw BrainException.InvalidOutput(parsed.Rejection, output.RawText);
         }
 
         ClaudeCodeLog.Replied(_logger, Name, elapsedMs, mode, resumed: false);
