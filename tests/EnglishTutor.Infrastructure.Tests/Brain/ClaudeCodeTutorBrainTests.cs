@@ -4,6 +4,7 @@ using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.Processes;
 using EnglishTutor.Infrastructure.Tests.Fakes;
 using EnglishTutor.Infrastructure.Tests.Support;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -118,6 +119,91 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
         await sut.SendAsync(SingleMessageRequest("t1"), cancellation.Token);
 
         _processRunner.Tokens.Should().Equal(cancellation.Token);
+    }
+
+    // US-004 — Cenário: processo isolado e sem ferramentas — RN-BRAIN06
+    [Fact]
+    public async Task SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty()
+    {
+        var workingDirectory = Path.Combine(_rootDirectory, "missing", "brain");
+        var existedDuringRun = false;
+        var entriesDuringRun = -1;
+        _processRunner.OnRun = run =>
+        {
+            existedDuringRun = Directory.Exists(run.WorkingDirectory);
+            entriesDuringRun = existedDuringRun ? Directory.GetFileSystemEntries(run.WorkingDirectory).Length : -1;
+        };
+        _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1")));
+        var sut = CreateSut(options => options.WorkingDirectory = workingDirectory);
+
+        await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        existedDuringRun.Should().BeTrue();
+        entriesDuringRun.Should().Be(0);
+        _processRunner.Requests.Should().ContainSingle()
+            .Which.WorkingDirectory.Should().Be(Path.GetFullPath(workingDirectory));
+    }
+
+    // US-004 — Cenário: processo isolado e sem ferramentas (apoio, AP-016: expansão de variável) — RN-BRAIN06
+    [Fact]
+    public async Task SendAsync_WithEnvironmentVariableInWorkingDirectory_ExpandsIt()
+    {
+        var variable = $"ENGLISHTUTOR_TEST_{Guid.NewGuid():N}";
+        Environment.SetEnvironmentVariable(variable, _rootDirectory);
+        try
+        {
+            _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1")));
+            var sut = CreateSut(options => options.WorkingDirectory = $"%{variable}%/brain");
+
+            await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+            var workingDirectory = _processRunner.Requests.Should().ContainSingle().Subject.WorkingDirectory;
+            workingDirectory.Should().Be(Path.GetFullPath(Path.Combine(_rootDirectory, "brain")));
+            workingDirectory.Should().NotContain("%");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, null);
+        }
+    }
+
+    // US-004 — apoio: latência em log — ARCHITECTURE §9
+    [Fact]
+    public async Task SendAsync_AfterReply_LogsLatencyWithoutConversationText()
+    {
+        _processRunner.OnRun = _ => _timeProvider.Advance(TimeSpan.FromMilliseconds(1500));
+        var replyJson = ClaudeOutputs.ValidReplyJson("t1");
+        _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-1", replyJson));
+        var sut = CreateSut();
+
+        await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var entry = _logger.Entries.Should().ContainSingle(e => e.EventId.Id == 2001).Subject;
+        entry.Level.Should().Be(LogLevel.Information);
+        entry.Message.Should().Contain("ClaudeCode").And.Contain("1500 ms").And.Contain("JsonSchema");
+        _logger.Entries.Should().NotContain(e =>
+            e.Message.Contains("student sentence t1", StringComparison.Ordinal)
+            || e.Message.Contains(_systemPrompt, StringComparison.Ordinal)
+            || e.Message.Contains("Reply t1?", StringComparison.Ordinal));
+    }
+
+    // US-004 — Cenário: processo isolado e sem ferramentas (apoio, P13, B4: normalização) — ADR-002
+    [Theory]
+    [InlineData("jsonschema", "format.json.md", true, BrainOutputModes.JsonSchema)]
+    [InlineData("TAGS", "format.tags.md", false, BrainOutputModes.Tags)]
+    public async Task SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog(
+        string configuredMode, string formatFileName, bool withSchema, string canonicalMode)
+    {
+        _processRunner.ReturnsOutput(ValidOutputFor(configuredMode, "s-1", "t1"));
+        var sut = CreateSut(options => options.OutputMode = configuredMode);
+
+        await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var run = _processRunner.Requests.Should().ContainSingle().Subject;
+        ValueAfter(run, "--json-schema").Should().Be(withSchema ? TutorReplySchema.Json : null);
+        ValueAfter(run, "--append-system-prompt-file").Should().Be(Path.Combine(_promptFiles.Directory, formatFileName));
+        var entry = _logger.Entries.Should().ContainSingle(e => e.EventId.Id == 2001).Subject;
+        entry.Message.Should().Contain($"output mode {canonicalMode}").And.NotContain(configuredMode);
     }
 
     public void Dispose()
