@@ -1,0 +1,50 @@
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+coverage.*.xml
+artifacts/
+publish/
+
+# ---- Modelos locais (Whisper, Piper, Kokoro) ----
+models/
+*.bin
+*.onnx
+*.onnx.json
+*.gguf
+
+# ---- Dados do usuário ----
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+recordings/
+*.wav
+*.mp3
+*.ogg
+logs/
+*.log
+
+# ---- Configuração local / segredos ----
+appsettings.*.local.json
+appsettings.Local.json
+.env
+.env.*
+
+# ---- Claude Code (local por máquina) ----
+.claude/settings.local.json
+.claude/worktrees/
+
+# ---- Relatórios de avaliação gerados ----
+eval/reports/
