@@ -31,6 +31,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Mudanças de comportamento estão primeiro na spec/plano e decisões técnicas relevantes têm ADR commitado **antes** do código que as implementa.
 - [O] Todos os comandos da Definition of Done foram rodados pelo Executor, com resultado colado em "Evidências" no `plan.md`, e o resultado confere com o seu.
 - Comentários do usuário no `plan.md` foram respondidos e respeitados.
+- Escolhas de forma registradas pelo Executor no §12 têm commit anterior ao `feat`/`fix` que as implementa (AP-014).
 
 ## 2. Arquitetura (`ARCHITECTURE.md`)
 - [O] `EnglishTutor.Core` sem referência a Infrastructure/Console/pacotes de terceiros (R1).

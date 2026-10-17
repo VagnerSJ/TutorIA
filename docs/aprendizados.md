@@ -144,7 +144,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** as escolhas de forma (nome do tipo em `invalid corrections`, ponto final do detalhe em `invalid JSON`, marcador e seta nas tags) foram para a §12 do `plan.md` só no commit de evidências, depois dos `feat`, apesar da regra em `.claude/agents/executor.md:58` (aplicada em 5f4c9c4). Na rodada de correções (T9) a regra foi respeitada: o registro saiu em 053779d, antes do primeiro teste. Lá, o pedido do usuário já listava as mudanças.
 - **Por que importa:** uma regra escrita não bastou; o momento de registrar não tem ponto de parada no fluxo. Quando a escolha surge no meio do Green, sem pedido prévio, o registro tardio se repete (hábito 4: intenção no documento antes do código).
 - **Correção (proposta):** (a) `.claude/skills/tdd-dotnet/SKILL.md` (ciclo Green) ou `.claude/agents/executor.md`: passo explícito antes de cada commit `feat`/`fix`: "o Green decidiu algo que o plano deixava em aberto (texto, nome, formato)? Se sim, commit `docs(ai)` na §12 primeiro"; (b) `.claude/skills/checklist-revisao/SKILL.md` §1: item não obrigatório "escolhas de forma registradas na §12 têm commit anterior ao `feat` que as implementa".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17; opção (a) em `.claude/agents/executor.md`, passo Green, e (b) em `checklist-revisao` §1)
 
 ### AP-015 — Asserção satisfeita pelo texto de uma biblioteca externa
 
