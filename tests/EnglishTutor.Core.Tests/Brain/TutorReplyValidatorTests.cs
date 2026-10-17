@@ -76,6 +76,59 @@ public sealed class TutorReplyValidatorTests
         result.Reply!.IsRawFallback.Should().BeFalse();
     }
 
+    // US-002 — Cenário: mais de duas correções — RN-FEED02
+    [Fact]
+    public void Validate_WhenMoreThanTwoCorrections_KeepsFirstTwoAndWarns()
+    {
+        var candidate = Candidate("Good effort! What did you do after that?",
+        [
+            new Correction("a1", "b1", "x1"),
+            new Correction("a2", "b2", "x2"),
+            new Correction("a3", "b3", "x3"),
+        ]);
+
+        var result = TutorReplyValidator.Validate(candidate);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Corrections.Select(c => c.Original).Should().Equal("a1", "a2");
+        result.Warnings.Should().ContainSingle()
+            .Which.Should().Be("Tutor reply had 3 corrections; kept the first 2 (RN-FEED02).");
+    }
+
+    // US-002 — Cenário: mais de duas correções (apoio, P3)
+    [Fact]
+    public void Validate_WhenCorrectionLacksOriginalOrCorrected_DropsItAndWarns()
+    {
+        var candidate = Candidate("What did you do?",
+        [
+            new Correction(" ", "b1", "x1"),
+            new Correction("  a2 ", " b2  ", " x2 "),
+            new Correction("a3", "", "x3"),
+        ]);
+
+        var result = TutorReplyValidator.Validate(candidate);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Corrections.Should().Equal(new Correction("a2", "b2", "x2"));
+        result.Warnings.Should().ContainSingle()
+            .Which.Should().Be("Dropped 2 correction(s) without \"original\" or \"corrected\".");
+    }
+
+    // US-002 — campos opcionais em branco viram null — RN-FEED03/04/05 (formato)
+    [Fact]
+    public void Validate_WhenOptionalFieldsAreBlank_NormalizesThemToNull()
+    {
+        var candidate = Candidate("What did you do?", [], pronunciation: "  ", vocabulary: "", praise: "  Well done!  ");
+
+        var result = TutorReplyValidator.Validate(candidate);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Pronunciation.Should().BeNull();
+        result.Reply!.Vocabulary.Should().BeNull();
+        result.Reply!.Praise.Should().Be("Well done!");
+        result.Warnings.Should().BeEmpty();
+    }
+
     private static TutorReply Candidate(
         string reply,
         IReadOnlyList<Correction> corrections,
