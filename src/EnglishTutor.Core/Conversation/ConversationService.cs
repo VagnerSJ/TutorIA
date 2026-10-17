@@ -15,8 +15,6 @@ public sealed class ConversationService(
 {
     private readonly ConversationWindow _window = new(options.Value.MaxTurnsInWindow);
 
-    private readonly ILogger<ConversationService> _logger = logger;
-
     public TutorMode Mode { get; private set; } = TutorMode.Default;
 
     // Takes effect on the next turn (RN-CONV01).
@@ -54,7 +52,7 @@ public sealed class ConversationService(
         }
         catch (BrainException first) when (first.IsInvalidOutput)
         {
-            ConversationLog.ReplyRejectedRetrying(_logger, brain.Name, first.Rejection.Reason);
+            ConversationLog.ReplyRejectedRetrying(logger, brain.Name, first.Rejection.Reason);
 
             // ADR-006: the model sees its rejected answer and the correction; neither enters the window.
             var retry = CreateRequest(
@@ -70,7 +68,7 @@ public sealed class ConversationService(
             }
             catch (BrainException second) when (second.IsInvalidOutput)
             {
-                ConversationLog.ReplyRejectedAgainUsingRawFallback(_logger, brain.Name, second.Rejection.Reason);
+                ConversationLog.ReplyRejectedAgainUsingRawFallback(logger, brain.Name, second.Rejection.Reason);
                 return TutorReply.RawFallback(second.RawText);
             }
         }
