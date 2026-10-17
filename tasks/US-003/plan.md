@@ -1,9 +1,9 @@
 # Plano — US-003 ConversationService dono do histórico
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-17
 Branch: feature/US-003_conversation-service
 Spec: specs/sprints/SPRINT_1.md#us-003
-Regras: RN-CONV01–06, RN-BRAIN01, RN-BRAIN04, RN-TTS01 (RN-BRAIN07 só pelo enum `BrainErrorKind`); ARCHITECTURE §2 (R1, R2, R4), §3, §4, §5, §9, §10; ADR-002, ADR-005 (Aceito), ADR-006 (Proposto, novo)
+Regras: RN-CONV01–06, RN-BRAIN01, RN-BRAIN04, RN-TTS01 (RN-BRAIN07 só pelo enum `BrainErrorKind`); ARCHITECTURE §2 (R1, R2, R4), §3, §4, §5, §9, §10; ADR-002, ADR-005 (Aceito), ADR-006 (Aceito, novo)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Criar no Core o `ConversationService`, que guarda o histórico da sessão e o mo
 
 ## 2. Abordagem
 
-Decisão central no **ADR-006 (Proposto)**: `docs/adr/ADR-006-retentativa-de-formato-e-historico-no-conversation-service.md`. Resumo: o adaptador sinaliza formato inválido com `BrainException.InvalidOutput(rejection, rawText)`. O serviço refaz a chamada **uma** vez, acrescentando a resposta rejeitada (`Assistant`) e a instrução de correção (`User`). Na segunda falha, o turno vira `TutorReply.RawFallback`. O histórico guarda a mensagem formatada do aluno e o `RawText` final do professor. O system prompt vem da porta `ITutorPromptSource`.
+Decisão central no **ADR-006 (Aceito)**: `docs/adr/ADR-006-retentativa-de-formato-e-historico-no-conversation-service.md`. Resumo: o adaptador sinaliza formato inválido com `BrainException.InvalidOutput(rejection, rawText)`. O serviço refaz a chamada **uma** vez, acrescentando a resposta rejeitada (`Assistant`) e a instrução de correção (`User`). Na segunda falha, o turno vira `TutorReply.RawFallback`. O histórico guarda a mensagem formatada do aluno e o `RawText` final do professor. O system prompt vem da porta `ITutorPromptSource`.
 
 O serviço é por sessão e não é thread-safe: uma chamada de `SendAsync` por vez. O console é sequencial, então isso basta.
 
@@ -276,7 +276,7 @@ Se o usuário escolher o caminho (b) do B1 (trazer os itens para esta US), este 
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-006-retentativa-de-formato-e-historico-no-conversation-service.md` | Decisão (Proposto), criada junto com este plano |
+| Criar | `docs/adr/ADR-006-retentativa-de-formato-e-historico-no-conversation-service.md` | Decisão (Aceito em 2026-10-17), criada junto com este plano |
 | Alterar | `ARCHITECTURE.md` | §3, §4, §5 (texto em §2.6), pelo orquestrador antes da T1 |
 | Alterar | `.claude/skills/bdd-para-testes/SKILL.md` | Trecho do "Exemplo completo" identificado pelo texto antigo (§2.6), pelo orquestrador antes da T1 |
 | Alterar | `specs/sprints/SPRINT_1.md` | US-004: regras, 4 cenários e D8–D10 (texto em §2.6, B1), pelo orquestrador antes da T1 |
@@ -537,3 +537,10 @@ Aprovo o plano com as respostas padrão para P1–P14 e o ADR-006. Incorporar as
 - S9 → §2.6 (bloco `gherkin` da US-004, cenário "janela de turnos configurável": nova linha `E o código de saída é o de configuração inválida (ExitCodes.InvalidConfiguration, diferente de 0)`; `ExitCodes.InvalidConfiguration = 2` em `src/EnglishTutor.Console/ExitCodes.cs:10`). Nenhum D novo na US-004; `specs/` só muda pelo orquestrador antes da T1, como já previsto.
 - S10 → §5 (frase no parágrafo de abertura das tarefas), §5 T7 (9 nomes completos na lista e nos textos de motivo do Red e do estado do ramo), §5 T8 (6 nomes completos), §5 T9 (3 nomes completos, pela mesma razão). Os nomes conferem um a um com a §4.
 - Sem mudança em contagens (35/51; `ConversationServiceTests` 18/21; suíte 148), escopo, tarefas, testes, P* ou DoD.
+
+### 2026-10-17 — aprovação do usuário
+
+Plano aprovado pelo usuário no chat em 2026-10-17, com S8, S9 e S10 incorporados (rodada 3 da revisão do plano: APROVADO).
+- Perguntas em aberto P1–P14: valem as respostas padrão propostas na §9 (P1 e B1: caminho (a), itens adiados registrados na US-004).
+- ADR-006: Aceito.
+- §2.6 aplicada antes da T1: `docs(ai): update spec for US-003` (US-004 do `SPRINT_1.md`) e `docs(ai): update architecture for US-003` (`ARCHITECTURE.md` §3/§4/§5 e exemplo da `bdd-para-testes`). O orquestrador usou dois commits, em vez do commit único citado na §2.6 e na pré-condição da §5, para separar spec e arquitetura conforme o fluxo do `/us`.

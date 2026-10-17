@@ -1,6 +1,6 @@
 # ADR-006 — Retentativa de formato e histórico no ConversationService
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-17)
 - **Data:** 2026-10-17
 - **US relacionadas:** US-003 (e, como consumidoras, US-004, US-006, US-007, US-008)
 
