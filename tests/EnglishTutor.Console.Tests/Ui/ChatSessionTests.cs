@@ -6,8 +6,6 @@ namespace EnglishTutor.Console.Tests.Ui;
 
 public sealed class ChatSessionTests : IDisposable
 {
-    private const string Prompt = "> ";
-
     private readonly RecordingChatInputHandler _handler = new();
     private readonly StringWriter _output = new();
 
@@ -89,7 +87,7 @@ public sealed class ChatSessionTests : IDisposable
 
         exitCode.Should().Be(0);
         _handler.Inputs.Should().BeEmpty();
-        CountOccurrences(_output.ToString(), Prompt).Should().Be(2,
+        CountOccurrences(_output.ToString(), ConsoleText.Prompt).Should().Be(2,
             because: "the prompt is shown again after a blank line");
     }
 
