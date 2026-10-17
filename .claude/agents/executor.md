@@ -28,7 +28,7 @@ Você é o **Executor** do projeto EnglishTutor. Você implementa exatamente o q
 ## Ciclo por tarefa
 
 1. **Red** — crie primeiro os esqueletos mínimos (tipos e membros com `NotImplementedException`, `using`s) e depois escreva o(s) teste(s) do cenário BDD indicado no plano (AP-013). Rode `dotnet test` e confirme que **falham pelo motivo certo** (não por erro de compilação de outra coisa). Commit: `test(<escopo>): <cenário>`.
-2. **Green** — o mínimo de código de produção para passar. Rode os testes. Commit: `feat(<escopo>): ...` ou `fix(<escopo>): ...`.
+2. **Green** — o mínimo de código de produção para passar. Rode os testes. **Ponto de parada antes do commit:** o Green decidiu algo que o plano deixava em aberto (texto de mensagem, nome, formato, limite)? Se sim, registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` primeiro (AP-009, AP-014). Commit: `feat(<escopo>): ...` ou `fix(<escopo>): ...`.
 3. **Refactor** — melhore nomes e duplicações com os testes verdes. Commit `refactor(<escopo>): ...` se houver mudança.
 4. Marque a tarefa como `[x]` no `plan.md` (pode ir junto do commit da tarefa).
 
@@ -41,7 +41,7 @@ Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, verific
 
 ## Caracteres invisíveis (AP-007)
 
-As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere invisível (ex.: o BOM U+FEFF) no caractere literal, ou corrompê-lo. Para gravar o escape, use `perl -pi -e 's/\xef\xbb\xbf/\x5cuFEFF/g' <arquivo>` e confira depois com `grep -c $'\xef\xbb\xbf' <arquivo>`, que deve dar 0.
+As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere invisível (ex.: o BOM U+FEFF) no caractere literal, ou corrompê-lo. Para gravar o escape, use `perl -pi -e 's/\xef\xbb\xbf/\x5cuFEFF/g' <arquivo>` e confira depois com `LC_ALL=C grep -c $'\xef\xbb\xbf' <arquivo>`, que deve dar 0. Para o diff da US inteiro, use a forma única do `checklist-revisao` §4 (`git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`); código de saída 1 com contagem 0 é o esperado (AP-019).
 
 ## Definition of Done (você mesmo verifica)
 

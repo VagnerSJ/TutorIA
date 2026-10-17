@@ -25,7 +25,7 @@ tests/EnglishTutor.Infrastructure.Tests/
   Brain/TutorReplyParserTests.cs
   Contract/TutorBrainContractTests.cs          # abstrata
   Contract/ClaudeCodeTutorBrainContractTests.cs
-  Fixtures/claude-json-structured.json         # saídas reais gravadas (CopyToOutputDirectory)
+  Fixtures/claude-json-structured.json         # saídas reais gravadas a partir da US-004 (CopyToOutputDirectory)
 ```
 
 - Uma classe de teste por classe de produção; nome `<Classe>Tests`.
@@ -87,7 +87,7 @@ Variantes live: subclasses marcadas com `[Trait("Category", "LiveBrain")]`, excl
 
 ## Fixtures
 
-Saídas reais de processo/HTTP gravadas em `Fixtures/*.json`, com `<None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />`. Nunca dados pessoais nem tokens.
+Saídas reais de processo/HTTP gravadas em `Fixtures/*.json` (a partir da US-004; a US-002 usa exemplos da spec em `Fixtures/TutorReply/`), com `<None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />`. Nunca dados pessoais nem tokens.
 
 ## Cobertura
 

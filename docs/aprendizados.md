@@ -83,6 +83,8 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Correção (proposta):** (a) skill `padroes-codigo`: exigir escape (`\uXXXX`) para caracteres não imprimíveis em código e testes; (b) skill `checklist-revisao`: item "nenhum caractere invisível literal no diff"; (c) agente `executor`: para gravar escapes `\uXXXX` usar `perl` com `\x5cuFEFF` e conferir com `grep` pelos bytes EF BB BF (`$'\xef\xbb\xbf'`), que não deve achar nada. Arquivos: `.claude/skills/padroes-codigo/SKILL.md`, `.claude/skills/checklist-revisao/SKILL.md`, `.claude/agents/executor.md`.
 - **Status:** Aplicada (commit c858312)
 
+**Atualização 2026-10-17 (US-002, AP-019):** a conferência por bytes passa a ter forma única, com `LC_ALL=C`: `git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'` (fonte: `checklist-revisao` §4).
+
 ### AP-008 — Revisor não consegue reproduzir parte da DoD
 
 - **Data / US:** 2026-10-17 / US-001 (Rodadas 1 e 2)
@@ -136,3 +138,75 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** ruído no feedback e risco de confundir erro de compilação com Red.
 - **Correção (proposta):** no ciclo Red, criar primeiro os esqueletos mínimos (tipos que lançam `NotImplementedException`, `using`s e arquivos) e só então o teste, para o Red falhar por asserção ou exceção prevista. Os commits de teste desta US já seguiram isso. Arquivo: `.claude/skills/tdd-dotnet/SKILL.md`.
 - **Status:** Aplicada (commit 1bcb6ee)
+
+### AP-014 — AP-009 recorreu mesmo com a regra escrita no agente
+
+- **Data / US:** 2026-10-17 / US-002 (Rodada 1, S2; Rodada 2)
+- **Quem errou:** executor
+- **O que aconteceu:** as escolhas de forma (nome do tipo em `invalid corrections`, ponto final do detalhe em `invalid JSON`, marcador e seta nas tags) foram para a §12 do `plan.md` só no commit de evidências, depois dos `feat`, apesar da regra em `.claude/agents/executor.md:58` (aplicada em 5f4c9c4). Na rodada de correções (T9) a regra foi respeitada: o registro saiu em 053779d, antes do primeiro teste. Lá, o pedido do usuário já listava as mudanças.
+- **Por que importa:** uma regra escrita não bastou; o momento de registrar não tem ponto de parada no fluxo. Quando a escolha surge no meio do Green, sem pedido prévio, o registro tardio se repete (hábito 4: intenção no documento antes do código).
+- **Correção (proposta):** (a) `.claude/skills/tdd-dotnet/SKILL.md` (ciclo Green) ou `.claude/agents/executor.md`: passo explícito antes de cada commit `feat`/`fix`: "o Green decidiu algo que o plano deixava em aberto (texto, nome, formato)? Se sim, commit `docs(ai)` na §12 primeiro"; (b) `.claude/skills/checklist-revisao/SKILL.md` §1: item não obrigatório "escolhas de forma registradas na §12 têm commit anterior ao `feat` que as implementa".
+- **Status:** Aplicada (2026-10-17; opção (a) em `.claude/agents/executor.md`, passo Green, e (b) em `checklist-revisao` §1)
+
+### AP-015 — Asserção satisfeita pelo texto de uma biblioteca externa
+
+- **Data / US:** 2026-10-17 / US-002 (Rodada 1, S1)
+- **Quem errou:** planejador (mapeou o teste com `Contain("Expected ")`) e executor (reportou a fraqueza, mas só depois da revisão)
+- **O que aconteceu:** `Parse_WhenJsonIsMalformed_RejectsWithInvalidJson` e `Parse_WhenJsonHasTrailingText_RejectsWithInvalidJson` conferiam `Contain("Expected ")`, mas a `JsonException` do System.Text.Json também diz "Expected ...". O parser poderia montar `"invalid JSON: " + ex.Message`, sem o sufixo do catálogo, e os dois testes continuariam verdes. Corrigido na T9 (f3c8b36) com um trecho que só o catálogo produz (`Expected a single JSON object {"reply": string`) e o final `with no text around it.`.
+- **Por que importa:** o teste passa por causa de um texto que o código do projeto não controla; a instrução de correção da RN-BRAIN04 perderia a descrição do objeto esperado sem aviso.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md` e checklist do Planejador/Revisor de plano (`.claude/agents/revisor.md`, modo revisão de plano): "quando a mensagem embute texto de biblioteca externa, o teste confere um trecho que só o código do projeto produz, e o plano já mapeia o teste assim na §4".
+- **Status:** Proposta
+
+### AP-016 — Comportamento de linha única escapa da cobertura de linhas
+
+- **Data / US:** 2026-10-17 / US-002 (Rodada 1, S3)
+- **Quem errou:** planejador (tabela de mensagens da §2 citava o corte e a normalização sem teste na §4)
+- **O que aconteceu:** o corte do reply em 80 caracteres + `...` (ternário) e o `TrimEnd('.')` do detalhe da `JsonException` estavam a 100% de cobertura sem nenhum teste que os fixasse. Fixados na T9 (e8f5f00).
+- **Por que importa:** a meta de cobertura de linhas não vê transformações de uma linha; a US-003 e a US-009 poderiam mexer no catálogo com regressão silenciosa.
+- **Correção (proposta):** `.claude/agents/revisor.md` (checklist de revisão de plano) e `.claude/agents/planejador.md`: "cada transformação citada nas tabelas de mensagens da §2 (corte, normalização, limite) tem teste na §4, inclusive nos dois lados do limite, como já se exige para as respostas P*".
+- **Status:** Proposta
+
+### AP-017 — Red por mutação temporária para testes de caracterização
+
+- **Data / US:** 2026-10-17 / US-002 (T9, S1 e S3; S6 da Rodada 2)
+- **Quem errou:** — (procedimento que funcionou e não está escrito)
+- **O que aconteceu:** a revisão pediu testes que fixam comportamento que o código já tem, então não existe Red natural. O Executor mostrou o Red por mutação temporária, não commitada, descrita na T9 com a mensagem de falha obtida (ex.: sem corte e sem `TrimEnd` → 2 falhas; `>=` no lugar de `>` → falha o teste dos 80 caracteres). O 80º caractere do reply de teste é `b`, o que distingue corte em 79 de corte em 80. Ligado ao AP-010 (o Red falha pelo motivo certo). A S6 acrescenta: o valor usado para conferir que um campo é preservado não deve coincidir com o de outro campo que o código poderia copiar por engano (no teste da S4, `RawText` igual ao `Reply`).
+- **Por que importa:** sem o procedimento, o teste de caracterização pode nascer verde sem provar que discrimina.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, seção Red: "teste de caracterização pedido em revisão: aplique uma mutação temporária que quebre o comportamento, mostre a falha pelo motivo certo, reverta (não commite) e descreva a mutação e a falha na tarefa do `plan.md`. Em testes de preservação de campo, use valores distintos entre campos".
+- **Status:** Proposta
+
+### AP-018 — P* sem "Teste: ..." mapeado no plano (recorrência do AP-004)
+
+- **Data / US:** 2026-10-17 / US-002 (`plan-review.md`, rodadas 1 a 3: B1, B2, S11, S13)
+- **Quem errou:** planejador
+- **O que aconteceu:** a primeira versão do plano deixou P4, P5, P7 e P9 (normalização e comportamento de borda) sem teste na §4 (B1). Na revisão, só as P* citadas no bloqueante receberam "Teste: ..." (P2 e P3 ficaram de fora, S13). Padrões vizinhos da mesma revisão: (1) uma tarefa que cria um desvio (detecção JSON/tags) fazia o ramo da tarefa seguinte existir e o teste da T7 nascer verde (B2); resolvido dizendo que o ramo lança `NotImplementedException` até lá, e os testes da tarefa atual declaram a entrada que os mantém no ramo já implementado (S11); (2) a resposta da §12 no formato "sugestão → seções tocadas" permitiu conferir tudo numa rodada.
+- **Por que importa:** o AP-004 já tinha motivado o item [O] do checklist; a regra existe só no revisor e o planejador reincide.
+- **Correção (proposta):** `.claude/agents/planejador.md`: (a) na §9, **toda** P* termina com "Teste: `<Classe>.<Método>`" ou "Sem efeito observável", conferido antes de entregar; (b) na §5, quando uma tarefa cria um desvio cujo outro ramo pertence à tarefa seguinte, o plano diz o estado desse ramo; (c) respostas a revisão de plano na §12 seguem o formato "sugestão → seções tocadas". Opcional: espelhar (a) e (b) em `.claude/skills/tdd-dotnet/SKILL.md`.
+- **Status:** Aplicada (2026-10-17; (a), (b) e (c) em `.claude/agents/planejador.md`; o espelho opcional na `tdd-dotnet` não foi feito)
+
+### AP-019 — Forma única de checar caracteres invisíveis (LC_ALL=C)
+
+- **Data / US:** 2026-10-17 / US-002 (`plan-review.md`, rodadas 1 a 3: S1 e aprendizado da Rodada 3)
+- **Quem errou:** planejador (D11 inicial usava `grep -P '\xEF\xBB\xBF'`, que depende do locale) e skill `checklist-revisao` (forma diferente)
+- **O que aconteceu:** o D11 inicial não detectava os bytes (no Git Bash, `\xEF` vira o código U+00EF, não o byte). Foi corrigido para `LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`. O `checklist-revisao` §4 e o AP-007 usam o mesmo comando sem `LC_ALL=C`: hoje dão o mesmo resultado, mas são duas formas do mesmo comando.
+- **Por que importa:** cada variante pode falhar em silêncio e dar `0` falso (AP-007).
+- **Correção (proposta):** adotar uma forma só, com `LC_ALL=C`, em `.claude/skills/checklist-revisao/SKILL.md` §4, no AP-007 (nota de atualização) e em `.claude/agents/executor.md`; o Planejador copia dali na DoD, sem reescrever. Lembrar que `grep -c` sai com código 1 quando conta 0, resultado esperado.
+- **Status:** Aplicada (2026-10-17; `checklist-revisao` §4, `executor.md`, `planejador.md` (DoD) e nota no AP-007)
+
+### AP-020 — FluentAssertions 7: `Should().BeTrue()` não informa a análise de nulidade
+
+- **Data / US:** 2026-10-17 / US-002 (relato do Executor)
+- **Quem errou:** executor (descobriu pelo compilador)
+- **O que aconteceu:** com `TreatWarningsAsErrors`, `result.IsValid.Should().BeTrue();` seguido de `result.Reply.Reply` gera CS8602, porque o `[MemberNotNullWhen]` de `IsValid` só vale em `if (result.IsValid)` ou `Debug.Assert`. Foi preciso `!` depois de verificar `IsValid` (ex.: `result.Reply!.IsRawFallback`).
+- **Por que importa:** cada teste novo sobre `TutorReplyParseResult` (US-003 em diante) repete o tropeço e o Red vira erro de compilação (AP-013).
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "FluentAssertions 7 não propaga nulidade; depois de `result.IsValid.Should().BeTrue()`, acesse `result.Reply!` (o `!` é seguro porque a asserção anterior falha o teste). Não usar `if` no teste para contornar".
+- **Status:** Proposta
+
+### AP-021 — PowerShell 5.1: `git commit -m @'...'@` quebra os argumentos
+
+- **Data / US:** 2026-10-17 / US-002 (relato do Executor)
+- **Quem errou:** executor
+- **O que aconteceu:** no Windows PowerShell 5.1, `git commit -m @'...'@` com aspas duplas dentro da mensagem divide os argumentos do `git`. O que funcionou foi o Bash com `git commit -F -` e heredoc.
+- **Por que importa:** o commit sai com mensagem truncada ou falha, e o corpo/atribuição se perdem.
+- **Correção (proposta):** `.claude/agents/executor.md` (seção Git) e skill `padroes-codigo` (seção Git): "mensagem de commit com várias linhas ou aspas: `git commit -F -` com heredoc no Bash; não usar here-string do PowerShell 5.1".
+- **Status:** Proposta

@@ -1,0 +1,11 @@
+{
+  "reply": "Good effort! What did you do after that?",
+  "corrections": [
+    { "original": "a1", "corrected": "b1", "explanation": "first explanation" },
+    { "original": "a2", "corrected": "b2", "explanation": "second explanation" },
+    { "original": "a3", "corrected": "b3", "explanation": "third explanation" }
+  ],
+  "pronunciation": null,
+  "vocabulary": null,
+  "praise": null
+}

@@ -6,7 +6,7 @@
 | US | Título | Fase | Depende de | Status |
 |---|---|---|---|---|
 | US-001 | Fundação da solução e configuração | 1 | — | Concluída |
-| US-002 | Contrato do professor e parser único da resposta | 1 | US-001 | A fazer |
+| US-002 | Contrato do professor e parser único da resposta | 1 | US-001 | Concluída |
 | US-003 | ConversationService dono do histórico | 1 | US-002 | A fazer |
 | US-004 | Conversar por texto com o professor via Claude Code | 2 | US-003 | A fazer |
 | US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | A fazer |

@@ -31,6 +31,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Mudanças de comportamento estão primeiro na spec/plano e decisões técnicas relevantes têm ADR commitado **antes** do código que as implementa.
 - [O] Todos os comandos da Definition of Done foram rodados pelo Executor, com resultado colado em "Evidências" no `plan.md`, e o resultado confere com o seu.
 - Comentários do usuário no `plan.md` foram respondidos e respeitados.
+- Escolhas de forma registradas pelo Executor no §12 têm commit anterior ao `feat`/`fix` que as implementa (AP-014).
 
 ## 2. Arquitetura (`ARCHITECTURE.md`)
 - [O] `EnglishTutor.Core` sem referência a Infrastructure/Console/pacotes de terceiros (R1).
@@ -58,7 +59,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Logs estruturados (templates), sem interpolação e sem dados sensíveis.
 - Sem código morto, TODO sem US, números mágicos sem constante/configuração.
 - Tipos `sealed`/`record` conforme `padroes-codigo`.
-- Nenhum caractere invisível literal no diff (BOM, zero-width, espaço sem quebra); use escape `\uXXXX`. Confira por bytes (BOM, zero-width space, espaço sem quebra) com `git diff develop...HEAD | grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`, que deve dar 0.
+- Nenhum caractere invisível literal no diff (BOM, zero-width, espaço sem quebra); use escape `\uXXXX`. Confira por bytes (BOM, zero-width space, espaço sem quebra) com `git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'` (Git Bash), que deve dar 0 (o código de saída 1 com contagem 0 é o esperado). Esta é a forma única do projeto: o Planejador a copia para a DoD e o Executor a usa, sem variantes (AP-019).
 
 ## 5. Segurança e privacidade
 - [O] Nenhum segredo, token, caminho pessoal ou dado do usuário commitado (inclui fixtures).

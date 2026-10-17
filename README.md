@@ -52,7 +52,7 @@ Cinco hábitos de trabalho com IA estão embutidos na estrutura: contexto curto 
 
 ## Como rodar
 
-> Disponível desde a US-001 (casca de console: cabeçalho, `/help`, `/quit`; ainda sem professor). Logs em `logs/`. Detalhes em [docs/us/US-001.md](docs/us/US-001.md).
+> Disponível desde a US-001 (casca de console: cabeçalho, `/help`, `/quit`; ainda sem professor). Logs em `logs/`. Detalhes em [docs/us/US-001.md](docs/us/US-001.md). Desde a US-002 existe o parser da resposta do professor (JSON e tags), ainda sem uso no console: [docs/us/US-002.md](docs/us/US-002.md).
 
 ```bash
 dotnet build

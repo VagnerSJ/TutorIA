@@ -49,8 +49,9 @@ src/
   EnglishTutor.Core/
     Conversation/      ConversationService, ConversationWindow, TurnMessageBuilder, TutorMode,
                        LocalCommandParser, LocalCommand, LocalCommands
-    Brain/             ITutorBrain, BrainRequest, BrainMessage, TutorReply, Correction, BrainException,
-                       BrainOptions, BrainOptionsValidator, BrainProviders
+    Brain/             ITutorBrain, BrainRequest, BrainMessage, TutorReply, Correction, TutorReplyParseResult,
+                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, FeedbackFormatter,
+                       BrainException, BrainOptions, BrainOptionsValidator, BrainProviders
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
@@ -97,6 +98,7 @@ public sealed record BrainMessage(BrainRole Role, string Content);
 public sealed record TutorReply(string Reply, IReadOnlyList<Correction> Corrections,
                                 string? Pronunciation, string? Vocabulary, string? Praise,
                                 bool IsRawFallback, string RawText);
+public sealed record Correction(string Original, string Corrected, string Explanation);
 
 public interface ITextToSpeech
 {
@@ -175,7 +177,7 @@ Validação das Options na inicialização (`ValidateOnStart`).
 - Forma canônica: objeto JSON `{ reply, corrections[{original, corrected, explanation}], pronunciation, vocabulary, praise }`.
 - `ClaudeCode` usa `--json-schema` e lê `structured_output`; `Ollama` usa `format` com o mesmo JSON Schema.
 - `TutorReplyParser` é **único**: aceita o JSON canônico e, como alternativa, o formato com tags `<reply>…</reply><feedback>…</feedback>` (texto cru, modelos menores, `OutputMode: Tags`).
-- O parser também valida as regras de conteúdo verificáveis (reply não vazio, máximo de 2 correções, etc. — RN-FEED*).
+- As regras de conteúdo verificáveis (reply não vazio e terminando em `?`, no máximo 2 correções, correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
 
 ### 6.3 Provedor Claude Code (processo)
 
@@ -238,7 +240,7 @@ SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala tran
 | Tipo | Onde | Ferramentas |
 |---|---|---|
 | Unidade (TDD) | `EnglishTutor.Core.Tests` | xUnit, FluentAssertions, NSubstitute; fakes de todas as portas |
-| Parser / fixtures | `EnglishTutor.Infrastructure.Tests` | saídas reais gravadas em `Fixtures/` (Claude Code JSON, Ollama JSON) |
+| Parser / fixtures | `EnglishTutor.Infrastructure.Tests` | saídas reais gravadas em `Fixtures/` (Claude Code JSON, Ollama JSON) a partir da US-004; até lá (US-002), exemplos da spec em `Fixtures/TutorReply/` |
 | Contrato | `Infrastructure.Tests/Contract/TutorBrainContractTests` (classe abstrata) | uma subclasse por provedor; fake de processo/HTTP |
 | Live | mesmas classes com `[Trait("Category","LiveBrain")]` | excluídas por padrão: `dotnet test --filter "Category!=LiveBrain"` |
 | Avaliação | comando `eval` + `eval/golden-set.json` | relatório em `eval/reports/` |

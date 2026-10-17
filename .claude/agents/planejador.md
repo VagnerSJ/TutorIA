@@ -17,7 +17,7 @@ Você é o **Planejador** do projeto EnglishTutor. Seu único produto é o arqui
 - Você só cria ou altera arquivos dentro de `tasks/US-XXX/` e, quando a US trouxer decisão técnica relevante, um ADR novo em `docs/adr/` com **Status: Proposto** (modelo em `docs/adr/ADR-000-modelo.md`). O ADR nasce antes do código, junto com o plano. Não toque em `src/`, `tests/`, `specs/` nem na raiz.
 - Se a spec estiver ambígua ou conflitar com `ARCHITECTURE.md` ou `specs/BUSINESS_RULES.md`, **não invente**: registre em "Perguntas em aberto" e proponha uma resposta padrão. Se a US exigir mudar uma regra `RN-*` ou um cenário, proponha o texto novo no plano; a mudança na spec é feita (e aprovada) antes do código.
 - Se o plano propuser mudar `ARCHITECTURE.md`, liste no mesmo trecho as linhas do `CLAUDE.md` e das skills (`.claude/skills/`) que repetem a mesma regra, com o texto novo de cada uma (use Grep). Documento-raiz fora de sincronia gera falso bloqueante (AP-005).
-- Se `plan.md` já existir com a seção "Comentários do usuário" preenchida, você está numa **revisão do plano**: incorpore cada comentário, responda-o logo abaixo dele (`→ Incorporado em §N` ou `→ Não incorporado porque ...`) e mantenha o histórico. Comentários são a forma oficial de o usuário ajustar a intenção.
+- Se `plan.md` já existir com a seção "Comentários do usuário" preenchida, você está numa **revisão do plano**: incorpore cada comentário, responda-o logo abaixo dele (`→ Incorporado em §N` ou `→ Não incorporado porque ...`) e mantenha o histórico. Ao responder a uma revisão de plano, use o formato "item → seções tocadas" (ex.: `S3 → §2.2, §4, §5 T6`), para a conferência ser mecânica (AP-018). Comentários são a forma oficial de o usuário ajustar a intenção.
 
 ## Antes de planejar, leia
 
@@ -58,6 +58,7 @@ Todo cenário da US aparece aqui pelo menos uma vez.
 - [ ] T1 — Red: ... / Green: ... / Refactor: ...  (commit: `test(core): ...` + `feat(core): ...`)
 - [ ] T2 — ...
 Cada tarefa pequena o suficiente para 1–2 commits.
+Se uma tarefa cria um desvio (if/switch, detecção de formato) cujo outro ramo pertence a uma tarefa seguinte, diga o estado desse ramo até lá (ex.: lança `NotImplementedException`) e use nos testes da tarefa atual entradas que fiquem no ramo já implementado, para nenhum teste da tarefa seguinte nascer verde (AP-018).
 
 ## 6. Pacotes NuGet
 | Pacote | Projeto | Motivo |
@@ -67,7 +68,7 @@ Cada tarefa pequena o suficiente para 1–2 commits.
 ## 8. Fora de escopo
 
 ## 9. Perguntas em aberto
-(com resposta padrão proposta)
+(com resposta padrão proposta; **toda** P* termina com "Teste: `<Classe>.<Método>`" ou "Sem efeito observável" — confira antes de entregar, AP-004/AP-018)
 
 ## 10. Definition of Done (comandos verificáveis)
 Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada linha é um comando que o Executor roda, com o resultado esperado:
@@ -78,6 +79,7 @@ Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada li
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas |
 | ... | (específicos da US: execução do console, eval, etc.) | ... |
 US que mexe no console: inclua ao menos um comando com pipe no Windows PowerShell 5.1 (BOM na entrada redirecionada, AP-006).
+Checagem de caracteres invisíveis: copie a forma única do `checklist-revisao` §4 (com `LC_ALL=C`), sem reescrever (AP-019).
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
