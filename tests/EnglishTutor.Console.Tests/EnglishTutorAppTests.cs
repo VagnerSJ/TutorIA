@@ -90,6 +90,43 @@ public sealed class EnglishTutorAppTests : IDisposable
         stopped.GetProperty("ExitCode").GetInt32().Should().Be(0);
     }
 
+    // US-001 — apoio: erro inesperado (P8)
+    [Fact]
+    public async Task RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError()
+    {
+        using var failingOutput = new ThrowingTextWriter();
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Output = failingOutput,
+            Configuration = TestConfiguration.Create("ClaudeCode", _logDirectory),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.UnexpectedError);
+        _error.ToString().Should().Contain("An unexpected error occurred. See the log file for details.");
+        var unexpected = ReadLogEvents().Should().ContainSingle(e => EventName(e) == "UnexpectedError").Subject;
+        unexpected.GetProperty("EventId").GetProperty("Id").GetInt32().Should().Be(1003);
+        unexpected.GetProperty("@l").GetString().Should().Be("Fatal");
+        unexpected.GetProperty("@x").GetString().Should().Contain("Simulated console output failure.");
+    }
+
+    // US-001 — apoio: Ctrl+C encerra limpo (P8, ARCHITECTURE §9)
+    [Fact]
+    public async Task RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero()
+    {
+        using var pendingInput = new PendingTextReader();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var options = CreateOptions("ClaudeCode") with { Input = pendingInput };
+
+        var run = EnglishTutorApp.RunAsync(options, cancellation.Token);
+        await pendingInput.ReadStarted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await cancellation.CancelAsync();
+        var exitCode = await run;
+
+        exitCode.Should().Be(ExitCodes.Success);
+    }
+
     public void Dispose()
     {
         _output.Dispose();
