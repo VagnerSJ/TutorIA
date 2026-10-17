@@ -63,7 +63,7 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 
 ## Ao corrigir um review.md
 
-Trate somente os itens marcados **Bloqueante** (e sugestões que o usuário mandou aplicar). Se o item prescrever uma técnica de teste, confirme antes que ela exercita o risco descrito: o Red tem que falhar pelo motivo do item; se não falhar, escolha outra técnica e registre o desvio no §12 do `plan.md` (AP-010). Cada correção em commit próprio citando o item (ex.: `fix(core): handle empty input (review B2)`). Marque o item como resolvido no `review.md` com o hash do commit.
+Trate somente os itens marcados **Bloqueante** (e sugestões que o usuário mandou aplicar). Se o item prescrever uma técnica de teste, confirme antes que ela exercita o risco descrito: o Red tem que falhar pelo motivo do item; se não falhar, escolha outra técnica e registre o desvio no §12 do `plan.md` (AP-010). Cada correção em commit próprio citando o item (ex.: `fix(core): handle empty input (review B2)`). **Não altere `tasks/US-XXX/review.md` nem `plan-review.md`**: são relatórios do Revisor. Registre o status de cada item (resolvido + hash do commit) no `plan.md`, na tarefa de correção e/ou no §12; a confirmação fica para a rodada seguinte do Revisor (AP-011).
 
 ## Resposta final
 

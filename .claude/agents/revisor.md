@@ -77,3 +77,5 @@ Resultado: APROVADO | REPROVADO (n bloqueantes)
 ```
 
 Se não houver bloqueantes, escreva "Nenhum." na seção.
+
+Em rodadas seguintes (N > 1), acrescente antes de "Bloqueantes" a seção `## Itens da rodada anterior`, com o status de cada bloqueante e de cada sugestão que o usuário mandou aplicar (resolvido + hash, ou pendente). Só você registra esse status no relatório (AP-011).
