@@ -1,6 +1,6 @@
 # ADR-005 — Regras de conteúdo da resposta no Core; parser de formato na Infrastructure
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-17)
 - **Data:** 2026-10-17
 - **US relacionadas:** US-002 (e, como consumidoras, US-003, US-004, US-006)
 
