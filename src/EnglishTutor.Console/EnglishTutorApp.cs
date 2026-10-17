@@ -21,8 +21,20 @@ public static class EnglishTutorApp
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        IHost builtHost;
+        try
+        {
+            builtHost = BuildHost(options);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // P8: invalid appsettings.json or Serilog section; there is no logger yet, so only the console is told.
+            await options.Error.WriteLineAsync(ConsoleText.StartupFailed(exception.Message).AsMemory(), CancellationToken.None);
+            return ExitCodes.UnexpectedError;
+        }
+
         // Disposing the host disposes the Serilog logger (dispose: true), flushing the log before returning.
-        using var host = BuildHost(options);
+        using var host = builtHost;
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger(AppLog.Category);
         var timeProvider = host.Services.GetRequiredService<TimeProvider>();
         var startedAt = timeProvider.GetTimestamp();

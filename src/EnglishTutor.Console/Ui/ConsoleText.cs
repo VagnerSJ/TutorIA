@@ -13,6 +13,9 @@ public static class ConsoleText
 
     public const string InvalidConfiguration = "Invalid configuration:";
 
+    // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
+    public static string StartupFailed(string reason) => $"The application could not start: {reason}";
+
     public static IReadOnlyList<string> Header(string provider, TutorMode mode) =>
     [
         "EnglishTutor",
