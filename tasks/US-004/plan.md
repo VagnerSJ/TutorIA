@@ -15,7 +15,7 @@ A decisão central está no **ADR-007 (Proposto)**: `docs/adr/ADR-007-claude-cod
 
 - processo por turno atrás de `IProcessRunner`;
 - histórico renderizado num texto único no stdin;
-- `session_id` guardado no adaptador e reaproveitado só quando o request estende exatamente a sessão conhecida;
+- `session_id` guardado no adaptador e reaproveitado só quando o request estende exatamente a sessão conhecida (mesmo system prompt, mesmas mensagens, mais uma mensagem do aluno);
 - system prompt num arquivo temporário fora da pasta de trabalho;
 - `structured_output`/`result` → `TutorReplyParser`.
 
@@ -35,7 +35,14 @@ public interface IProcessRunner
 public sealed class ProcessRunner : IProcessRunner   // único lugar que usa System.Diagnostics.Process
 ```
 
-O `ProcessRunner` usa `UseShellExecute = false`, `CreateNoWindow = true` e `ArgumentList`, nunca string concatenada. stdin, stdout e stderr ficam redirecionados em UTF-8 sem BOM (`new UTF8Encoding(false)`). O runner escreve o stdin e o fecha, e lê stdout e stderr ao mesmo tempo, de forma assíncrona. Depois espera com `WaitForExitAsync(ct)`. Se o `ct` for cancelado, chama `Kill(entireProcessTree: true)` e relança a `OperationCanceledException`. Ele não traduz exceções: `Win32Exception` (executável inexistente) propaga, e a tradução para `CliNotFound` é da US-005. Não há teste unitário, porque ele lança um processo real (ARCHITECTURE §10). Quem o exercita são os testes `LiveBrain` (T9).
+O `ProcessRunner` usa `UseShellExecute = false`, `CreateNoWindow = true` e `ArgumentList`, nunca string concatenada. stdin, stdout e stderr ficam redirecionados em UTF-8 sem BOM (`new UTF8Encoding(false)`). Ordem, nesta sequência:
+
+1. inicia o processo;
+2. **começa** a leitura assíncrona de stdout e de stderr (as duas tarefas ficam em andamento);
+3. escreve o stdin e o fecha. Se o processo já tiver terminado (argumento recusado, versão antiga da CLI), a `IOException` de pipe fechado na escrita é ignorada, para que o código de saída e o stderr ainda cheguem ao adaptador (review S4);
+4. espera com `WaitForExitAsync(ct)` e depois aguarda as duas leituras.
+
+Se o `ct` for cancelado, chama `Kill(entireProcessTree: true)` e relança a `OperationCanceledException`. Ele não traduz exceções: `Win32Exception` (executável inexistente) propaga, e o console a trata como erro inesperado até a US-005, que a traduz para `CliNotFound` (texto alinhado na §2.8 e no ADR-007, item 5; review S3). Não há teste unitário, porque ele lança um processo real (ARCHITECTURE §10). Quem o exercita são os testes `LiveBrain` (T9).
 
 ### 2.2 Configuração (`src/EnglishTutor.Infrastructure/Brain/`)
 
@@ -63,6 +70,8 @@ public sealed class ClaudeCodeOptions
 
 public sealed class ClaudeCodeOptionsValidator : IValidateOptions<ClaudeCodeOptions>;
 ```
+
+**Normalização de `OutputMode` (B4, P13).** As Options guardam o valor como foi configurado. O **adaptador** é o dono da normalização para uso: a cada chamada, obtém o modo canônico com `BrainOutputModes.TryGetCanonical(options.OutputMode, out var mode)` e usa **só** o canônico na decisão de `--json-schema`, na escolha do arquivo de formato e no log 2001. É o mesmo padrão de `Brain:Provider` (US-001, P4: `BrainProviders.TryGetCanonical` no consumidor). Com `"jsonschema"` no `appsettings.json`, o processo roda no modo JsonSchema e o log diz `JsonSchema`.
 
 `TimeoutSeconds` (ARCHITECTURE §6.1) **não** entra nesta US: o tempo máximo e a mensagem de tempo esgotado são da US-005, cenário "tempo esgotado" (P6).
 
@@ -103,6 +112,9 @@ public sealed class ClaudeCodeTutorBrain(
     public Task<TutorReply> SendAsync(BrainRequest request, CancellationToken ct);
 }
 
+// Estado privado do adaptador (campo _session); a igualdade de mensagens é feita com SequenceEqual.
+private sealed record ClaudeCodeSession(string SessionId, string SystemPrompt, IReadOnlyList<BrainMessage> Messages);
+
 public static class ClaudeCodePromptRenderer
 {
     public static string Render(IReadOnlyList<BrainMessage> messages);
@@ -123,16 +135,16 @@ internal static partial class ClaudeCodeLog                       // faixa 2000�
 **`SendAsync(request, ct)`**, nesta ordem:
 
 1. `ArgumentNullException.ThrowIfNull(request)`.
-2. Pasta de trabalho: `Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.WorkingDirectory))` e depois `Directory.CreateDirectory` (RN-BRAIN06). O adaptador não escreve nada nela.
-3. Retomada: `resumeId = options.UseResume && _session is { } s && request.Messages.Count == s.Messages.Count + 1 && request.Messages[^1].Role == BrainRole.User && request.Messages.Take(s.Messages.Count).SequenceEqual(s.Messages) ? s.SessionId : null`. A igualdade é a de `record` de `BrainMessage` (`Role` + `Content`, só strings; AP-028 não se aplica). Antes de rodar, `_session = null`, para que falha ou cancelamento nunca deixem uma sessão "conhecida" inconsistente.
+2. Pasta de trabalho: `Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.WorkingDirectory))` e depois `Directory.CreateDirectory` (RN-BRAIN06). O adaptador não escreve nada nela. Modo: `mode` = canônico de `options.OutputMode` via `BrainOutputModes.TryGetCanonical` (§2.2, P13); se falhar, `InvalidOperationException` (defensiva, §2.9).
+3. Retomada: `resumeId = options.UseResume && _session is { } s && request.SystemPrompt == s.SystemPrompt && request.Messages.Count == s.Messages.Count + 1 && request.Messages[^1].Role == BrainRole.User && request.Messages.Take(s.Messages.Count).SequenceEqual(s.Messages) ? s.SessionId : null`. A igualdade é a de `record` de `BrainMessage` (`Role` + `Content`, só strings; AP-028 não se aplica) e a ordinal de `string` para o system prompt (review S2). Antes de rodar, `_session = null`, para que falha ou cancelamento nunca deixem uma sessão "conhecida" inconsistente.
 4. stdin: com `resumeId`, `request.Messages[^1].Content`; senão, `ClaudeCodePromptRenderer.Render(request.Messages)`.
-5. System prompt: grava `request.SystemPrompt` (UTF-8 sem BOM) em `Path.Combine(Path.GetTempPath(), $"englishtutor-system-prompt-{Guid.NewGuid():N}.md")`. O arquivo é apagado num `finally` (`File.Delete`) depois do processo.
+5. System prompt: grava `request.SystemPrompt` (UTF-8 sem BOM) em `Path.Combine(Path.GetTempPath(), $"englishtutor-system-prompt-{Guid.NewGuid():N}.md")`. O arquivo é apagado num `finally` (`File.Delete`) depois do processo, inclusive quando o processo falha ou a chamada é cancelada.
 6. Argumentos, nesta ordem, em `ArgumentList`:
-   `-p`, `--output-format`, `json`, [`--json-schema`, `TutorReplySchema.Json` se `OutputMode = JsonSchema`], `--system-prompt-file`, `<arquivo temporário>`, `--append-system-prompt-file`, `<FormatJsonPath | FormatTagsPath>`, `--tools`, `""` (string vazia), `--disallowedTools`, `mcp__*`, `--strict-mcp-config`, `--permission-mode`, `dontAsk`, `--model`, `<Model>`, [`--resume`, `<resumeId>`]. Nunca `--bare` (RN-BRAIN05, RN-BRAIN06).
+   `-p`, `--output-format`, `json`, [`--json-schema`, `TutorReplySchema.Json` se `mode == BrainOutputModes.JsonSchema`], `--system-prompt-file`, `<arquivo temporário>`, `--append-system-prompt-file`, `<FormatJsonPath | FormatTagsPath conforme mode>`, `--tools`, `""` (string vazia), `--disallowedTools`, `mcp__*`, `--strict-mcp-config`, `--permission-mode`, `dontAsk`, `--model`, `<Model>`, [`--resume`, `<resumeId>`]. Nunca `--bare` (RN-BRAIN05, RN-BRAIN06).
 7. `result = await processRunner.RunAsync(new(ExecutablePath, args, workingDirectory, stdin), ct)`, com o `ct` do chamador sem troca. O tempo é medido com `timeProvider.GetTimestamp()`/`GetElapsedTime`.
 8. `ClaudeCodeOutput.Read(result)` (§2.5) devolve `SessionId` e `RawText`.
-9. `_session = SessionId is null ? null : new(SessionId, [.. request.Messages, new(BrainRole.Assistant, RawText)])`, tanto para resposta válida quanto inválida. Assim, a retentativa do ADR-006 estende a sessão.
-10. `parser.Parse(RawText)`. Se for válido, loga 2001 e devolve `Reply`. Se for inválido, lança `BrainException.InvalidOutput(rejection, RawText)` (ADR-006).
+9. `_session = SessionId is null ? null : new(SessionId, request.SystemPrompt, [.. request.Messages, new(BrainRole.Assistant, RawText)])`, tanto para resposta válida quanto inválida. Assim, a retentativa do ADR-006 estende a sessão.
+10. `parser.Parse(RawText)`. Se for válido, loga 2001 (com `mode`, o canônico) e devolve `Reply`. Se for inválido, lança `BrainException.InvalidOutput(rejection, RawText)` (ADR-006).
 
 Os logs não levam o texto do aluno, o system prompt nem o `RawText` (padroes-codigo, Logs).
 
@@ -158,16 +170,18 @@ Os logs não levam o texto do aluno, o system prompt nem o `RawText` (padroes-co
 
 ### 2.5 Leitura da saída e falhas (`ClaudeCodeOutput.Read`)
 
-| Situação | Resultado |
-|---|---|
-| `ExitCode != 0` | `BrainException(Unknown, "Claude Code failed (exit code <n>): <detalhe>")` |
-| `ExitCode == 0` e stdout não é objeto JSON com `"type": "result"` | `BrainException(Unknown, "Claude Code returned output that is not a JSON result. Expected the JSON object printed by \"claude -p --output-format json\".")` |
-| `is_error: true` | `BrainException(Unknown, "Claude Code failed (exit code <n>): <detalhe>")` |
-| `structured_output` é objeto | `RawText = structured_output.GetRawText()` |
-| senão | `RawText = result` (string; ausente → `""`) |
-| `session_id` | string não vazia → `SessionId`; senão `null` |
+As linhas são avaliadas nesta ordem; a primeira que casar decide. Cada linha de falha tem, na §4, um caso de teste que só ela satisfaz (B3).
 
-`<detalhe>`, nesta ordem: o `result` do JSON, quando o stdout é legível, `is_error` é `true` e o `result` não está em branco (com `Trim()`); senão, a **primeira linha não vazia** do stderr (com `Trim()`); senão, `no error details were printed`. Essa transformação (primeira linha) tem teste nos dois lados (§4, AP-016). A classificação por `BrainErrorKind` (`CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`) é da US-005 (P5).
+| # | Situação | Resultado |
+|---|---|---|
+| 1 | `ExitCode != 0` | `BrainException(Unknown, "Claude Code failed (exit code <n>): <detalhe>")` |
+| 2 | `ExitCode == 0` e stdout não é objeto JSON com `"type": "result"` | `BrainException(Unknown, "Claude Code returned output that is not a JSON result. Expected the JSON object printed by \"claude -p --output-format json\".")` |
+| 3 | `ExitCode == 0` e `is_error: true` | `BrainException(Unknown, "Claude Code reported an error: <detalhe>")`, **sem** chamar o parser, mesmo que haja `structured_output` válido (B3) |
+| 4 | `structured_output` é objeto | `RawText = structured_output.GetRawText()` |
+| 5 | senão | `RawText = result` (string; ausente → `""`) |
+| — | `session_id` (linhas 4 e 5) | string não vazia → `SessionId`; senão `null` (o turno seguinte não usa `--resume`) |
+
+`<detalhe>`, nesta ordem: o `result` do JSON, quando o stdout é legível, `is_error` é `true` e o `result` não está em branco (com `Trim()`); senão, a **primeira linha não vazia** do stderr (com `Trim()`); senão, `no error details were printed`. Os três ramos e a "primeira linha" têm teste (§4, AP-016; review S5). A classificação por `BrainErrorKind` (`CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`) é da US-005 (P5).
 
 ### 2.6 Console
 
@@ -208,7 +222,13 @@ Textos exibidos ao aluno (em `ConsoleText`, em inglês):
   - `AddOptions<ClaudeCodeOptions>().Bind(GetSection(ClaudeCodeOptions.SectionName)).ValidateOnStart()`;
   - `AddOptions<ConversationOptions>().Bind(GetSection(ConversationOptions.SectionName)).ValidateOnStart()`.
 
-  `MaxTurnsInWindow = 0` falha no `StartAsync` e cai no `catch (OptionsValidationException)` que já existe: `Invalid configuration:` + a mensagem do validador em `Error` e `ExitCodes.InvalidConfiguration` (2), sem cabeçalho nem prompt (AP-024, mesmo padrão da US-001).
+  Com **uma** classe de Options inválida (ex.: só `MaxTurnsInWindow = 0`), o `StartAsync` lança `OptionsValidationException`, que cai no `catch` que já existe: `Invalid configuration:` + a mensagem do validador em `Error` e `ExitCodes.InvalidConfiguration` (2), sem cabeçalho nem prompt (AP-024, mesmo padrão da US-001).
+
+  Com **mais de uma** classe inválida ao mesmo tempo (ex.: `Brain:Provider = "Inexistente"` e `Conversation:MaxTurnsInWindow = 0`), o `ValidateOnStart` lança uma `AggregateException` com uma `OptionsValidationException` por classe, que hoje cairia no `catch (Exception)` (erro inesperado, código 1). Decisão (B1, P19): o tratamento de configuração inválida passa a reconhecer as duas formas.
+  - Falhas de validação = `exception.Failures` de uma `OptionsValidationException`, ou a concatenação dos `Failures` de cada interna de uma `AggregateException` cujas internas são **todas** `OptionsValidationException`, na ordem em que vêm.
+  - Com falhas de validação: `logger.StartupFailed(string.Join(" ", failures))`, `Invalid configuration:` e uma linha `  <falha>` por falha em `Error` (com `CancellationToken.None`, como hoje), e `ExitCodes.InvalidConfiguration`.
+  - `AggregateException` com qualquer interna de outro tipo continua erro inesperado (defensiva, §2.9).
+  - Forma sugerida, livre para o Executor: um `private static IReadOnlyList<string>? ValidationFailures(Exception)` usado num filtro `catch (Exception exception) when (ValidationFailures(exception) is { } failures)`, no lugar do `catch (OptionsValidationException)`; `WriteInvalidConfigurationAsync` passa a receber a lista.
 - `RunSessionAsync`: com o provedor canônico `ClaudeCode`, usa `new ConversationInputHandler(services.GetRequiredService<ConversationService>(), options.Output)`; com qualquer outro, `new TutorNotConnectedInputHandler(options.Output)` (P7). `ApplicationStarted` loga `handler.Mode.Name`.
 - `appsettings.json`:
 
@@ -246,10 +266,35 @@ Textos exibidos ao aluno (em `ConsoleText`, em inglês):
 
 O orquestrador aplica, depois da aprovação e **antes da T1**:
 
-- `docs(ai): update spec for US-004`: o bloco `specs/sprints/SPRINT_1.md` abaixo;
+- `docs(ai): update spec for US-004`: os dois blocos de `specs/sprints/SPRINT_1.md` abaixo (US-005 e US-006);
 - `docs(ai): update architecture for US-004`: `ARCHITECTURE.md` e skills abaixo, com o ADR-007 em "Aceito", se aprovado.
 
 Nenhuma tarefa da §5 altera esses documentos. Cada trecho é identificado pelo **texto antigo** (AP-023).
+
+**`specs/sprints/SPRINT_1.md`, seção `## US-005 — Erros do Claude Code com mensagens claras`** (AP-022: esta US deixa a falha do cérebro encerrar o app com erro inesperado, P11; B2). Os critérios reaproveitam os já fixados no projeto (AP-024): mensagens de falha na saída de erro (`Error`), como `Invalid configuration:` e `An unexpected error occurred...`; código 0 ao sair com `/quit`; o texto `Claude Code failed (exit code <n>): <detalhe>` desta US.
+
+1. No bloco `gherkin` da US-005, depois do cenário "tempo esgotado" (última linha antiga: `  E vejo uma mensagem de tempo esgotado`), acrescentar:
+
+```gherkin
+
+Cenário: falha do cérebro no console não encerra a sessão
+  Dado o console com o provedor ClaudeCode
+  E um cérebro que falha num turno com BrainException de qualquer BrainErrorKind que chegue ao console, inclusive Unknown
+  Quando envio uma frase
+  Então vejo na saída de erro uma mensagem que diz o que deu errado e o que fazer
+  E, para Unknown, a mensagem inclui o detalhe da BrainException (ex.: "Claude Code failed (exit code 1): ...")
+  E não vejo "An unexpected error occurred. See the log file for details."
+  E a sessão continua: a frase seguinte é enviada ao cérebro
+  E ao digitar "/quit" o código de saída é 0
+```
+
+2. Na tabela "DoD extra" da US-005, depois da linha antiga que começa com `| D6 | `$env:Brain__ClaudeCode__ExecutablePath="nao-existe"`, acrescentar:
+
+```
+| D7 | `dotnet test --filter "FullyQualifiedName~EnglishTutorAppTests"` | verde; o teste `RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError` (US-004, P11) foi substituído pelo teste do cenário "falha do cérebro no console não encerra a sessão" |
+```
+
+(O `InvalidOutput` não chega ao console: o `ConversationService` o trata com retentativa e fallback, ADR-006. Por isso o texto diz "que chegue ao console".)
 
 **`specs/sprints/SPRINT_1.md`, seção `## US-006 — Professor local via Ollama`** (AP-022: esta US mantém o console "não conectado" para `Ollama`, P7). No bloco `gherkin` da US-006, depois do cenário "modelo não baixado" (última linha antiga: `  Então vejo o comando "ollama pull <modelo>"`), acrescentar:
 
@@ -284,7 +329,7 @@ Cenário: console conversa com o Ollama
 - §3, texto antigo: `    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/, Logging/`
   Texto novo: `    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/ (ChatSession, ConversationInputHandler), Logging/; prompts/ copiado para a saída`
 - §5, texto antigo: `Provedores com estado (Claude Code via `--resume`) podem usar `SessionHint` como otimização, mas devem funcionar corretamente recebendo apenas o `BrainRequest` completo.`
-  Texto novo: `Provedores com estado (Claude Code via `--resume`) guardam o identificador da sessão no próprio adaptador e só o reaproveitam quando o `BrainRequest` repete exatamente as mensagens que a sessão já conhece e acrescenta uma única mensagem do aluno; em qualquer outro caso enviam a janela completa numa sessão nova (ADR-007). `BrainRequest.SessionHint` fica reservado, e o `ConversationService` o envia `null`.`
+  Texto novo: `Provedores com estado (Claude Code via `--resume`) guardam o identificador da sessão no próprio adaptador e só o reaproveitam quando o `BrainRequest` tem o mesmo system prompt, repete exatamente as mensagens que a sessão já conhece e acrescenta uma única mensagem do aluno; em qualquer outro caso enviam a janela completa numa sessão nova (ADR-007). `BrainRequest.SessionHint` fica reservado, e o `ConversationService` o envia `null`.`
 - §6.3, no bloco da invocação, texto antigo (3 linhas):
   ```
     --json-schema <schema>                  (OutputMode=JsonSchema)
@@ -300,7 +345,7 @@ Cenário: console conversa com o Ollama
 - §6.3, texto antigo: `- Prompt enviado via stdin (evita limites e escaping de linha de comando no Windows).`
   Texto novo (2 itens):
   `- Prompt enviado via stdin (evita limites e escaping de linha de comando no Windows): sem `--resume`, as mensagens do `BrainRequest` num texto único (`ClaudeCodePromptRenderer`); com `--resume`, só a mensagem nova (ADR-007). O arquivo temporário do system prompt fica fora da pasta de trabalho e é apagado ao fim da chamada.`
-  `- Saída: `structured_output` (JsonSchema) ou `result` (Tags) vai para o `TutorReplyParser`; o `session_id` fica no adaptador (ADR-007). Até a US-005, toda falha do processo vira `BrainException` com `Unknown`.`
+  `- Saída: `structured_output` (JsonSchema) ou `result` (Tags) vai para o `TutorReplyParser`; o `session_id` fica no adaptador (ADR-007). Até a US-005, código de saída diferente de zero, `is_error` ou saída que não é JSON viram `BrainException` com `Unknown`; executável inexistente propaga a exceção do sistema e o console mostra erro inesperado (a US-005 a classifica como `CliNotFound`).`
 
 **Repetições em `CLAUDE.md` e skills** (Grep por `SessionHint|--resume|system-prompt-file|AddEnglishTutorInfrastructure|ValidateDataAnnotations|IProcessRunner|claude-json` em `CLAUDE.md` e `.claude/**`):
 
@@ -321,12 +366,16 @@ Cenário: console conversa com o Ollama
   `  Fixtures/ClaudeCode/claude-json-structured.json  # saídas reais gravadas a partir da US-004 (CopyToOutputDirectory)`
 - `.claude/skills/tdd-dotnet/SKILL.md`, linha sobre `IProcessRunner` em "Fakes x mocks": continua correta. **Sem alteração.**
 
+(As propostas de skill dos "Aprendizados para o processo" do `plan-review.md`, como a regra de falhas simultâneas de Options, ficam para o Documentador, como no fluxo do `/us`.)
+
 ### 2.9 Guardas defensivas (sem teste, decisão registrada; review S3 da US-003)
 
 São defensivas e ficam sem teste:
 
 - os `ArgumentNullException.ThrowIfNull` dos métodos públicos novos (`ClaudeCodeTutorBrain.SendAsync`, `ClaudeCodePromptRenderer.Render`, `FileTutorPromptSource` (construtor), `ConversationInputHandler` (construtor e `HandleAsync`), `ClaudeCodeOptionsValidator.Validate`, `AddEnglishTutorInfrastructure`);
-- a `ArgumentException` de `Render` com lista vazia.
+- a `ArgumentException` de `Render` com lista vazia;
+- a `InvalidOperationException` do adaptador quando `TryGetCanonical` falha para `OutputMode` (só acontece se o validador for contornado; o validador recusa o valor antes, com teste);
+- no `EnglishTutorApp`, a `AggregateException` com alguma interna que não é `OptionsValidationException` continuar como erro inesperado (o `ValidateOnStart` só junta `OptionsValidationException`; um validador que lançasse em vez de devolver `Fail` seria bug, e o caminho é o `catch (Exception)` já testado).
 
 Só o próprio código os chama, sempre com valores válidos. A US que criar outro chamador acrescenta o teste.
 
@@ -336,6 +385,8 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 - `--resume` sempre, enviando só a última mensagem: a sessão da CLI passa a guardar mais turnos que a janela e a tentativa rejeitada (ADR-007).
 - System prompt gravado dentro da pasta de trabalho, ou `--system-prompt <texto>`: viola RN-BRAIN06 ou o cenário da US-004 (ADR-007).
 - `AddEnglishTutorInfrastructure(configuration)` com bind na Infrastructure: exige `Options.ConfigurationExtensions` na Infrastructure e contraria o ADR-004.
+- Normalizar `OutputMode` nas Options (`PostConfigure`): esconderia o valor configurado das mensagens do validador e divergiria do padrão de `Brain:Provider` (P13).
+- Um validador único para as três seções, para evitar a `AggregateException`: acoplaria Core e Infrastructure num só tipo (P19).
 - Comando `measure-latency` no console: o `AddCommandLine` atual trataria o argumento como configuração. O teste `LiveBrain` de medição basta para a D7, e a US-009 cria o comando `eval` (P15).
 - `ITutorBrain` "não conectado" para Ollama: provisório descartável. O handler não conectado já existe (P7).
 - Gravar fixtures à mão no PowerShell: o JSON Schema na linha de comando do PowerShell 5.1 quebra as aspas. O teste gravador (`LiveBrain`) usa o mesmo adaptador (P16).
@@ -344,11 +395,11 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` | Decisão (Proposto), criada junto com este plano |
+| Criar | `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` | Decisão (Proposto), criada junto com este plano; itens 3 e 5 e "Consequências" revisados na rodada 1 |
 | Alterar | `ARCHITECTURE.md` | §3, §5, §6.3 (texto em §2.8), pelo orquestrador antes da T1 |
 | Alterar | `.claude/skills/padroes-codigo/SKILL.md` | 2 linhas de "DI e configuração" (§2.8), pelo orquestrador antes da T1 |
 | Alterar | `.claude/skills/tdd-dotnet/SKILL.md` | Caminho da fixture (§2.8), pelo orquestrador antes da T1 |
-| Alterar | `specs/sprints/SPRINT_1.md` | Cenário "console conversa com o Ollama" na US-006 (§2.8), pelo orquestrador antes da T1 |
+| Alterar | `specs/sprints/SPRINT_1.md` | Cenário "falha do cérebro no console não encerra a sessão" e D7 na US-005; cenário "console conversa com o Ollama" na US-006 (§2.8), pelo orquestrador antes da T1 |
 | Alterar | `docs/adr/ADR-002-contrato-saida-estruturada.md` | Tabela de latência JsonSchema × Tags (D7), pelo Executor na T11 |
 | Alterar | `src/EnglishTutor.Console/EnglishTutor.Console.csproj` | Cópia de `prompts/**` para a saída |
 | Alterar | `tests/EnglishTutor.Infrastructure.Tests/EnglishTutor.Infrastructure.Tests.csproj` | Cópia de `prompts/**`; `PackageReference` a `Microsoft.Extensions.DependencyInjection` |
@@ -360,7 +411,7 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 | Criar | `src/EnglishTutor.Infrastructure/Brain/ClaudeCodePromptRenderer.cs` | Mensagens → texto único (§2.4) |
 | Criar | `src/EnglishTutor.Infrastructure/Brain/PromptFiles.cs` | Caminhos de `tutor.md` e dos arquivos de formato |
 | Criar | `src/EnglishTutor.Infrastructure/Brain/FileTutorPromptSource.cs` | `ITutorPromptSource` lendo `tutor.md` |
-| Criar | `src/EnglishTutor.Infrastructure/Brain/ClaudeCodeTutorBrain.cs` | Adaptador (§2.4) |
+| Criar | `src/EnglishTutor.Infrastructure/Brain/ClaudeCodeTutorBrain.cs` | Adaptador (§2.4), com `ClaudeCodeSession` privado e normalização de `OutputMode` |
 | Criar | `src/EnglishTutor.Infrastructure/Brain/ClaudeCodeOutput.cs` | `ClaudeCodeResult` + leitura e falhas (§2.5) |
 | Criar | `src/EnglishTutor.Infrastructure/Brain/ClaudeCodeLog.cs` | `[LoggerMessage]` 2001 |
 | Criar | `src/EnglishTutor.Infrastructure/Processes/IProcessRunner.cs` | Porta interna + `ProcessRequest`/`ProcessResult` |
@@ -374,14 +425,14 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 | Alterar | `src/EnglishTutor.Console/Ui/ChatSession.cs` | Modo pelo handler; `case Mode` |
 | Alterar | `src/EnglishTutor.Console/Ui/ConsoleText.cs` | Textos da §2.6 |
 | Alterar | `src/EnglishTutor.Console/AppRunOptions.cs` | `ConfigureServices` |
-| Alterar | `src/EnglishTutor.Console/EnglishTutorApp.cs` | Infrastructure, binds, handler por provedor |
+| Alterar | `src/EnglishTutor.Console/EnglishTutorApp.cs` | Infrastructure, binds, handler por provedor; configuração inválida em várias seções (P19) |
 | Alterar | `src/EnglishTutor.Console/Program.cs` | `OutputEncoding` UTF-8 sem BOM |
 | Alterar | `src/EnglishTutor.Console/appsettings.json` | `Brain:ClaudeCode` e `Conversation:MaxTurnsInWindow` |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Fakes/FakeProcessRunner.cs` | Fila de `ProcessResult`; registra `Requests`, `Tokens`; callback `OnRun(ProcessRequest)` para inspecionar arquivos durante a execução |
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/ClaudeOutputs.cs` | Monta stdout da CLI: `Structured(sessionId, replyJson)`, `Text(sessionId, resultText)`, `Error(resultText)` + `ValidReplyJson(label)` (`reply` = `Reply <label>?`, `praise` = `Praise <label>`) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/ClaudeOutputs.cs` | Monta stdout da CLI: `Structured(sessionId, replyJson)`, `Text(sessionId, resultText)`, `Error(resultText, structuredReplyJson = null)` (`is_error: true`; com `structured_output` quando informado) + `ValidReplyJson(label)` (`reply` = `Reply <label>?`, `praise` = `Praise <label>`) |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/ManualTimeProvider.cs` | `TimeProvider` com `Advance(TimeSpan)` |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/RecordingProcessRunner.cs` | (LiveBrain) envolve o `ProcessRunner` real e guarda requests/resultados |
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LiveClaudeCode.cs` | (LiveBrain) monta o adaptador real com pasta temporária, `prompts/` da saída e `ENGLISHTUTOR_CLAUDE_PATH` (padrão `claude`) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LiveClaudeCode.cs` | (LiveBrain) monta o adaptador real com pasta temporária, `prompts/` da saída e `ENGLISHTUTOR_CLAUDE_PATH` (padrão `claude`); o system prompt dos requests é o conteúdo de `AppContext.BaseDirectory/prompts/tutor.md` (o mesmo que o app usa; review S9) |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LatencySummary.cs` | Média e p95 por posto mais próximo |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/claude-json-structured.json` | Saída real, `OutputMode = JsonSchema`, frase "I have worked with C# since five years" |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/claude-json-tags.json` | Saída real, `OutputMode = Tags`, mesma frase |
@@ -401,10 +452,10 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 | Criar | `tests/EnglishTutor.Console.Tests/Support/FixedTutorPromptSource.cs` | System prompt fixo |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/ConsoleTutorReplies.cs` | `Valid(label)`: `Reply <label>?`, `raw answer <label>`, `Correction("orig <label>", "fixed <label>", "why <label>")` (AP-026) |
 | Alterar | `tests/EnglishTutor.Console.Tests/Support/RecordingChatInputHandler.cs` | `Mode`, `ChangeMode`, `ModeChanges` |
-| Alterar | `tests/EnglishTutor.Console.Tests/Support/TestConfiguration.cs` | Parâmetro opcional com valores extras (ex.: `Conversation:MaxTurnsInWindow`) |
+| Alterar | `tests/EnglishTutor.Console.Tests/Support/TestConfiguration.cs` | Parâmetro opcional com valores extras (ex.: `Conversation:MaxTurnsInWindow`, `Brain:ClaudeCode:OutputMode`) |
 | Criar | `tests/EnglishTutor.Console.Tests/Ui/ConversationInputHandlerTests.cs` | Exibição e modo |
 | Alterar | `tests/EnglishTutor.Console.Tests/Ui/ChatSessionTests.cs` | `/mode`, `/help`; 2 testes existentes ajustados |
-| Alterar | `tests/EnglishTutor.Console.Tests/EnglishTutorAppTests.cs` | Ligação ao serviço, binds; 1 teste existente renomeado |
+| Alterar | `tests/EnglishTutor.Console.Tests/EnglishTutorAppTests.cs` | Ligação ao serviço, binds, várias seções inválidas; 1 teste existente renomeado |
 | Criar | `tests/EnglishTutor.Console.Tests/PromptFilesDeploymentTests.cs` | `prompts/` na saída |
 
 ## 4. Mapa cenário BDD → testes
@@ -414,8 +465,9 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 - `t1`/`t2`/`t3`, com `ClaudeOutputs.ValidReplyJson(label)` na Infrastructure e `ConsoleTutorReplies.Valid(label)` no Console;
 - os `session_id` são distintos (`s-1`, `s-2`, ...);
 - a resposta rejeitada (`"I like that."` sem `?`) difere da aceita;
-- o system prompt de teste é `SYSTEM PROMPT for test`, diferente de qualquer mensagem;
-- o `Model` de teste é `model-under-test` e o `ExecutablePath` é `claude-under-test`, diferentes dos padrões, para a asserção não passar por coincidência com o default.
+- o system prompt de teste é `SYSTEM PROMPT for test`, diferente de qualquer mensagem (o caso `"system-prompt-changed"` usa `SYSTEM PROMPT v2 for test`);
+- o `Model` de teste é `model-under-test` e o `ExecutablePath` é `claude-under-test`, diferentes dos padrões, para a asserção não passar por coincidência com o default;
+- nos testes de falha, o texto de cada fonte do detalhe é único (`boom result detail`, `first stderr t2`, `ignored stderr`), para a asserção provar de onde ele veio.
 
 Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por teste, apagada no `Dispose`.
 
@@ -423,24 +475,26 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 |---|---|---|---|---|
 | frase com erro gramatical | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion` (`"I have worked with C# since five years"` via `TurnMessageBuilder.Build(..., [], FreeConversation)`; `Reply` termina em `?`; no máximo 3 frases, contando terminadores `.`, `!`, `?` seguidos de espaço ou fim; alguma `Correction` com `Original` contendo `since five years` e `Corrected` contendo `for five years`, sem diferenciar maiúsculas) | LiveBrain |
 | frase com erro gramatical (offline, com a saída gravada) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` (ver "leitura da saída gravada") | Unidade (caracterização) |
-| frase com erro gramatical (D5) | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat` (5 frases da tabela abaixo, cada uma num request de 1 mensagem; conta `InvalidOutput` como fora do formato; espera 5/5 no formato e ≥ 4 com `Corrected` contendo o trecho esperado) | LiveBrain |
+| frase com erro gramatical (D5) | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat` (5 frases da tabela abaixo, cada uma num request de 1 mensagem; conta `InvalidOutput` como fora do formato; espera 5/5 no formato e ≥ 4 com `Corrected` contendo o trecho esperado, sem diferenciar maiúsculas) | LiveBrain |
 | processo isolado e sem ferramentas | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_Always_RunsIsolatedClaudeWithoutTools` (`FileName == "claude-under-test"`; `Arguments` contém `-p`; valor depois de `--output-format` = `json`; depois de `--tools` = `""` (string vazia); depois de `--disallowedTools` = `mcp__*`; contém `--strict-mcp-config`; depois de `--permission-mode` = `dontAsk`; depois de `--model` = `model-under-test`; contém `--system-prompt-file`; **não** contém `--bare`) | Unidade |
 | processo isolado e sem ferramentas | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty` (pasta configurada ainda inexistente; `OnRun` registra `Directory.Exists` = `true` e nenhuma entrada na pasta; `ProcessRequest.WorkingDirectory` = caminho completo dela) | Unidade |
 | processo isolado (apoio, AP-016: expansão de variável) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithEnvironmentVariableInWorkingDirectory_ExpandsIt` (variável de ambiente com nome único por teste, ex.: `ENGLISHTUTOR_TEST_<guid>` = pasta temporária, criada e removida no teste; `WorkingDirectory = "%ENGLISHTUTOR_TEST_<guid>%/brain"` → `ProcessRequest.WorkingDirectory` = `<temp>/brain` em caminho completo, sem `%`) | Unidade |
 | processo isolado (apoio, P3) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_Always_PassesSystemPromptInTemporaryFileOutsideWorkingDirectory` (`OnRun` lê o arquivo depois de `--system-prompt-file`: conteúdo = `SYSTEM PROMPT for test`; o caminho não fica dentro da pasta de trabalho; depois da chamada, o arquivo não existe) | Unidade |
 | processo isolado (apoio, ADR-002) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithOutputMode_AppendsMatchingFormatFileAndSchema` (`[Theory]`: `JsonSchema` → depois de `--append-system-prompt-file` = `PromptFiles.FormatJsonPath` e depois de `--json-schema` = `TutorReplySchema.Json`; `Tags` → `FormatTagsPath` e sem `--json-schema`; saída `Structured`/`Text` conforme o caso) | Unidade |
+| processo isolado (apoio, P13, B4: normalização) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog` (`[Theory]`: `"jsonschema"` com saída `Structured` → depois de `--json-schema` = `TutorReplySchema.Json`, depois de `--append-system-prompt-file` = `FormatJsonPath`, entrada 2001 contém `output mode JsonSchema`; `"TAGS"` com saída `Text` → sem `--json-schema`, `FormatTagsPath`, entrada 2001 contém `output mode Tags`; nos dois, a entrada 2001 não contém o valor configurado cru) | Unidade |
 | processo isolado (apoio: stdin) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithSingleMessage_SendsItUnchangedAsStandardInput` (stdin = `Content` exato da mensagem RN-CONV02, sem rótulos) | Unidade |
 | processo isolado (apoio: cancelamento) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_Always_PassesCallerTokenToProcessRunner` (token de um `CancellationTokenSource` não cancelado; `FakeProcessRunner.Tokens` = `[token]`) | Unidade |
-| continuidade de sessão | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_OnSecondTurnWithUseResume_ResumesSessionAndSendsOnlyNewMessage` (1ª saída `Structured("abc", ValidReplyJson("t1"))`; 2º request = `[User(m1), Assistant(reply1.RawText), User(m2)]`; 2ª chamada: valor depois de `--resume` = `abc`; stdin = `m2`) | Unidade |
+| continuidade de sessão | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_OnSecondTurnWithUseResume_ResumesSessionAndSendsOnlyNewMessage` (1ª saída `Structured("abc", ValidReplyJson("t1"))`; 2º request = `[User(m1), Assistant(reply1.RawText), User(m2)]`, mesmo system prompt; 2ª chamada: valor depois de `--resume` = `abc`; stdin = `m2`) | Unidade |
 | continuidade de sessão (apoio, P2: sem estado) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithHistoryAndNoKnownSession_SendsRenderedTranscriptWithoutResume` (adaptador novo; request de 3 mensagens; stdin = `ClaudeCodePromptRenderer.Render(messages)`; sem `--resume`) | Unidade |
 | continuidade de sessão (apoio) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenUseResumeIsDisabled_SendsFullTranscriptWithoutResume` (`UseResume = false`; mesmos 2 turnos do teste de retomada; 2ª chamada sem `--resume` e stdin = texto renderizado das 3 mensagens) | Unidade |
-| continuidade de sessão (apoio, P1, ADR-007) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript` (`[Theory]`: `"tutor-differs"`, 2º request com `Assistant("another raw answer")`; `"window-slid"`, depois de 2 turnos, 3º request sem o 1º turno; `"after-failure"`, 1ª chamada ok com `s-1`, 2ª falha com exit 1, 3ª repete o request da 2ª; em todos, a última chamada não tem `--resume` e o stdin é o texto renderizado) | Unidade |
+| continuidade de sessão (apoio, P1, ADR-007) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript` (`[Theory]`, 5 casos: `"tutor-differs"`, 2º request com `Assistant("another raw answer")`; `"window-slid"`, depois de 2 turnos, 3º request sem o 1º turno; `"after-failure"`, 1ª chamada ok com `s-1`, 2ª falha com exit 1, 3ª repete o request da 2ª; `"system-prompt-changed"` (review S2), 2º request estende exatamente o 1º mas com `SystemPrompt = "SYSTEM PROMPT v2 for test"`; `"session-id-missing"` (review S5c), 1ª saída `Structured("", ValidReplyJson("t1"))` e 2º request que estende exatamente o 1º; em todos, a última chamada não tem `--resume` e o stdin é o texto renderizado) | Unidade |
 | continuidade de sessão (apoio, ADR-006 × ADR-007) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenRetryingRejectedAnswer_ResumesWithOnlyFormatCorrection` (1ª saída `Structured("s-1", {"reply":"I like that.",...})` → `BrainException` com `IsInvalidOutput`; 2º request = `[User(m1), Assistant(ex.RawText), User(TurnMessageBuilder.BuildFormatCorrection(ex.Rejection))]`; 2ª chamada: valor depois de `--resume` = `s-1`, stdin = a instrução de correção) | Unidade |
-| leitura da saída gravada | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` (stdout = `Fixtures/ClaudeCode/claude-json-structured.json`; `Reply` termina em `?`; correção `since five years` → `for five years`; o 2º turno que estende o 1º tem, depois de `--resume`, o `session_id` lido da fixture com `JsonDocument` no próprio teste) | Unidade (caracterização) |
+| leitura da saída gravada | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` (stdout = `Fixtures/ClaudeCode/claude-json-structured.json`; `Reply` termina em `?`; `Corrections` tem um item com `Original` **contendo** `since five years` e `Corrected` **contendo** `for five years`, sem diferenciar maiúsculas, porque o texto real pode trazer a frase inteira (review S13); o 2º turno que estende o 1º tem, depois de `--resume`, o `session_id` lido da fixture com `JsonDocument` no próprio teste) | Unidade (caracterização) |
 | leitura da saída gravada (apoio, OutputMode Tags) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedTagsOutput_ReturnsTutorReply` (`OutputMode = Tags`; stdout = `claude-json-tags.json`; `Reply` termina em `?`; `RawText` = campo `result` da fixture) | Unidade (caracterização) |
 | leitura da saída (apoio, ADR-006) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenAnswerIsOutOfFormat_ThrowsInvalidOutputWithRawText` (`Tags`; `Text("s-1", "Sure! Here is my answer without tags.")`; `BrainException` com `IsInvalidOutput`, `Rejection!.Reason == TutorReplyRejections.MissingReplyReason`, `RawText` = o texto) | Unidade |
-| leitura da saída (apoio, P5, AP-015/016) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail` (`[Theory]`: `"exit-code"` com exit 1, stdout vazio e stderr `"\n  boom stderr detail  \nsecond stderr line"` → `Message` contém `Claude Code failed (exit code 1): boom stderr detail` e não contém `second stderr line`; `"is-error"` com exit 1, stdout `Error("boom result detail")` e stderr `ignored stderr` → `Message` contém `Claude Code failed (exit code 1): boom result detail` e não contém `ignored stderr`; nos dois, `Kind == Unknown`) | Unidade |
-| leitura da saída (apoio, P5) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation` (exit 0, stdout `not json at all`; `Kind == Unknown`; `Message` contém `is not a JSON result` e `Expected`) | Unidade |
+| leitura da saída (apoio, P5, AP-015/016: linha 1 da §2.5) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail` (`[Theory]`: `"exit-code"` com exit 1, stdout vazio e stderr `"\n  boom stderr detail  \nsecond stderr line"` → `Message` contém `Claude Code failed (exit code 1): boom stderr detail` e não contém `second stderr line`; `"is-error"` com exit 1, stdout `Error("boom result detail")` e stderr `ignored stderr` → `Message` contém `Claude Code failed (exit code 1): boom result detail` e não contém `ignored stderr`; nos dois, `Kind == Unknown` e o arquivo temporário do system prompt, lido no `OnRun`, não existe depois da exceção (review S6)) | Unidade |
+| leitura da saída (apoio, P5, B3: linha 3 da §2.5, só ela satisfaz) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing` (`[Theory]`, `OutputMode = JsonSchema`, exit **0**, stdout `Error(<result>, ValidReplyJson("t1"))` (um `structured_output` **válido**, para que ignorar `is_error` devolva uma resposta e o teste falhe): `"result-detail"`, `result` = `boom result detail` e stderr `ignored stderr` → `Message` contém `Claude Code reported an error: boom result detail` e não contém `ignored stderr`; `"blank-result-uses-stderr"` (review S5a), `result` = `"   "` e stderr `"\nfirst stderr t2\nsecond stderr t2"` → contém `Claude Code reported an error: first stderr t2` e não contém `second stderr t2`; `"no-details"` (review S5b), `result` = `""` e stderr `""` → contém `Claude Code reported an error: no error details were printed`; nos três, `Kind == Unknown`, `IsInvalidOutput == false` e não contém `Reply t1?`) | Unidade |
+| leitura da saída (apoio, P5: linha 2 da §2.5) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation` (exit 0, stdout `not json at all`; `Kind == Unknown`; `Message` contém `is not a JSON result` e `Expected`) | Unidade |
 | medição de latência | Infrastructure.Tests | `LatencyMeasurementLiveTests` | `SendAsync_FiveSentencesInEachOutputMode_ReportsMeanAndP95Latency` (as 5 frases da tabela, primeiro com `JsonSchema` e depois com `Tags`, cada uma num request de 1 mensagem; `Stopwatch` em volta de `SendAsync`; escreve no `TestContext.Current.TestOutputHelper` uma tabela markdown `Modo \| n \| média (ms) \| p95 (ms) \| fora do formato`; falha se algum modo tiver menos de 5 amostras medidas) | LiveBrain |
 | medição de latência (apoio, P15, AP-016) | Infrastructure.Tests | `LatencySummaryTests` | `Compute_WithFiveSamples_ReturnsMeanAndMaxAsP95` (100, 200, 300, 400, 1000 ms → média 400, p95 1000) | Unidade |
 | medição de latência (apoio, AP-016: outro lado do posto) | Infrastructure.Tests | `LatencySummaryTests` | `Compute_WithTwentySamples_ReturnsNineteenthSmallestAsP95` (1..20 × 10 ms embaralhados → p95 = 190 ms, posto ⌈0,95·20⌉ = 19, não 200) | Unidade |
@@ -455,8 +509,9 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 | modo desconhecido pelo console | Console.Tests | `ChatSessionTests` | `RunAsync_WhenUserTypesModeWithUnknownOrMissingName_ShowsAvailableModesAndKeepsMode` (`[Theory]`: `"/mode interview"` → 1ª linha `Unknown mode "interview".`; `"/mode"` → `Choose a mode: /mode <mode>.`; nos dois, `Available modes: free-conversation, job-interview, listening-practice`; `ModeChanges` vazio; `handler.Mode == FreeConversation`; `Inputs` vazio) | Componente UI |
 | modo desconhecido pelo console | Console.Tests | `EnglishTutorAppTests` | `RunAsync_AfterUnknownMode_SendsNothingAndKeepsFreeConversation` (`/mode interview`, `sentence t1`, `/quit`; `Requests` com 1 item, só da frase; `Messages[^1].Content` termina com `Mode: free-conversation`) | Componente UI |
 | janela de turnos configurável | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenMaxTurnsInWindowIsZero_ExitsWithInvalidConfigurationBeforePrompt` (`Conversation:MaxTurnsInWindow = 0`; código = `ExitCodes.InvalidConfiguration`; `Error` contém `Invalid configuration:`, `Conversation:MaxTurnsInWindow must be at least 1 (found 0)` e `Expected`; `Output` vazio) | Componente UI |
+| janela de turnos configurável (apoio, P19, B1: várias seções inválidas) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration` (`[Theory]`, `Conversation:MaxTurnsInWindow = 0` nos dois casos: `"provider-and-window"`, `Brain:Provider = "Inexistente"` → `Error` contém `Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.`; `"output-mode-and-window"`, Provider `ClaudeCode` e `Brain:ClaudeCode:OutputMode = "Json"` → `Error` contém `Brain:ClaudeCode:OutputMode 'Json' is invalid. Accepted values: JsonSchema, Tags.`; nos dois: código = `ExitCodes.InvalidConfiguration`, `Error` contém `Invalid configuration:` e `Conversation:MaxTurnsInWindow must be at least 1 (found 0)`, não contém `An unexpected error occurred`; `Output` vazio. A ordem das mensagens não é conferida) | Componente UI |
 | (apoio, P7: Ollama ainda não conectado) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected` (renomeado de `RunAsync_WhenUserTypesText_ShowsTutorNotConnected`; Provider `Ollama`, entrada `hello`; saída contém `The tutor is not connected yet.`; `ScriptedTutorBrain.Requests` vazio) | Componente UI (caracterização) |
-| (apoio, P11: falha do cérebro até a US-005) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError` (`ScriptedTutorBrain.Throws(new BrainException(BrainErrorKind.Unknown, "Claude Code failed (exit code 1): test"))`; código = `ExitCodes.UnexpectedError`; `Error` contém `An unexpected error occurred. See the log file for details.`) | Componente UI |
+| (apoio, P11: falha do cérebro até a US-005) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError` (`ScriptedTutorBrain.Throws(new BrainException(BrainErrorKind.Unknown, "Claude Code failed (exit code 1): test"))`; código = `ExitCodes.UnexpectedError`; `Error` contém `An unexpected error occurred. See the log file for details.`. Comentário do teste: substituído na US-005, cenário "falha do cérebro no console não encerra a sessão") | Componente UI |
 | (apoio, P12: prompts na saída) | Console.Tests | `PromptFilesDeploymentTests` | `ApplicationFolder_Always_ContainsTutorAndFormatPrompts` (`AppContext.BaseDirectory/prompts/` tem `tutor.md`, `format.json.md` e `format.tags.md`, todos não vazios) | Unidade |
 | (apoio, ADR-002) | Infrastructure.Tests | `TutorReplySchemaTests` | `Json_Always_DescribesCanonicalTutorReplyContract` (`JsonDocument.Parse`; `type` = `object`; `required` = os 5 campos; `additionalProperties` = `false`; `corrections.maxItems` = 2; `required` do item = `original`, `corrected`, `explanation`) | Unidade |
 | (apoio, P2) | Infrastructure.Tests | `ClaudeCodePromptRendererTests` | `Render_WithSingleMessage_ReturnsItsContentUnchanged` | Unidade |
@@ -493,10 +548,10 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 - `EnglishTutorAppTests.RunAsync_WhenUserTypesText_ShowsTutorNotConnected` → renomeado para `RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected`, com Provider `Ollama` (P7). Com `ClaudeCode`, o texto livre agora vai ao cérebro.
 - `ChatSessionTests.CreateSession` e `EnglishTutorAppTests.CreateOptions` (helpers): o primeiro deixa de passar `TutorMode`; o segundo passa a registrar sempre um `ScriptedTutorBrain` sem respostas e um `FixedTutorPromptSource` via `ConfigureServices`, para nenhum teste do console lançar o processo real.
 
-**Contagens previstas (fora do `LiveBrain`): 46 métodos novos, 54 casos novos.**
+**Contagens previstas (fora do `LiveBrain`): 49 métodos novos, 63 casos novos.**
 
-- Infrastructure.Tests: 32 métodos / 39 casos.
-  - `ClaudeCodeTutorBrainTests`: 18 / 22 (15 `[Fact]` + 3 `[Theory]`, com 2, 3 e 2 casos).
+- Infrastructure.Tests: 34 métodos / 46 casos.
+  - `ClaudeCodeTutorBrainTests`: 20 / 29 (15 `[Fact]` + 5 `[Theory]`: `WithOutputMode` 2, `WithOutputModeInOtherCase` 2, `WhenRequestDoesNotExtendKnownSession` 5, `WhenClaudeReportsFailure` 2, `WhenClaudeReportsErrorWithExitCodeZero` 3).
   - `ClaudeCodePromptRendererTests`: 2 / 2.
   - `TutorReplySchemaTests`: 1 / 1.
   - `ClaudeCodeOptionsTests`: 1 / 1.
@@ -504,20 +559,20 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
   - `FileTutorPromptSourceTests`: 3 / 3.
   - `InfrastructureServiceCollectionExtensionsTests`: 2 / 2.
   - `LatencySummaryTests`: 2 / 2.
-- Console.Tests: 13 métodos / 14 casos.
+- Console.Tests: 14 métodos / 16 casos.
   - `ConversationInputHandlerTests`: 4 / 4.
   - `ChatSessionTests`: +3 / +4 (2 `[Fact]` + 1 `[Theory]` com 2 casos).
-  - `EnglishTutorAppTests`: +5 / +5 (o renomeado não muda a contagem).
+  - `EnglishTutorAppTests`: +6 / +7 (5 `[Fact]` + 1 `[Theory]` com 2 casos; o renomeado não muda a contagem).
   - `PromptFilesDeploymentTests`: 1 / 1.
 - Core.Tests: +1 / +1 (`CoreServiceCollectionExtensionsTests`).
 
 `LiveBrain` (fora do D2): 5 métodos / 5 casos (`ClaudeCodeTutorBrainLiveTests` 3, `LatencyMeasurementLiveTests` 1, `FixtureRecorderLiveTests` 1).
 
-Suíte após a US (D2): **205 casos** = Core.Tests 102 + 1 = 103; Console.Tests 25 + 14 = 39; Infrastructure.Tests 24 + 39 = 63. Se o Executor mudar uma contagem, atualiza o cabeçalho, este detalhamento, D2 e D11, e confere a soma (AP-031).
+Suíte após a US (D2): **214 casos** = Core.Tests 102 + 1 = 103; Console.Tests 25 + 16 = 41; Infrastructure.Tests 24 + 46 = 70. Se o Executor mudar uma contagem, atualiza o cabeçalho, este detalhamento, D2 e D11, e confere a soma (AP-031).
 
 ## 5. Tarefas (ordem de execução TDD)
 
-**Pré-condição** (antes da T1): o orquestrador aplica a §2.8 em dois commits, `docs(ai): update spec for US-004` (US-006 no `SPRINT_1.md`) e `docs(ai): update architecture for US-004` (`ARCHITECTURE.md` §3/§5/§6.3, `padroes-codigo`, `tdd-dotnet`). Junto vai o ADR-007 em "Aceito", se aprovado.
+**Pré-condição** (antes da T1): o orquestrador aplica a §2.8 em dois commits, `docs(ai): update spec for US-004` (US-005 e US-006 no `SPRINT_1.md`) e `docs(ai): update architecture for US-004` (`ARCHITECTURE.md` §3/§5/§6.3, `padroes-codigo`, `tdd-dotnet`). Junto vai o ADR-007 em "Aceito", se aprovado.
 
 Regras que valem para todas as tarefas:
 
@@ -541,60 +596,63 @@ Regras que valem para todas as tarefas:
   Escolhas de forma: nenhuma | §12 em `<hash>`
 - [ ] T4 — Red: esqueleto `ClaudeCodePromptRenderer.Render` (lança `NotImplementedException`) + `ClaudeCodePromptRendererTests.Render_WithSingleMessage_ReturnsItsContentUnchanged` e `ClaudeCodePromptRendererTests.Render_WithHistory_LabelsEachMessageAndEndsWithCurrentMessage`. Green: formato da §2.4. (commits: `test(infra): claude code prompt rendering` + `feat(infra): render brain messages for claude code stdin`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T5 — Red: esqueletos `IProcessRunner`/`ProcessRequest`/`ProcessResult`, `PromptFiles`, `ClaudeCodeResult`/`ClaudeCodeOutput` (`Read` lança `NotImplementedException`), `ClaudeCodeLog` (2001 declarado, sem uso) e `ClaudeCodeTutorBrain` (construtor completo da §2.4; `SendAsync` lança `NotImplementedException`). Fakes e apoio: `FakeProcessRunner`, `ClaudeOutputs`, `ManualTimeProvider`. Testes, todos com pasta de trabalho **já existente**, request de 1 mensagem e saída válida (`Structured` ou `Text`):
+- [ ] T5 — Red: esqueletos `IProcessRunner`/`ProcessRequest`/`ProcessResult`, `PromptFiles`, `ClaudeCodeResult`/`ClaudeCodeOutput` (`Read` lança `NotImplementedException`), `ClaudeCodeLog` (2001 declarado, sem uso) e `ClaudeCodeTutorBrain` (construtor completo da §2.4; `SendAsync` lança `NotImplementedException`). Fakes e apoio: `FakeProcessRunner`, `ClaudeOutputs`, `ManualTimeProvider`. Testes, todos com pasta de trabalho **já existente**, `OutputMode` na caixa canônica (`JsonSchema` ou `Tags`), request de 1 mensagem e saída válida (`Structured` ou `Text`):
   - `ClaudeCodeTutorBrainTests.SendAsync_Always_RunsIsolatedClaudeWithoutTools`
   - `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesSystemPromptInTemporaryFileOutsideWorkingDirectory`
   - `ClaudeCodeTutorBrainTests.SendAsync_WithOutputMode_AppendsMatchingFormatFileAndSchema` (2 casos)
   - `ClaudeCodeTutorBrainTests.SendAsync_WithSingleMessage_SendsItUnchangedAsStandardInput`
   - `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesCallerTokenToProcessRunner`
 
-  São 5 métodos / 6 casos, que falham com `NotImplementedException`. Green: passos 1 e 4–8 e 10 da §2.4 e o caminho feliz do `ClaudeCodeOutput.Read` (`structured_output` → `GetRawText()`, senão `result`). **Estado dos ramos até as tarefas seguintes:**
+  São 5 métodos / 6 casos, que falham com `NotImplementedException`. Green: passos 1 e 4–8 e 10 da §2.4 (com o `finally` do arquivo temporário) e o caminho feliz do `ClaudeCodeOutput.Read` (linhas 4 e 5 da §2.5). **Estado dos ramos até as tarefas seguintes:**
   - pasta de trabalho: usada como configurada, sem expansão nem criação (T6);
+  - `OutputMode` comparado de forma exata: `JsonSchema` → modo schema, `Tags` → modo tags, qualquer outro valor lança `NotImplementedException("US-004 T6")` (T6);
   - sem medição nem log (T6);
-  - `ExitCode != 0`, `is_error` e resultado do parser inválido lançam `NotImplementedException("US-004 T7")`, e stdout que não é JSON deixa a `JsonException` propagar (T7);
+  - `ExitCode != 0`, `is_error` (com qualquer código) e resultado do parser inválido lançam `NotImplementedException("US-004 T7")`, e stdout que não é JSON deixa a `JsonException` propagar (T7);
   - stdin com mais de uma mensagem leva só `request.Messages[^1].Content`;
   - sem `_session` nem `--resume` (T8).
 
   (commits: `test(infra): claude code invocation` + `feat(infra): run claude code headless per turn`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T6 — Red:
+- [ ] T6 — Red (4 métodos / 5 casos):
   - `ClaudeCodeTutorBrainTests.SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty`: falha porque a pasta não é criada.
   - `ClaudeCodeTutorBrainTests.SendAsync_WithEnvironmentVariableInWorkingDirectory_ExpandsIt`: falha porque o caminho mantém `%...%`.
   - `ClaudeCodeTutorBrainTests.SendAsync_AfterReply_LogsLatencyWithoutConversationText`: falha porque não há entrada 2001.
+  - `ClaudeCodeTutorBrainTests.SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog` (2 casos): falham com `NotImplementedException("US-004 T6")`, porque `"jsonschema"` e `"TAGS"` não são a caixa canônica.
 
-  Green: passo 2 da §2.4 (expansão, caminho completo, criação), medição com `TimeProvider` e log 2001. (commits: `test(infra): claude code working directory and latency log` + `feat(infra): isolate claude code working directory and log latency`)
+  Green: passo 2 da §2.4 (expansão, caminho completo, criação, modo canônico via `BrainOutputModes.TryGetCanonical`), medição com `TimeProvider` e log 2001 com o modo canônico. (commits: `test(infra): claude code working directory, output mode and latency log` + `feat(infra): isolate claude code working directory, normalize output mode and log latency`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T7 — Red:
+- [ ] T7 — Red (4 métodos / 7 casos):
   - `ClaudeCodeTutorBrainTests.SendAsync_WhenAnswerIsOutOfFormat_ThrowsInvalidOutputWithRawText`: recebe `NotImplementedException`.
   - `ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail` (2 casos): recebe `NotImplementedException`.
+  - `ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing` (3 casos): recebe `NotImplementedException` (`is_error` com código 0, estado da T5).
   - `ClaudeCodeTutorBrainTests.SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation`: recebe `JsonException`.
 
-  O Executor confere esses motivos antes do Green. Green: a tabela da §2.5 em `ClaudeCodeOutput.Read` e `BrainException.InvalidOutput` no passo 10. (commits: `test(infra): claude code failures and invalid output` + `feat(infra): translate claude code failures into brain exceptions`)
+  O Executor confere esses motivos antes do Green. Green: a tabela da §2.5 em `ClaudeCodeOutput.Read`, na ordem das linhas 1–5, e `BrainException.InvalidOutput` no passo 10. (commits: `test(infra): claude code failures and invalid output` + `feat(infra): translate claude code failures into brain exceptions`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T8 — Red (5 métodos / 7 casos):
+- [ ] T8 — Red (5 métodos / 9 casos):
   - `ClaudeCodeTutorBrainTests.SendAsync_WithHistoryAndNoKnownSession_SendsRenderedTranscriptWithoutResume`
   - `ClaudeCodeTutorBrainTests.SendAsync_OnSecondTurnWithUseResume_ResumesSessionAndSendsOnlyNewMessage`
   - `ClaudeCodeTutorBrainTests.SendAsync_WhenUseResumeIsDisabled_SendsFullTranscriptWithoutResume`
-  - `ClaudeCodeTutorBrainTests.SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript` (3 casos)
+  - `ClaudeCodeTutorBrainTests.SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript` (5 casos)
   - `ClaudeCodeTutorBrainTests.SendAsync_WhenRetryingRejectedAnswer_ResumesWithOnlyFormatCorrection`
 
-  Motivos do Red (estado da T5): nos testes de texto renderizado, o stdin traz só a última mensagem; nos de retomada, falta `--resume`. Green: passos 3, 4 e 9 da §2.4 (`_session`, regra de extensão exata, renderer). `SendAsync_WithSingleMessage_SendsItUnchangedAsStandardInput` segue verde. (commits: `test(infra): claude code session continuity` + `feat(infra): resume claude code session only when the window is extended`)
+  Motivos do Red (estado da T5): nos testes de texto renderizado, o stdin traz só a última mensagem; nos de retomada, falta `--resume`. Green: passos 3, 4 e 9 da §2.4 (`_session` com system prompt, regra de extensão exata, renderer). `SendAsync_WithSingleMessage_SendsItUnchangedAsStandardInput` segue verde. (commits: `test(infra): claude code session continuity` + `feat(infra): resume claude code session only when the window is extended`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T9 — Red: esqueleto `ProcessRunner` (`RunAsync` lança `NotImplementedException`), `RecordingProcessRunner`, `LiveClaudeCode` e os testes `LiveBrain` (todos com `[Trait("Category", "LiveBrain")]`):
+- [ ] T9 — Red: esqueleto `ProcessRunner` (`RunAsync` lança `NotImplementedException`), `RecordingProcessRunner`, `LiveClaudeCode` (system prompt lido de `AppContext.BaseDirectory/prompts/tutor.md`, review S9) e os testes `LiveBrain` (todos com `[Trait("Category", "LiveBrain")]`):
   - `ClaudeCodeTutorBrainLiveTests.SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat`
   - `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion`
   - `ClaudeCodeTutorBrainLiveTests.SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply`
   - `FixtureRecorderLiveTests.SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes`
 
-  `dotnet test --filter "Category=LiveBrain"` → os 4 falham com `NotImplementedException`. O D2 continua verde, sem `LiveBrain`. Green: `ProcessRunner` da §2.1. Os 4 ficam verdes com o CLI real. Se a fumaça ficar abaixo de 4/5, parar e registrar na §12 (risco de prompt, não de código). (commits: `test(infra): live claude code smoke tests` + `feat(infra): run external processes with tree kill on cancellation`)
+  `dotnet test --filter "Category=LiveBrain"` → os 4 falham com `NotImplementedException`. O D2 continua verde, sem `LiveBrain`. Green: `ProcessRunner` da §2.1 (leituras iniciadas antes da escrita do stdin; `IOException` de pipe fechado ignorada). Os 4 ficam verdes com o CLI real. Se a fumaça ficar abaixo de 4/5, parar e registrar na §12 (risco de prompt, não de código). (commits: `test(infra): live claude code smoke tests` + `feat(infra): run external processes with tree kill on cancellation`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T10 — Fixtures: copiar `recorded-fixtures/claude-json-structured.json` e `claude-json-tags.json` (gravados na T9) para `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/`. Depois, conferir que a resposta estruturada tem a correção `since five years` → `for five years` (se não tiver, rodar o gravador de novo) e que não há dado pessoal (D13). Testes:
+- [ ] T10 — Fixtures: copiar `recorded-fixtures/claude-json-structured.json` e `claude-json-tags.json` (gravados na T9) para `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/`. Depois, conferir que a resposta estruturada tem a correção `since five years` → `for five years` (com "contém", sem diferenciar maiúsculas; se não tiver, rodar o gravador de novo) e que não há dado pessoal (D13). Testes:
   - `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId`
   - `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedTagsOutput_ReturnsTutorReply`
 
   Os dois nascem verdes (caracterização do formato real). Red por mutação temporária não commitada, pelo efeito, uma por vez: (a) "o `session_id` lido deixa de ser guardado" → o primeiro falha na asserção de `--resume`; (b) "o texto do campo `result` deixa de ser usado no modo Tags" → o segundo falha. Registrar as falhas na tarefa. (commit: `test(infra): recorded claude code output fixtures`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T11 — Red: esqueleto `LatencySummary.Compute(IReadOnlyList<TimeSpan>)` (lança `NotImplementedException`; devolve `record LatencyStats(int Count, TimeSpan Mean, TimeSpan P95)`) + `LatencySummaryTests.Compute_WithFiveSamples_ReturnsMeanAndMaxAsP95` e `LatencySummaryTests.Compute_WithTwentySamples_ReturnsNineteenthSmallestAsP95`. Green: média e posto mais próximo `⌈0,95·n⌉`. Depois, `LatencyMeasurementLiveTests.SendAsync_FiveSentencesInEachOutputMode_ReportsMeanAndP95Latency` (LiveBrain), rodado como D7. A tabela vai para §11 e para o ADR-002, numa seção "Medição (US-004)" com data, modelo e máquina. (commits: `test(infra): latency summary` + `feat(infra): measure claude code latency per output mode` + `docs(ai): record claude code latency in ADR-002`)
+- [ ] T11 — Red: esqueleto `LatencySummary.Compute(IReadOnlyList<TimeSpan>)` (lança `NotImplementedException`; devolve `record LatencyStats(int Count, TimeSpan Mean, TimeSpan P95)`) + `LatencySummaryTests.Compute_WithFiveSamples_ReturnsMeanAndMaxAsP95` e `LatencySummaryTests.Compute_WithTwentySamples_ReturnsNineteenthSmallestAsP95`. Green: média e posto mais próximo `⌈0,95·n⌉`. Depois, `LatencyMeasurementLiveTests.SendAsync_FiveSentencesInEachOutputMode_ReportsMeanAndP95Latency` (LiveBrain), rodado como D7. A tabela vai para §11 e para o ADR-002, numa seção "Medição (US-004)" com data, modelo e máquina. Todo o código desta tarefa fica no projeto de teste, por isso os commits são `test` (review S10). (commits: `test(infra): latency summary statistics` + `test(infra): measure claude code latency per output mode` + `docs(ai): record claude code latency in ADR-002`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
 - [ ] T12 — Red: esqueleto `FileTutorPromptSource.GetSystemPromptAsync` (lança `NotImplementedException`) + os 3 testes, que falham com essa exceção:
   - `FileTutorPromptSourceTests.GetSystemPromptAsync_WhenTutorFileExists_ReturnsItsContent`
@@ -618,13 +676,13 @@ Regras que valem para todas as tarefas:
 
   Green: delegação e textos da §2.6 (`ConsoleText.TutorReply`, `FeedbackHeader`, prefixo `  - `). (commits: `test(console): show tutor reply and feedback` + `feat(console): delegate free text to the conversation service`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T15 — Refactor primeiro: o `ChatSession` lê o modo do handler e o construtor perde `TutorMode mode`; `CreateSession` e `EnglishTutorApp.RunSessionAsync` acompanham. Os 25 testes do Console continuam verdes (commit `refactor(console): read session mode from input handler`). Red:
+- [ ] T15 — Refactor primeiro: o `ChatSession` lê o modo do handler e o construtor perde `TutorMode mode`; `CreateSession` e `EnglishTutorApp.RunSessionAsync` acompanham. Os 30 casos do Console existentes nesse ponto (25 da base + 1 da T1 + 4 da T14) continuam verdes (commit `refactor(console): read session mode from input handler`; review S8). Red:
   - `ChatSessionTests.RunAsync_WhenUserTypesModeWithKnownName_ChangesModeAndConfirms`
   - `ChatSessionTests.RunAsync_WhenUserTypesHelp_ListsModeCommandWithAllModes`
   - `ChatSessionTests.RunAsync_WhenUserTypesModeWithUnknownOrMissingName_ShowsAvailableModesAndKeepsMode` (2 casos)
   - e os 2 testes existentes ajustados (§4).
 
-  Os 3 novos e `RunAsync_WhenUserTypesUnknownCommand_ShowsUnknownCommandAndAvailableCommands` falham na asserção (hoje a saída é `Unknown command "/mode".` e a lista é `/help, /quit`). `RunAsync_AfterUnknownCommand_KeepsSessionOpenAndForwardsNothing` com `"/foo bar"` já passa: é regressão. Green: `case LocalCommandKind.Mode`, `LocalCommands.Available` com `Mode`, `ConsoleText.ModeChanged` e `ConsoleText.ModeNotRecognized`. (commits: `refactor(console): ...` + `test(console): mode command in the console` + `feat(console): change tutor mode with /mode`)
+  Os 3 novos e `RunAsync_WhenUserTypesUnknownCommand_ShowsUnknownCommandAndAvailableCommands` falham na asserção (hoje a saída é `Unknown command "/mode".` e a lista é `/help, /quit`). `RunAsync_AfterUnknownCommand_KeepsSessionOpenAndForwardsNothing` com `"/foo bar"` já passa: é regressão. Green, em dois commits por escopo (review S10): primeiro `LocalCommands.Available` com `Mode` (Core); depois `case LocalCommandKind.Mode`, `ConsoleText.ModeChanged` e `ConsoleText.ModeNotRecognized` (Console). (commits: `refactor(console): read session mode from input handler` + `test(console): mode command in the console` + `feat(core): list mode among available local commands` + `feat(console): change tutor mode with /mode`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
 - [ ] T16 — Red: esqueleto `AppRunOptions.ConfigureServices`, já aplicado no fim do `BuildHost` (encanamento de teste; sem ele o arranjo não compila). `TestConfiguration.Create` passa a aceitar valores extras. `CreateOptions` registra `ScriptedTutorBrain` e `FixedTutorPromptSource`. O teste existente é renomeado para Ollama (§4). Testes:
   - `EnglishTutorAppTests.RunAsync_WhenUserSendsTwoSentences_SecondRequestCarriesFirstTurnAndShowsBothReplies`: falha porque a saída é `The tutor is not connected yet.` e `Requests` está vazio.
@@ -641,9 +699,11 @@ Regras que valem para todas as tarefas:
 
   (commits: `test(console): console talks to the conversation service` + `feat(console): connect the console to the claude code tutor`)
   Escolhas de forma: nenhuma | §12 em `<hash>`
-- [ ] T17 — DoD: rodar D1–D15, colar em §11 e marcar a §5 com os hashes. Cada `[x]` leva o hash na própria linha (AP-031). (commit: `docs(ai): add DoD evidence for US-004`)
+- [ ] T17 — Red (B1, P19): `EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration` (2 casos). Com os binds da T16, os dois casos falham com código 1 ≠ 2 e `An unexpected error occurred. See the log file for details.` em `Error`. O Executor confirma no Red que o motivo é o descrito: o evento `UnexpectedError` (1003) do log tem `AggregateException` com `OptionsValidationException` internas. Se o Red não acontecer por esse motivo, parar e registrar na §12. Green: P19 / §2.6 (falhas de validação de `OptionsValidationException` ou de `AggregateException` só com `OptionsValidationException`; `Invalid configuration:` + uma linha por falha; `StartupFailed` com todas; `ExitCodes.InvalidConfiguration`). Os testes de configuração inválida da US-001 e o da T16 seguem verdes. (commits: `test(console): invalid configuration in several sections` + `feat(console): explain every options validation failure at startup`)
+  Escolhas de forma: nenhuma | §12 em `<hash>`
+- [ ] T18 — DoD: rodar D1–D15, colar em §11 e marcar a §5 com os hashes. Cada `[x]` leva o hash na própria linha (AP-031). (commit: `docs(ai): add DoD evidence for US-004`)
 
-Conferência das contagens por tarefa: `ClaudeCodeTutorBrainTests` = T5 5/6 + T6 3/3 + T7 3/4 + T8 5/7 + T10 2/2 = 18 métodos / 22 casos. Console.Tests = T1 1/1 + T14 4/4 + T15 3/4 + T16 5/5 = 13 / 14. Infrastructure.Tests = T2 4/7 + T3 1/1 + T4 2/2 + `ClaudeCodeTutorBrainTests` 18/22 + T11 2/2 + T12 3/3 + T13 2/2 = 32 / 39. Core.Tests = T13 1/1.
+Conferência das contagens por tarefa: `ClaudeCodeTutorBrainTests` = T5 5/6 + T6 4/5 + T7 4/7 + T8 5/9 + T10 2/2 = 20 métodos / 29 casos. Console.Tests = T1 1/1 + T14 4/4 + T15 3/4 + T16 5/5 + T17 1/2 = 14 / 16. Infrastructure.Tests = T2 4/7 + T3 1/1 + T4 2/2 + `ClaudeCodeTutorBrainTests` 20/29 + T11 2/2 + T12 3/3 + T13 2/2 = 34 / 46. Core.Tests = T13 1/1. Total: 49 / 63.
 
 ## 6. Pacotes NuGet
 
@@ -660,22 +720,30 @@ Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core 
 | Risco | Mitigação |
 |---|---|
 | Algum teste do console lança o `claude` real (lento, depende de rede) | `CreateOptions` registra sempre um `ScriptedTutorBrain` sem respostas, que lança se for chamado. O teste do Ollama não resolve o serviço. `ProcessRunner` só nos testes `LiveBrain` |
+| Duas ou mais seções de configuração inválidas ao mesmo tempo viram `AggregateException` e caem no erro inesperado (código 1, sem explicação), regredindo a US-001 (B1) | P19: o `EnglishTutorApp` reconhece a `AggregateException` só com `OptionsValidationException`. T17 com teste de duas seções inválidas, em dois pares; o Executor confirma o motivo do Red no log |
+| `OutputMode` aceito em outra caixa roda em silêncio no modo errado (B4) | O adaptador usa só o valor canônico (P13). `SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog` com `"jsonschema"` e `"TAGS"` |
+| `is_error: true` com código 0 mandaria o texto do erro ao parser e à tela como fala do professor (B3) | Linha 3 da §2.5, sem chamar o parser; teste com `structured_output` válido, que só passa se o `is_error` for respeitado |
 | `ProcessRunner` sem teste unitário (processo real é proibido na suíte rápida) | Classe pequena e sem regra; exercitada pelos 4 testes `LiveBrain` da T9 e pelo D6. O encerramento por tempo esgotado ganha teste na US-005 |
+| Processo que termina antes de ler o stdin derruba a escrita com pipe fechado e esconde o stderr | Leituras iniciadas antes da escrita; `IOException` da escrita ignorada; código de saída e stderr chegam ao adaptador (§2.1, review S4) |
 | `claude` instalado como shim `.cmd` (npm): o `cmd.exe` reinterpreta as aspas do JSON Schema | ADR-007 registra o instalador nativo (`claude.exe`) como suportado. `ExecutablePath` aceita caminho completo |
+| Configuração de **usuário** da CLI (`~/.claude/CLAUDE.md`, hooks em `~/.claude/settings.json`) entra no contexto ou roda a cada turno; a pasta dedicada só isola a de projeto (review S11) | Aceito de forma explícita nesta US: RN-BRAIN06 trata da pasta de trabalho, e `--tools ""`, `--strict-mcp-config` e `--permission-mode dontAsk` limitam o que roda. Registrado no ADR-007. O Executor anota na §11 se o `claude --help` oferece flag para restringir fontes de configuração; adotá-la é mudança de ADR em outra US, não decisão do Executor |
 | Formato JSON da CLI muda (ADR-001) | Fixtures reais gravadas pelo `FixtureRecorderLiveTests`; regravar é rodar um teste |
 | Fixture com dado pessoal | D13 procura `Users`, `@` e `sk-ant`. O Executor revisa os campos antes do commit (tdd-dotnet, Fixtures) |
 | `--resume` com `--system-prompt-file` reenviado gera erro ou ignora o arquivo | `SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply` (LiveBrain) confere com o CLI real. Se falhar, parar e registrar na §12 (alternativa: omitir `--system-prompt-file` ao retomar) |
+| `tutor.md` alterado no meio da sessão e retomada com o prompt antigo (review S2) | O system prompt faz parte da identidade da sessão (ADR-007, item 3); caso `"system-prompt-changed"` |
 | Fumaça abaixo de 4/5 (qualidade do modelo `haiku`) | Parar na T9 e registrar. A correção é de prompt (`tutor.md`) ou de modelo, decidida pelo usuário, não pelo Executor |
 | Sessão da CLI com conteúdo diferente da janela (tentativa rejeitada) | Regra de extensão exata (ADR-007). Depois de uma retentativa, o turno seguinte abre sessão nova |
+| `--resume` só ajuda nos primeiros `MaxTurnsInWindow` turnos: depois, a janela desliza e todo turno abre sessão nova (review S1) | Registrado no ADR-007 ("Consequências"); a US-009 mede a taxa de sessões novas no `eval` |
 | `RawText` vazio gera `[tutor]` vazio no texto renderizado (ADR-006) | Aceito: o texto único não é recusado pela CLI como uma mensagem `Assistant` vazia seria numa API de chat |
 | Seta `→` ilegível no console do Windows | `OutputEncoding` UTF-8 sem BOM no `Program.cs` (P14); o D6 confere a seta. Efeito colateral conhecido: o code page do console fica UTF-8 depois da execução |
 | Variável de ambiente de teste vaza entre testes | Nome único por teste (`ENGLISHTUTOR_TEST_<guid>`), removido no fim |
-| Asserção satisfeita por texto externo (AP-015) | As mensagens conferidas têm trechos do projeto (`Claude Code failed (exit code`, `is not a JSON result`, `Expected prompts/tutor.md`) |
+| Asserção satisfeita por texto externo (AP-015) | As mensagens conferidas têm trechos do projeto (`Claude Code failed (exit code`, `Claude Code reported an error:`, `is not a JSON result`, `Expected prompts/tutor.md`, `Invalid configuration:`) |
 | Contagens divergentes no fim (AP-031) | Conferência por tarefa no fim da §5; o Executor atualiza cabeçalho, detalhamento, D2 e D11 juntos |
 
 ## 8. Fora de escopo
 
-- Classificação de falhas (`CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`), `TimeoutSeconds` e mensagens claras ao aluno com a sessão continuando: **US-005**. A spec já cobre: cenários "CLI não encontrada", "não autenticado", "limite de uso atingido", "tempo esgotado" e D5 ("um teste por `BrainErrorKind`"). Nada novo a registrar. Até lá, falha do cérebro encerra com `ExitCodes.UnexpectedError` (P11).
+- Classificação de falhas (`CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`), `TimeoutSeconds` e mensagens claras ao aluno com a sessão continuando: **US-005**. A spec já cobre a classificação (cenários "CLI não encontrada", "não autenticado", "limite de uso atingido", "tempo esgotado" e D5). A sessão continuando depois de **qualquer** falha do cérebro, inclusive `Unknown`, e a troca do teste da P11 entram na spec da US-005 antes da T1: cenário "falha do cérebro no console não encerra a sessão" e D7 (§2.8, AP-022; B2). Até lá, falha do cérebro encerra com `ExitCodes.UnexpectedError` (P11).
+- Timeout: o item [O] "Processos externos com `ArgumentList`, timeout e encerramento da árvore" do `checklist-revisao` §4 vale como **N/A para o timeout** nesta US, por decisão da spec (US-005, cenário "tempo esgotado"; P6). `ArgumentList` e encerramento da árvore no cancelamento valem e estão na §2.1 (review S12).
 - Ollama no console: **US-006**, com o cenário "console conversa com o Ollama" acrescentado à spec antes da T1 (§2.8, AP-022).
 - `BrainFactory`, troca de cérebro por configuração e fallback: US-007. Suíte de contrato: US-008, que vai consumir o `FakeProcessRunner` e as fixtures desta US.
 - Comando `eval`, golden set e relatório: US-009. O `LatencySummary` desta US mora no projeto de teste, e a US-009 decide se o promove.
@@ -683,27 +751,29 @@ Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core 
 - Persistência de turnos e resumo de erros recorrentes (RN-PERS*, RN-CONV04), voz e TTS.
 - Validação de "no máximo 3 frases" (RN-FEED01) no Core: fica no prompt e no teste `LiveBrain` (P18). Mudar o `TutorReplyValidator` seria decisão do ADR-005, revisitável na US-009.
 - Remover `BrainRequest.SessionHint` do contrato: fica reservado (P1).
+- Restringir as fontes de configuração de usuário da CLI: risco aceito (§7); sem US de destino até haver decisão de ADR.
 
 ## 9. Perguntas em aberto
 
-- **P1 — Como a continuidade de sessão chega ao adaptador (D10).** **Padrão proposto:** o `session_id` fica guardado no adaptador, junto com as mensagens que a sessão conhece. `--resume` só vale quando o request repete exatamente essas mensagens e acrescenta uma única mensagem `User`. Em qualquer outro caso, abre sessão nova com a janela completa (ADR-007). `SessionHint` continua `null` e reservado. Alternativa: o serviço preenche `SessionHint`, o que exige o id no `TutorReply` e muda o contrato da §4. Testes: `ClaudeCodeTutorBrainTests.SendAsync_OnSecondTurnWithUseResume_ResumesSessionAndSendsOnlyNewMessage`, `ClaudeCodeTutorBrainTests.SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript`, `ClaudeCodeTutorBrainTests.SendAsync_WhenRetryingRejectedAnswer_ResumesWithOnlyFormatCorrection` e `ConversationServiceTests.SendAsync_InJobInterviewMode_SendsStandardTurnMessageLast`.
+- **P1 — Como a continuidade de sessão chega ao adaptador (D10).** **Padrão proposto:** o `session_id` fica guardado no adaptador, junto com o system prompt e as mensagens que a sessão conhece. `--resume` só vale quando o request tem o mesmo system prompt, repete exatamente essas mensagens e acrescenta uma única mensagem `User`. Em qualquer outro caso (inclusive `session_id` ausente ou vazio), abre sessão nova com a janela completa (ADR-007). `SessionHint` continua `null` e reservado. Alternativa: o serviço preenche `SessionHint`, o que exige o id no `TutorReply` e muda o contrato da §4. Testes: `ClaudeCodeTutorBrainTests.SendAsync_OnSecondTurnWithUseResume_ResumesSessionAndSendsOnlyNewMessage`, `ClaudeCodeTutorBrainTests.SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript`, `ClaudeCodeTutorBrainTests.SendAsync_WhenRetryingRejectedAnswer_ResumesWithOnlyFormatCorrection` e `ConversationServiceTests.SendAsync_InJobInterviewMode_SendsStandardTurnMessageLast`.
 - **P2 — Como o histórico vai ao `claude -p` sem `--resume`.** **Padrão proposto:** texto único no stdin, com mensagens anteriores rotuladas `[student]`/`[tutor]` e a atual depois de `Current message:`. Uma mensagem só vai sem rótulos. Alternativa: `--input-format stream-json`, que não aceita histórico de `Assistant`. Testes: `ClaudeCodePromptRendererTests.Render_WithHistory_LabelsEachMessageAndEndsWithCurrentMessage`, `ClaudeCodePromptRendererTests.Render_WithSingleMessage_ReturnsItsContentUnchanged` e `ClaudeCodeTutorBrainTests.SendAsync_WithHistoryAndNoKnownSession_SendsRenderedTranscriptWithoutResume`.
-- **P3 — Onde fica o arquivo do system prompt.** **Padrão proposto:** arquivo temporário com nome único na pasta temporária do sistema, apagado ao fim da chamada; a pasta de trabalho fica vazia (RN-BRAIN06). Alternativas: arquivo dentro da pasta de trabalho, ou `--system-prompt <texto>`. Testes: `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesSystemPromptInTemporaryFileOutsideWorkingDirectory` e `ClaudeCodeTutorBrainTests.SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty`.
+- **P3 — Onde fica o arquivo do system prompt.** **Padrão proposto:** arquivo temporário com nome único na pasta temporária do sistema, apagado ao fim da chamada, inclusive em falha; a pasta de trabalho fica vazia (RN-BRAIN06). Alternativas: arquivo dentro da pasta de trabalho, ou `--system-prompt <texto>`. Testes: `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesSystemPromptInTemporaryFileOutsideWorkingDirectory`, `ClaudeCodeTutorBrainTests.SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty` e `ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail`.
 - **P4 — Qual campo da saída é o `RawText`.** **Padrão proposto:** `structured_output` (texto JSON bruto) quando for objeto; senão, `result`. Testes: `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` e `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedTagsOutput_ReturnsTutorReply`.
-- **P5 — Falhas do processo nesta US.** **Padrão proposto:** código de saída ≠ 0, `is_error` ou saída que não é JSON viram `BrainException(Unknown)`, com o detalhe da §2.5 (o `result` do erro ou a primeira linha não vazia do stderr). A classificação fina é da US-005. Testes: `ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail` e `ClaudeCodeTutorBrainTests.SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation`.
-- **P6 — Tempo máximo nesta US.** **Padrão proposto:** sem `TimeoutSeconds`; o tempo esgotado é da US-005 (cenário "tempo esgotado"). O `ProcessRunner` já encerra a árvore do processo quando o `CancellationToken` é cancelado (Ctrl+C), e o adaptador repassa o token do chamador sem troca. Teste: `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesCallerTokenToProcessRunner`.
+- **P5 — Falhas do processo nesta US.** **Padrão proposto:** as linhas 1–3 da §2.5, nessa ordem: código de saída ≠ 0 → `Claude Code failed (exit code <n>): <detalhe>`; saída que não é o objeto JSON da CLI → `... is not a JSON result. Expected ...`; código 0 com `is_error: true` → `Claude Code reported an error: <detalhe>`, sem chamar o parser (B3). Todas viram `BrainException(Unknown)`. O detalhe é o `result` do erro, senão a primeira linha não vazia do stderr, senão `no error details were printed`. Executável inexistente propaga `Win32Exception` (§2.1). A classificação fina é da US-005. Testes: `ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail`, `ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing` e `ClaudeCodeTutorBrainTests.SendAsync_WhenOutputIsNotJsonResult_ThrowsUnknownWithExpectation`.
+- **P6 — Tempo máximo nesta US.** **Padrão proposto:** sem `TimeoutSeconds`; o tempo esgotado é da US-005 (cenário "tempo esgotado"). O item de timeout do `checklist-revisao` §4 é N/A nesta US (§8). O `ProcessRunner` já encerra a árvore do processo quando o `CancellationToken` é cancelado (Ctrl+C), e o adaptador repassa o token do chamador sem troca. Teste: `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesCallerTokenToProcessRunner`.
 - **P7 — Console com `Brain:Provider = Ollama` antes da US-006.** **Padrão proposto:** o console mantém o `TutorNotConnectedInputHandler` (`The tutor is not connected yet.`) e não resolve o `ConversationService`. A ligação ao Ollama vai para a spec da US-006 (§2.8). Alternativa: registrar um cérebro "não conectado" (provisório descartável). Teste: `EnglishTutorAppTests.RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected`.
 - **P8 — Formato da resposta na tela.** **Padrão proposto:** `Tutor: <reply>`; depois, se houver feedback, `Feedback:` e uma linha `  - <item>` por item do `FeedbackFormatter`. No fallback cru, só a linha `Tutor:`. Testes: `ConversationInputHandlerTests.HandleAsync_WhenTutorReplies_ShowsReplyAndFeedbackLines` e `ConversationInputHandlerTests.HandleAsync_WhenReplyIsRawFallback_ShowsOnlyReply`.
 - **P9 — Textos do `/mode` e do `/help`.** **Padrão proposto:** os da tabela da §2.6 (confirmação, nome desconhecido, nome ausente, linha do `/help`, ordem `/help, /mode, /quit`). Testes: `ChatSessionTests.RunAsync_WhenUserTypesModeWithKnownName_ChangesModeAndConfirms`, `ChatSessionTests.RunAsync_WhenUserTypesModeWithUnknownOrMissingName_ShowsAvailableModesAndKeepsMode` e `ChatSessionTests.RunAsync_WhenUserTypesHelp_ListsModeCommandWithAllModes`.
 - **P10 — Quem trata a linha em branco no console.** **Padrão proposto:** o `ChatSession` continua tratando (vale também para o handler não conectado). O `ConversationInputHandler` mostra o `Warning` do serviço se um texto em branco chegar até ele. Testes: `ChatSessionTests.RunAsync_WhenLineIsBlank_ShowsEmptyInputWarning` (existente, regressão) e `ConversationInputHandlerTests.HandleAsync_WhenInputIsBlank_ShowsLocalWarning`.
-- **P11 — Falha do cérebro durante a sessão, até a US-005.** **Padrão proposto:** a `BrainException` propaga e o app encerra com `ExitCodes.UnexpectedError` e `An unexpected error occurred. See the log file for details.`, como qualquer erro inesperado (US-001). A US-005 troca isso por mensagem clara com a sessão continuando e atualiza este teste. Teste: `EnglishTutorAppTests.RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError`.
-- **P12 — Onde ficam os prompts em tempo de execução.** **Padrão proposto:** cópia de `prompts/**` na pasta `prompts/` ao lado do executável, resolvida pelo content root, sem chave de configuração. O `tutor.md` é lido a cada turno. Testes: `PromptFilesDeploymentTests.ApplicationFolder_Always_ContainsTutorAndFormatPrompts`, `FileTutorPromptSourceTests.GetSystemPromptAsync_WhenTutorFileIsMissing_ThrowsWithPathAndExpectation` e `FileTutorPromptSourceTests.GetSystemPromptAsync_AfterFileChanges_ReturnsNewContent`.
-- **P13 — Onde ficam as Options do Claude Code e o que elas validam.** **Padrão proposto:** `ClaudeCodeOptions` e o validador na Infrastructure (registrado por ela), bind no composition root (ADR-004). Valores obrigatórios: `ExecutablePath`, `Model`, `WorkingDirectory`; `OutputMode` em `JsonSchema`/`Tags`, sem diferenciar maiúsculas. Testes: `ClaudeCodeOptionsTests.Constructor_Always_UsesDocumentedDefaults`, `ClaudeCodeOptionsValidatorTests.Validate_WhenRequiredValueIsBlank_FailsNamingTheKey`, `ClaudeCodeOptionsValidatorTests.Validate_WhenOutputModeIsUnknown_FailsWithAcceptedValues` e `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_Always_RegistersClaudeCodeOptionsValidator`.
+- **P11 — Falha do cérebro durante a sessão, até a US-005.** **Padrão proposto:** a `BrainException` propaga e o app encerra com `ExitCodes.UnexpectedError` e `An unexpected error occurred. See the log file for details.`, como qualquer erro inesperado (US-001). A troca por mensagem clara com a sessão continuando, para qualquer falha que chegue ao console (inclusive `Unknown`), e a substituição deste teste ficam registradas na spec da US-005 (cenário "falha do cérebro no console não encerra a sessão" e D7, §2.8; B2). Teste: `EnglishTutorAppTests.RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError`.
+- **P12 — Onde ficam os prompts em tempo de execução.** **Padrão proposto:** cópia de `prompts/**` na pasta `prompts/` ao lado do executável, resolvida pelo content root, sem chave de configuração. O `tutor.md` é lido a cada turno. Os testes `LiveBrain` usam o mesmo `prompts/tutor.md` da saída. Testes: `PromptFilesDeploymentTests.ApplicationFolder_Always_ContainsTutorAndFormatPrompts`, `FileTutorPromptSourceTests.GetSystemPromptAsync_WhenTutorFileIsMissing_ThrowsWithPathAndExpectation` e `FileTutorPromptSourceTests.GetSystemPromptAsync_AfterFileChanges_ReturnsNewContent`.
+- **P13 — Onde ficam as Options do Claude Code, o que elas validam e quem normaliza `OutputMode`.** **Padrão proposto:** `ClaudeCodeOptions` e o validador na Infrastructure (registrado por ela), bind no composition root (ADR-004). Valores obrigatórios: `ExecutablePath`, `Model`, `WorkingDirectory`; `OutputMode` em `JsonSchema`/`Tags`, sem diferenciar maiúsculas. As Options guardam o valor configurado; o **adaptador** normaliza a cada chamada com `BrainOutputModes.TryGetCanonical` e usa só o canônico nos argumentos, no arquivo de formato e no log 2001 (B4; mesmo padrão de `Brain:Provider`, US-001 P4). Alternativa: `PostConfigure` nas Options (descartada na §2). Testes: `ClaudeCodeOptionsTests.Constructor_Always_UsesDocumentedDefaults`, `ClaudeCodeOptionsValidatorTests.Validate_WhenRequiredValueIsBlank_FailsNamingTheKey`, `ClaudeCodeOptionsValidatorTests.Validate_WhenOutputModeIsUnknown_FailsWithAcceptedValues`, `ClaudeCodeOptionsValidatorTests.Validate_WithAcceptedOutputMode_Succeeds`, `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_Always_RegistersClaudeCodeOptionsValidator` e `ClaudeCodeTutorBrainTests.SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog`.
 - **P14 — Codificação da saída do console.** **Padrão proposto:** `Console.OutputEncoding = new UTF8Encoding(false)` no `Program.cs`, para a seta `→` do feedback (pendência do `docs/us/US-002.md`). O `Program.cs` não roda nos testes em processo (ADR-004), e a conferência é o D6. Sem efeito observável nos testes automatizados.
 - **P15 — Forma do "comando de medição" de latência.** **Padrão proposto:** um teste `LiveBrain` (`LatencyMeasurementLiveTests`) rodado com `--logger "console;verbosity=detailed"`, que imprime a tabela. O p95 é por posto mais próximo, `⌈0,95·n⌉`; com n = 5, ele é o maior valor. Alternativa: subcomando no console (fica para o `eval` da US-009). Testes: `LatencySummaryTests.Compute_WithFiveSamples_ReturnsMeanAndMaxAsP95` e `LatencySummaryTests.Compute_WithTwentySamples_ReturnsNineteenthSmallestAsP95`.
 - **P16 — Como as fixtures reais são gravadas.** **Padrão proposto:** pelo `FixtureRecorderLiveTests`, com o mesmo adaptador e um `RecordingProcessRunner`. Ele grava em `bin/.../recorded-fixtures/`, e o Executor copia para `Fixtures/ClaudeCode/` depois de revisar (D13). Alternativa: rodar o `claude` à mão no PowerShell, onde as aspas do schema quebram no 5.1. Teste: `FixtureRecorderLiveTests.SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes`.
 - **P17 — Registro do `ITutorBrain` antes da `BrainFactory`.** **Padrão proposto:** `ClaudeCodeTutorBrain` registrado sempre como `ITutorBrain` pela Infrastructure. O console só o usa com Provider `ClaudeCode` (P7). A US-007 troca pelo registro por configuração. Teste: `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_Always_RegistersClaudeCodeBrainAndFilePromptSource`.
 - **P18 — "No máximo 3 frases" (RN-FEED01).** **Padrão proposto:** conferido só no teste `LiveBrain` do cenário 1 (contando terminadores de frase); o `TutorReplyValidator` (ADR-005) não muda. Teste: `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion`.
+- **P19 — Configuração inválida em mais de uma seção ao mesmo tempo (B1).** **Padrão proposto:** com `BrainOptions`, `ClaudeCodeOptions` e `ConversationOptions` validadas na partida, o `ValidateOnStart` lança `OptionsValidationException` quando uma só classe falha e `AggregateException` (uma `OptionsValidationException` por classe) quando mais de uma falha. O `EnglishTutorApp` trata as duas formas como configuração inválida: escreve `Invalid configuration:` e uma linha `  <falha>` para cada falha de cada classe, na ordem em que vêm; loga `StartupFailed` com todas; devolve `ExitCodes.InvalidConfiguration`, sem cabeçalho nem prompt (mesmos critérios da US-001, AP-024). `AggregateException` com interna de outro tipo continua erro inesperado (§2.9). Alternativa: um validador único para as três seções (acopla Core e Infrastructure). Teste: `EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration`.
 
 ## 10. Definition of Done (comandos verificáveis)
 
@@ -712,7 +782,7 @@ Executar a partir da raiz do repositório, em PowerShell. As exceções são o D
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes: 205 casos (Core.Tests 103, Console.Tests 39, Infrastructure.Tests 63), em < 30 s, sem rede, sem GPU e sem processo real |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes: 214 casos (Core.Tests 103, Console.Tests 41, Infrastructure.Tests 70), em < 30 s, sem rede, sem GPU e sem processo real |
 | D3 | `Remove-Item -Recurse -Force TestResults, coverage -ErrorAction SilentlyContinue; dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` | gera `coverage.cobertura.xml` para os 3 projetos de teste |
 | D3b | `dotnet tool restore; dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | linha `EnglishTutor.Core` ≥ 80% |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
@@ -722,8 +792,8 @@ Executar a partir da raiz do repositório, em PowerShell. As exceções são o D
 | D8 | `Select-String -Path src/EnglishTutor.Console/appsettings.json -Pattern '"MaxTurnsInWindow": 10'` | uma linha, dentro da seção `Conversation` (RN-CONV03) |
 | D9 | No Windows PowerShell 5.1: `"/mode job-interview", "/help", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` | aviso `Mode changed to "job-interview". It applies from your next sentence.`; `/help` lista `/mode`; nenhum `Unknown command`; `exit=0` |
 | D10 | Inspeção de `tasks/US-004/plan.md` | a P1 decide como a continuidade de sessão chega ao adaptador (`session_id` guardado no adaptador, RN-BRAIN01), com testes |
-| D11 | `dotnet test --filter "FullyQualifiedName~ClaudeCodeTutorBrainTests"` | 22 casos verdes (18 métodos); os testes `LiveBrain` têm outra classe (`ClaudeCodeTutorBrainLiveTests`) e não entram |
-| D12 | `Get-ChildItem -Force -Recurse "$env:LOCALAPPDATA\EnglishTutor\brain" \| Measure-Object \| Select-Object -ExpandProperty Count` (após D6) | `0`: a pasta existe e está vazia (RN-BRAIN06) |
+| D11 | `dotnet test --filter "FullyQualifiedName~ClaudeCodeTutorBrainTests"` | 29 casos verdes (20 métodos); os testes `LiveBrain` têm outra classe (`ClaudeCodeTutorBrainLiveTests`) e não entram |
+| D12 | `Test-Path "$env:LOCALAPPDATA\EnglishTutor\brain"; (Get-ChildItem -Force -Recurse "$env:LOCALAPPDATA\EnglishTutor\brain").Count` (após D6) | duas linhas: `True` e `0` (a pasta existe e está vazia, RN-BRAIN06; review S7) |
 | D13 | `Select-String -Path tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/*.json -Pattern 'Users','@','sk-ant'` | nenhuma linha (fixtures sem caminho pessoal, e-mail ou chave) |
 | D14 | `git status --short` após D2–D13 | nenhum arquivo de `TestResults/`, `coverage/`, `bin/`, `obj/` ou `logs/` |
 | D15 | (Git Bash) comando do bloco abaixo, com todo o código da US commitado | imprime `0` (código de saída 1 com contagem 0 é o esperado) |
@@ -740,7 +810,7 @@ Também entram, da DoD comum:
 - `review.md` sem bloqueantes;
 - `docs/us/US-004.md` criado;
 - ADR-007 aceito;
-- `ARCHITECTURE.md` §3/§5/§6.3, `padroes-codigo`, `tdd-dotnet` e a US-006 do `SPRINT_1.md` atualizados antes da T1 (§2.8);
+- `ARCHITECTURE.md` §3/§5/§6.3, `padroes-codigo`, `tdd-dotnet` e a US-005 e a US-006 do `SPRINT_1.md` atualizados antes da T1 (§2.8);
 - tabela de latência no ADR-002 (D7);
 - merge `--no-ff` em `develop`.
 
@@ -757,6 +827,33 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 Corrigir os bloqueantes abaixo (texto completo e "Esperado" em [plan-review.md](plan-review.md), Rodada 1):
 
 - **B1** — Com `BrainOptions`, `ClaudeCodeOptions` e `ConversationOptions` validadas na partida, falhas simultâneas de mais de uma seção viram `AggregateException` e caem no `catch (Exception)` (erro inesperado, código 1). Decidir numa P* como a saída mostra `Invalid configuration:` com a mensagem de cada validador e `ExitCodes.InvalidConfiguration`; mapear teste com duas seções inválidas (§4), tarefa (§5), contagens, D2 e risco (§7).
+
+  → Incorporado. B1 → §2.6 (composition root: as duas formas de exceção), §2.9 (`AggregateException` mista), §2 "Alternativas descartadas", §3 (`EnglishTutorApp.cs`, `EnglishTutorAppTests.cs`, `TestConfiguration.cs`), §4 (`EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration`, 2 casos: Provider + janela e OutputMode + janela), §4 contagens, §5 T17 (nova; Red confirmado pelo log com `AggregateException`; a antiga T17 virou T18), §7 (linha nova), §9 P19 (nova), §10 D2 (214).
+
 - **B2** — A P11 adia para a US-005 "mensagem clara com a sessão continuando" para qualquer falha (inclusive `Unknown`), mas a spec da US-005 não tem isso. Trazer na §2.8 o texto exato a acrescentar na US-005 (commit `docs(ai): update spec for US-004` antes da T1) e corrigir a §8.
+
+  → Incorporado. B2 → §2.8 (cenário "falha do cérebro no console não encerra a sessão" e linha D7 na DoD extra da US-005, com o texto antigo de referência; critérios reaproveitados: saída de erro, código 0 no `/quit`, texto `Claude Code failed (exit code <n>): ...`), §3 (`SPRINT_1.md`), §4 (comentário do teste da P11), §5 pré-condição, §8 (primeiro item reescrito, sem "Nada novo a registrar"), §9 P11, §10 DoD comum.
+
 - **B3** — A linha `is_error: true` com código de saída 0 da tabela de `ClaudeCodeOutput.Read` (§2.5) não é exercitada. Teste para "código 0 e `is_error: true`" → `BrainException(Unknown)` com detalhe, sem chamar o parser; definir o texto da mensagem; atualizar contagens, §5 e D11.
+
+  → Incorporado. B3 → §2.5 (tabela numerada e ordenada; linha 3 com `Claude Code reported an error: <detalhe>`, sem chamar o parser), §3 (`ClaudeOutputs.Error(resultText, structuredReplyJson = null)`), §4 (`ClaudeCodeTutorBrainTests.SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing`, 3 casos, com `structured_output` válido para provar que o parser não é chamado), §4 contagens, §5 T5 (estado: `is_error` com qualquer código) e T7 (4/7), §7 (linha nova), §9 P5, §10 D11 (29 casos / 20 métodos), ADR-007 item 5.
+
 - **B4** — `OutputMode` aceito sem diferenciar maiúsculas pelo validador, mas sem dono da normalização no adaptador. A P13 decide quem normaliza; §4/§5 mapeiam teste com valor aceito em outra caixa produzindo os argumentos e o arquivo de formato do modo correspondente.
+
+  → Incorporado. B4 → §2.2 (parágrafo "Normalização de `OutputMode`": o adaptador é o dono), §2.4 (passos 2, 6 e 10 usam `mode` canônico), §2.9 (falha de `TryGetCanonical`), §2 "Alternativas descartadas" (`PostConfigure`), §4 (`ClaudeCodeTutorBrainTests.SendAsync_WithOutputModeInOtherCase_UsesCanonicalModeInArgumentsAndLog`, `"jsonschema"` e `"TAGS"`, com argumentos, arquivo de formato e log 2001), §5 T5 (estado: valor fora da caixa canônica lança `NotImplementedException("US-004 T6")`, para os dois casos nascerem vermelhos) e T6 (4/5), §7 (linha nova), §9 P13.
+
+**Sugestões do `plan-review.md` (rodada 1), não obrigatórias.** Incorporadas todas, por serem baratas e coerentes:
+
+- S1 → ADR-007 "Consequências" (otimização só nos primeiros `MaxTurnsInWindow` turnos; sessão gravada no perfil do usuário), §7.
+- S2 → §2.4 passos 3 e 9 (`ClaudeCodeSession` com `SystemPrompt`), §4 caso `"system-prompt-changed"`, §5 T8 (5/9), §7, §9 P1, ADR-007 item 3; §2.8 texto novo da ARCHITECTURE §5.
+- S3 → §2.1 (último parágrafo), §2.8 (texto novo da ARCHITECTURE §6.3 diz a exceção do executável inexistente), §9 P5, ADR-007 item 5.
+- S4 → §2.1 (ordem numerada: leituras antes da escrita; `IOException` de pipe fechado ignorada), §5 T9, §7, ADR-007 item 1.
+- S5 → (a) e (b) nos casos `"blank-result-uses-stderr"` e `"no-details"` do teste de B3; (c) no caso `"session-id-missing"` de `SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript`; §2.5, §4, §5 T7/T8.
+- S6 → §2.4 passo 5, §4 (`SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail` confere que o arquivo temporário não existe depois da exceção), §9 P3, ADR-007 item 4. O caso de cancelamento não ganha teste próprio: o `finally` é o mesmo.
+- S7 → §10 D12 (`Test-Path` → `True` e contagem `0`).
+- S8 → §5 T15 (30 casos no ponto do Refactor).
+- S9 → §3 (`LiveClaudeCode` lê `prompts/tutor.md` da saída), §5 T9, §9 P12.
+- S10 → §5 T11 (commits `test(infra)`) e T15 (commit `feat(core)` separado para `LocalCommands.Available`).
+- S11 → §7 (risco aceito de forma explícita, com anotação na §11), §8, ADR-007 "Consequências".
+- S12 → §8 (item de timeout do `checklist-revisao` §4 = N/A nesta US), §9 P6.
+- S13 → §4 (correção conferida com "contém", sem diferenciar maiúsculas), §5 T10.
