@@ -59,7 +59,7 @@ public sealed class FakeTutorBrain : ITutorBrain
 
 ## Ciclo
 
-1. **Red**: escreva o teste do cenário; ele deve compilar (crie só a assinatura vazia / `throw new NotImplementedException()` se preciso) e **falhar na asserção**. Commit `test(...)`.
+1. **Red**: primeiro crie os esqueletos mínimos que o teste vai usar (arquivos, tipos e membros que lançam `NotImplementedException`, `using`s); só então escreva o teste do cenário. Assim o hook pós-edição compila a cada passo, e o Red falha **na asserção ou na exceção prevista**, nunca por erro de compilação (AP-013). Commit `test(...)` com teste e esqueletos.
 2. **Green**: o mínimo para passar. Commit `feat(...)`.
 3. **Refactor**: com tudo verde. Commit `refactor(...)`.
 
