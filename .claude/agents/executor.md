@@ -41,7 +41,7 @@ Depois de cada Edit/Write em `.cs`/`.csproj`, um hook formata o arquivo, verific
 
 ## Caracteres invisíveis (AP-007)
 
-As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere invisível (ex.: o BOM U+FEFF) no caractere literal, ou corrompê-lo. Para gravar o escape, use `perl -pi -e 's/\xef\xbb\xbf/\x5cuFEFF/g' <arquivo>` e confira depois com `grep -c $'\xef\xbb\xbf' <arquivo>`, que deve dar 0.
+As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere invisível (ex.: o BOM U+FEFF) no caractere literal, ou corrompê-lo. Para gravar o escape, use `perl -pi -e 's/\xef\xbb\xbf/\x5cuFEFF/g' <arquivo>` e confira depois com `LC_ALL=C grep -c $'\xef\xbb\xbf' <arquivo>`, que deve dar 0. Para o diff da US inteiro, use a forma única do `checklist-revisao` §4 (`git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`); código de saída 1 com contagem 0 é o esperado (AP-019).
 
 ## Definition of Done (você mesmo verifica)
 

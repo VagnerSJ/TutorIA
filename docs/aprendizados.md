@@ -83,6 +83,8 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Correção (proposta):** (a) skill `padroes-codigo`: exigir escape (`\uXXXX`) para caracteres não imprimíveis em código e testes; (b) skill `checklist-revisao`: item "nenhum caractere invisível literal no diff"; (c) agente `executor`: para gravar escapes `\uXXXX` usar `perl` com `\x5cuFEFF` e conferir com `grep` pelos bytes EF BB BF (`$'\xef\xbb\xbf'`), que não deve achar nada. Arquivos: `.claude/skills/padroes-codigo/SKILL.md`, `.claude/skills/checklist-revisao/SKILL.md`, `.claude/agents/executor.md`.
 - **Status:** Aplicada (commit c858312)
 
+**Atualização 2026-10-17 (US-002, AP-019):** a conferência por bytes passa a ter forma única, com `LC_ALL=C`: `git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'` (fonte: `checklist-revisao` §4).
+
 ### AP-008 — Revisor não consegue reproduzir parte da DoD
 
 - **Data / US:** 2026-10-17 / US-001 (Rodadas 1 e 2)
@@ -189,7 +191,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o D11 inicial não detectava os bytes (no Git Bash, `\xEF` vira o código U+00EF, não o byte). Foi corrigido para `LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`. O `checklist-revisao` §4 e o AP-007 usam o mesmo comando sem `LC_ALL=C`: hoje dão o mesmo resultado, mas são duas formas do mesmo comando.
 - **Por que importa:** cada variante pode falhar em silêncio e dar `0` falso (AP-007).
 - **Correção (proposta):** adotar uma forma só, com `LC_ALL=C`, em `.claude/skills/checklist-revisao/SKILL.md` §4, no AP-007 (nota de atualização) e em `.claude/agents/executor.md`; o Planejador copia dali na DoD, sem reescrever. Lembrar que `grep -c` sai com código 1 quando conta 0, resultado esperado.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-17; `checklist-revisao` §4, `executor.md`, `planejador.md` (DoD) e nota no AP-007)
 
 ### AP-020 — FluentAssertions 7: `Should().BeTrue()` não informa a análise de nulidade
 
