@@ -31,7 +31,6 @@ public static class TutorReplyValidator
             Pronunciation = NullIfBlank(candidate.Pronunciation),
             Vocabulary = NullIfBlank(candidate.Vocabulary),
             Praise = NullIfBlank(candidate.Praise),
-            IsRawFallback = false,
         };
         return TutorReplyParseResult.Valid(valid, warnings);
     }
