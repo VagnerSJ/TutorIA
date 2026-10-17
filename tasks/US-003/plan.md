@@ -429,3 +429,7 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-17 — pedido do Revisor do plano (rodada 1, B1)
+
+**B1** — §2.4, §2.5, §8 e §2.6 ("`specs/` não muda"). O plano adia para a US-004 cinco itens (ligação do `ConversationService` ao console; `/mode` no console e em `/help`; bind de `Conversation:MaxTurnsInWindow` com `ValidateOnStart` e a chave no `appsettings.json`; registro do serviço no DI; decisão sobre `SessionHint`), mas a US-004 em `specs/sprints/SPRINT_1.md` não cita nenhum deles — é o segundo adiamento (US-001 → US-003 → US-004). Mover escopo entre US é mudança de spec. Caminhos: (a) registrar os itens adiados na US-004 do `SPRINT_1.md` (cenário ou DoD extra), em commit `docs(ai): update spec for US-003` anterior à T1, e a §2.6 deixa de dizer "`specs/` não muda"; ou (b) trazê-los para esta US. A escolha final é do usuário na aprovação (P1/P12); até lá, mantenha o padrão do plano (caminho a) e escreva no plano o texto exato a acrescentar na US-004.
