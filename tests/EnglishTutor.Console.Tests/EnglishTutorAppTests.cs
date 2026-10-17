@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EnglishTutor.Console.Tests.Support;
+using Microsoft.Extensions.Configuration;
 
 namespace EnglishTutor.Console.Tests;
 
@@ -125,6 +126,65 @@ public sealed class EnglishTutorAppTests : IDisposable
         var exitCode = await run;
 
         exitCode.Should().Be(ExitCodes.Success);
+    }
+
+    // US-001 — apoio: falha ao montar o host não vaza stack trace (P8, review S2)
+    [Fact]
+    public async Task RunAsync_WhenHostCannotBeBuilt_ReturnsOneWithShortMessage()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Brain:Provider"] = "ClaudeCode",
+                ["Serilog:MinimumLevel:Default"] = "NotALevel",
+            })
+            .Build();
+        var options = CreateOptions("ClaudeCode", "/quit") with { Configuration = configuration };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.UnexpectedError);
+        _error.ToString().Should().StartWith("The application could not start: ")
+            .And.Contain("NotALevel")
+            .And.NotContain("   at ", because: "the student must not see a stack trace");
+        _output.ToString().Should().BeEmpty(because: "the session must not start when the host cannot be built");
+    }
+
+    // US-001 — Cenário: configuração do cérebro é validada na inicialização (review S3: cancelamento durante a escrita)
+    [Fact]
+    public async Task RunAsync_WhenProviderIsInvalidAndCancelledWhileWritingError_StillExplainsAndReturnsTwo()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        using var error = new CancellingTextWriter(cancellation);
+        var options = CreateOptions("Inexistente", "/quit") with { Error = error };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, cancellation.Token);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.");
+    }
+
+    // US-001 — apoio: cancelamento externo é registrado como saída anormal, não como código 1 (review S4)
+    [Fact]
+    public async Task RunAsync_WhenForeignCancellationPropagates_LogsAbortedInsteadOfStoppedWithExitCode()
+    {
+        using var input = new ForeignCancellationTextReader();
+        var options = CreateOptions("ClaudeCode") with
+        {
+            Input = input,
+            Configuration = TestConfiguration.Create("ClaudeCode", _logDirectory),
+        };
+
+        var run = () => EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        await run.Should().ThrowAsync<OperationCanceledException>();
+        var events = ReadLogEvents();
+        events.Should().NotContain(e => EventName(e) == "ApplicationStopped",
+            because: "the process does not exit with a known code when the cancellation propagates");
+        var aborted = events.Should().ContainSingle(e => EventName(e) == "ApplicationAborted").Subject;
+        aborted.GetProperty("EventId").GetProperty("Id").GetInt32().Should().Be(1004);
+        aborted.TryGetProperty("ElapsedMs", out _).Should().BeTrue();
     }
 
     public void Dispose()
