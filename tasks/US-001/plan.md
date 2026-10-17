@@ -467,3 +467,7 @@ Executor: atualizar §3/§4/§5 (contagens, nova tarefa T14 para S1–S4), D2 e 
 - **R1-S2**: texto escolhido para a mensagem (o pedido não fixava): `The application could not start: <mensagem da exceção>`. Não reaproveita `An unexpected error occurred. See the log file for details.` porque nesse ponto ainda não há arquivo de log.
 - **R1-S3 (desvio do teste descrito)**: um token **já cancelado** antes de `RunAsync` não chega ao caminho de configuração inválida: `host.StartAsync(ct)` lança `OperationCanceledException` antes do `ValidateOnStart`, e o app encerra com 0 e `Error` vazio (conferido com um teste provisório, descartado sem commit). Por isso o teste cancela o token **durante** a escrita da mensagem (`CancellingTextWriter`), que é o cenário real que a S3 descreve.
 - **R1-S4**: em vez de um código de saída que o processo não terá, o `finally` loga o evento novo `ApplicationAborted` (1004, `Warning`, `{ElapsedMs}`) e não loga `ApplicationStopped`.
+
+### 2026-10-17 — Aceite dos desvios e pendências
+
+Pedido do usuário no chat (transcrito pelo orquestrador): aceitos os desvios do Executor em R1-S2 (texto `The application could not start: <mensagem>`), R1-S3 (teste com `CancellingTextWriter`) e R1-S4 (evento `ApplicationAborted` 1004). Ficam como **pendências** para US futuras, sem implementar nesta US: S5–S7 da Rodada 1 e S1–S3 da Rodada 2 de [review.md](review.md). D13 (Ctrl+C manual) segue com o usuário, antes do merge.
