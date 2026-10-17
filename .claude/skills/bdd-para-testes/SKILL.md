@@ -54,9 +54,9 @@ Cenário: nova tentativa em resposta inválida
 public async Task SendAsync_WhenFirstReplyIsInvalid_RetriesWithFormatCorrection()
 {
     var brain = new FakeTutorBrain()
-        .ReturnsRaw("no tags here")
-        .Returns(TutorReplies.Valid());
-    var sut = ConversationServiceBuilder.With(brain).Build();
+        .ReturnsInvalid("no tags here", TutorReplyRejections.MissingReply())
+        .Returns(TutorReplies.Valid("t1"));
+    var sut = CreateService(brain);
 
     await sut.SendAsync("I goed to the park", CancellationToken.None);
 

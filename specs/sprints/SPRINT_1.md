@@ -7,7 +7,7 @@
 |---|---|---|---|---|
 | US-001 | Fundação da solução e configuração | 1 | — | Concluída |
 | US-002 | Contrato do professor e parser único da resposta | 1 | US-001 | Concluída |
-| US-003 | ConversationService dono do histórico | 1 | US-002 | A fazer |
+| US-003 | ConversationService dono do histórico | 1 | US-002 | Concluída |
 | US-004 | Conversar por texto com o professor via Claude Code | 2 | US-003 | A fazer |
 | US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | A fazer |
 | US-006 | Professor local via Ollama | 2b | US-003 | A fazer |
@@ -224,7 +224,7 @@ Como aluno,
 quero digitar uma frase em inglês e receber uma resposta curta com feedback,
 para praticar antes de ter o fluxo de voz.
 
-**Regras:** RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-FEED01–05; ARCHITECTURE §6.3; ADR-001, ADR-002.
+**Regras:** RN-BRAIN01, RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-CONV01, RN-CONV03, RN-CONV05, RN-CONV06, RN-FEED01–05; ARCHITECTURE §5, §6.3; ADR-001, ADR-002, ADR-006.
 
 ```gherkin
 Cenário: frase com erro gramatical
@@ -255,6 +255,32 @@ Cenário: medição de latência
   Dado o comando de medição com 5 frases
   Quando rodo com OutputMode JsonSchema e depois com Tags
   Então vejo a latência média e p95 de cada modo
+
+Cenário: console conversa pelo ConversationService
+  Dado o console com o ConversationService registrado no DI e ligado ao provedor configurado
+  Quando envio duas frases seguidas
+  Então o BrainRequest da segunda frase contém o primeiro turno completo (aluno e professor)
+  E vejo o reply e o feedback de cada turno
+
+Cenário: troca de modo pelo console
+  Dado que estou no modo "free-conversation"
+  Quando digito "/mode job-interview"
+  Então vejo um aviso local confirmando o modo "job-interview"
+  E a próxima mensagem enviada ao cérebro tem "Mode: job-interview"
+  E "/help" lista "/mode" e os 3 modos
+
+Cenário: modo desconhecido pelo console
+  Dado que estou no modo "free-conversation"
+  Quando digito "/mode interview"
+  Então vejo um aviso local com os modos disponíveis
+  E nada é enviado ao cérebro
+  E continuo no modo "free-conversation"
+
+Cenário: janela de turnos configurável
+  Dado "Conversation:MaxTurnsInWindow" igual a 0 na configuração
+  Quando a aplicação inicia
+  Então ela encerra antes do primeiro prompt com a mensagem do validador, que cita "Conversation:MaxTurnsInWindow" e o valor esperado
+  E o código de saída é o de configuração inválida (ExitCodes.InvalidConfiguration, diferente de 0)
 ```
 
 **DoD extra** (requer Claude Code CLI instalado e autenticado)
@@ -264,6 +290,9 @@ Cenário: medição de latência
 | D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ClaudeCode"` | verde: 5 frases de fumaça com erros conhecidos, ≥ 4 com a correção esperada e 5/5 no formato |
 | D6 | `"I have worked with C# since five years" \| dotnet run --project src/EnglishTutor.Console` | reply terminando em pergunta + correção "since five years → for five years" |
 | D7 | Medição de latência JsonSchema × Tags | tabela com média e p95 colada nas Evidências e no ADR-002 |
+| D8 | `Select-String -Path src/EnglishTutor.Console/appsettings.json -Pattern '"MaxTurnsInWindow": 10'` | uma linha, dentro da seção `Conversation` (RN-CONV03) |
+| D9 | No Windows PowerShell 5.1: `"/mode job-interview", "/help", "/quit" \| dotnet run --project src/EnglishTutor.Console` | aviso de troca para `job-interview`; `/help` lista `/mode`; nenhum `Unknown command`; `exit=0` |
+| D10 | Inspeção de `tasks/US-004/plan.md` | uma P* decide como a continuidade de sessão chega ao adaptador (`BrainRequest.SessionHint` preenchido pelo serviço ou `session_id` guardado no adaptador, RN-BRAIN01), com teste |
 
 ---
 

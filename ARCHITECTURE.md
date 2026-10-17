@@ -47,11 +47,12 @@ Regras:
 ```
 src/
   EnglishTutor.Core/
-    Conversation/      ConversationService, ConversationWindow, TurnMessageBuilder, TutorMode,
-                       LocalCommandParser, LocalCommand, LocalCommands
-    Brain/             ITutorBrain, BrainRequest, BrainMessage, TutorReply, Correction, TutorReplyParseResult,
+    Conversation/      ConversationService, ConversationWindow, ConversationTurn, ConversationTurnResult,
+                       ConversationMessages, ConversationOptions, ConversationOptionsValidator, ConversationLog,
+                       ITutorPromptSource, TurnMessageBuilder, TutorMode, LocalCommandParser, LocalCommand, LocalCommands
+    Brain/             ITutorBrain, BrainRequest, BrainMessage, BrainRole, TutorReply, Correction, TutorReplyParseResult,
                        TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, FeedbackFormatter,
-                       BrainException, BrainOptions, BrainOptionsValidator, BrainProviders
+                       BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
@@ -95,6 +96,10 @@ public interface ITutorBrain
 }
 public sealed record BrainRequest(string SystemPrompt, IReadOnlyList<BrainMessage> Messages, string? SessionHint);
 public sealed record BrainMessage(BrainRole Role, string Content);
+public enum BrainRole { User, Assistant }   // o system prompt vai em BrainRequest.SystemPrompt
+public enum BrainErrorKind { CliNotFound, NotAuthenticated, UsageLimitReached, Timeout, InvalidOutput, Unknown }
+public sealed class BrainException : Exception { /* Kind; Rejection e RawText só via BrainException.InvalidOutput(rejection, rawText) (ADR-006) */ }
+public interface ITutorPromptSource { Task<string> GetSystemPromptAsync(CancellationToken ct); }   // conteúdo de prompts/tutor.md
 public sealed record TutorReply(string Reply, IReadOnlyList<Correction> Corrections,
                                 string? Pronunciation, string? Vocabulary, string? Praise,
                                 bool IsRawFallback, string RawText);
@@ -118,16 +123,16 @@ O histórico **pertence à aplicação**, não ao provedor (RN-BRAIN01).
 
 A cada turno o `ConversationService`:
 
-1. Recebe a fala do aluno (`Transcript`, ou texto digitado na fase de texto).
+1. Recebe a fala do aluno (`Transcript`, ou texto digitado na fase de texto). Texto em branco não chega ao cérebro: o resultado é um aviso local (RN-CONV05).
 2. Monta a mensagem do turno (RN-CONV02):
    ```
    Student said (transcribed): "<texto>"
    Low-confidence words (possible pronunciation issues): ["word1", "word2"]
    Mode: <free-conversation | job-interview | listening-practice>
    ```
-3. Monta o `BrainRequest`: system prompt (`tutor.md` + instrução de formato do provedor) + resumo dos erros recorrentes + últimos N turnos (`Conversation:MaxTurnsInWindow`) + mensagem atual.
-4. Chama `ITutorBrain.SendAsync`. O cérebro devolve um `TutorReply` já validado pelo parser.
-5. Se o parser rejeitar, o serviço faz **uma** nova tentativa com instrução de correção; se falhar de novo, usa `TutorReply.IsRawFallback = true` (RN-BRAIN04).
+3. Monta o `BrainRequest`: system prompt (`tutor.md`, via `ITutorPromptSource`; a instrução de formato do provedor é anexada pelo adaptador, ADR-002) + resumo dos erros recorrentes + últimos N turnos (`Conversation:MaxTurnsInWindow`; o professor entra com o `RawText` da resposta) + mensagem atual.
+4. Chama `ITutorBrain.SendAsync`. O cérebro devolve um `TutorReply` já validado pelo parser. Se o parser rejeitar, o adaptador lança `BrainException.InvalidOutput(rejection, rawText)` (ADR-005, ADR-006).
+5. Em `InvalidOutput`, o serviço faz **uma** nova tentativa: as mesmas mensagens + a resposta rejeitada (`Assistant`) + a instrução de correção com `TutorReplyRejection.Message` (`User`). Se falhar de novo, usa `TutorReply.RawFallback` (`IsRawFallback = true`, sem feedback) (RN-BRAIN04). A tentativa rejeitada e a correção não entram no histórico (ADR-006).
 6. Envia **apenas** `Reply` ao TTS (RN-TTS01); o feedback vai só para a tela.
 7. Persiste o turno e atualiza erros recorrentes / palavras de baixa confiança.
 

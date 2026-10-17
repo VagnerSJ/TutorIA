@@ -91,6 +91,21 @@ public sealed class ChatSessionTests : IDisposable
             because: "the prompt is shown again after a blank line");
     }
 
+    // US-003 — Cenário: entrada vazia — RN-CONV05 (P1)
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public async Task RunAsync_WhenLineIsBlank_ShowsEmptyInputWarning(string line)
+    {
+        var sut = CreateSession(line, "/quit");
+
+        await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        CountOccurrences(_output.ToString(), ConversationMessages.EmptyInput).Should().Be(1);
+        _handler.Inputs.Should().BeEmpty();
+    }
+
     // US-001 — apoio: pipe sem /quit (D5/D11)
     [Fact]
     public async Task RunAsync_WhenInputEnds_ReturnsZero()

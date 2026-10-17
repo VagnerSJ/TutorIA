@@ -18,6 +18,7 @@ public sealed partial class CoreDependencyTests
     [
         "Microsoft.Extensions.Options",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
+        "Microsoft.Extensions.Logging.Abstractions",
     ];
 
     // Loaded by name so the test does not depend on any specific Core type (plan §2.10).

@@ -4,10 +4,8 @@
   </PropertyGroup>
   <ItemGroup Label="Core">
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.13" />
-  </ItemGroup>
-  <ItemGroup Label="Infrastructure">
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup Label="Console">
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />

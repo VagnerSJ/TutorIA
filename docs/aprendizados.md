@@ -210,3 +210,93 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** o commit sai com mensagem truncada ou falha, e o corpo/atribuição se perdem.
 - **Correção (proposta):** `.claude/agents/executor.md` (seção Git) e skill `padroes-codigo` (seção Git): "mensagem de commit com várias linhas ou aspas: `git commit -F -` com heredoc no Bash; não usar here-string do PowerShell 5.1".
 - **Status:** Proposta
+
+### AP-022 — Adiamento em cadeia sem dono na spec
+
+- **Data / US:** 2026-10-17 / US-003 (`plan-review.md`, Rodada 1 B1; Rodadas 2 e 3)
+- **Quem errou:** planejador
+- **O que aconteceu:** a US-001 adiou `/mode`, o aviso de linha em branco e `Conversation:MaxTurnsInWindow` para a US-003. A primeira versão do plano da US-003 entregou parte e adiou o resto para a US-004, cuja spec não citava nada disso (segundo adiamento sem dono). O Revisor do plano pegou como B1; o usuário escolheu registrar os itens na US-004 (4 cenários e D8 a D10), em commit anterior à T1.
+- **Por que importa:** item adiado sem registro na spec de destino se perde ou vira escopo implícito; é mudança de spec disfarçada.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md`: todo item da §8 que diz "fica para a US-YYY" é registrado na spec da US-YYY (cenário ou DoD extra) num commit `docs(ai)` anterior à T1, com o texto exato no plano; (b) checklist de revisão de plano (`.claude/agents/revisor.md` ou `checklist-revisao`): o Revisor confere a spec da US de destino.
+- **Status:** Proposta
+
+### AP-023 — Trecho de documento citado só pelo número da linha
+
+- **Data / US:** 2026-10-17 / US-003 (`plan-review.md`, Rodada 1 S1, ligado ao AP-005; `review.md` Rodada 2 S6)
+- **Quem errou:** planejador (plano) e executor (copiou linhas do Revisor sem conferir)
+- **O que aconteceu:** o plano citou a faixa "55–58" da skill `bdd-para-testes` para substituição, deslocada em uma linha; a correção foi citar o texto antigo exato. O espelho ocorreu na revisão de código: o Executor copiou para a §12 números de linha da Rodada 1 do Revisor que estavam uma linha acima do real (S6).
+- **Por que importa:** o número de linha envelhece a cada edição; quem aplica a mudança altera o trecho errado ou não o encontra.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md`, regra das alterações nos documentos-raiz: identificar o trecho pelo texto antigo (citação), com a linha só como apoio; (b) `checklist-revisao`, seção "Como escrever bloqueantes e sugestões": o Revisor identifica o trecho pelo símbolo (classe/método) além da linha; (c) `.claude/agents/executor.md`: conferir a linha no arquivo antes de copiá-la.
+- **Status:** Proposta
+
+### AP-024 — Cenário ou DoD escrito para outra US sem os critérios já fixados
+
+- **Data / US:** 2026-10-17 / US-003 (`plan-review.md`, Rodada 2 S9)
+- **Quem errou:** planejador
+- **O que aconteceu:** o cenário novo da US-004 "janela de turnos configurável" descrevia o encerramento por configuração inválida sem o código de saída, embora a US-001 já tivesse fixado o padrão (`ExitCodes.InvalidConfiguration`, diferente de 0). Corrigido a pedido do usuário.
+- **Por que importa:** o cenário escrito para outra US vira a spec dela; sem os critérios observáveis, o teste dessa US pode deixar de conferir o que o projeto já decidiu.
+- **Correção (proposta):** `.claude/agents/planejador.md`: ao escrever cenário ou DoD para outra US, reutilizar os critérios observáveis que o projeto já fixou para o mesmo tipo de comportamento (código de saída, texto da mensagem, canal de saída).
+- **Status:** Proposta
+
+### AP-025 — Nome abreviado de teste nas tarefas da §5
+
+- **Data / US:** 2026-10-17 / US-003 (`plan-review.md`, Rodada 2 S10)
+- **Quem errou:** planejador
+- **O que aconteceu:** as tarefas T7 e T8 citavam testes com prefixo omitido ou `...`, diferentes dos nomes da §4. O usuário pediu os nomes completos, idênticos aos da §4.
+- **Por que importa:** Executor e Revisor não conseguem conferir por busca textual se a tarefa e o mapa da §4 falam do mesmo teste.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md`: nas tarefas da §5, os testes aparecem com o nome completo idêntico ao da §4, sem prefixo omitido nem `...`; (b) checklist de revisão de plano, item "Consistência interna": "nomes de teste da §5 idênticos aos da §4".
+- **Status:** Proposta
+
+### AP-026 — Reforço do AP-017: valores distintos por turno e por campo
+
+- **Data / US:** 2026-10-17 / US-003 (`plan-review.md`, Rodada 1 S2)
+- **Quem errou:** planejador (o plano inicial mapeava testes de janela e histórico com respostas iguais em todos os turnos)
+- **O que aconteceu:** recorrência do AP-017. Em testes de janela e histórico, a asserção passa por coincidência se todo turno usa o mesmo texto, ou se a resposta rejeitada é igual à aceita. O plano passou a exigir `TutorReplies.Valid(label)` com `Reply`, `RawText` e `Correction` únicos por rótulo e `raw1` diferente da resposta que fica. A revisão de código confirmou que nenhuma asserção passou por coincidência.
+- **Por que importa:** é a segunda US em que o problema aparece no plano, e a regra do AP-017 continua só como proposta.
+- **Correção (proposta):** acrescentar ao texto já proposto no AP-017 (`.claude/skills/tdd-dotnet/SKILL.md`): "em testes de janela, histórico ou retentativa, cada turno tem aluno e professor com textos únicos, e a resposta rejeitada difere da aceita". Sem arquivo novo; aprovar junto com o AP-017.
+- **Status:** Proposta
+
+### AP-027 — AP-014 recorre pela terceira vez
+
+- **Data / US:** 2026-10-17 / US-003 (`review.md`, Rodada 1 S1 e Aprendizados; Rodada 2)
+- **Quem errou:** executor
+- **O que aconteceu:** as escolhas de forma E1 a E7 (nomes `ReplyRejectedRetrying`/`ReplyRejectedAgainUsingRawFallback`, guardas `ArgumentNullException`, `paramName: "kind"`, mensagem do `FakeTutorBrain` sem resposta) foram decididas no Red/Green e registradas na §12 só no commit de evidências (3156357), depois de todos os `feat`. O Executor reconheceu o desvio em E5. A regra do AP-014 (em `executor.md` e no `checklist-revisao` §1 como item não obrigatório) não bastou. Na rodada de correção (S2/S3), com o escopo definido no pedido do usuário, o registro saiu antes do código (3a09c34): a etapa funciona quando há ponto de parada.
+- **Por que importa:** a intenção chega ao documento depois do código (hábito 4); o usuário só aceita os desvios depois de implementados.
+- **Correção (proposta):** (a) `.claude/agents/executor.md` e o modelo da §5 do `.claude/agents/planejador.md`: cada tarefa fecha com a linha "Escolhas de forma: nenhuma | §12 em `<hash>`", preenchida antes do commit `feat`; (b) `.claude/skills/checklist-revisao/SKILL.md` §1: promover o item do AP-014 a [O] quando a escolha muda texto exibido, mensagem de exceção ou nome público; nos demais casos continua sugestão.
+- **Status:** Proposta
+
+### AP-028 — Igualdade de `record` com coleção compara por referência
+
+- **Data / US:** 2026-10-17 / US-003 (Executor E3, `c5cbc1a`; `review.md` Rodada 1)
+- **Quem errou:** executor (descobriu pelo teste vermelho)
+- **O que aconteceu:** `Add_WhenMoreTurnsThanMax_KeepsMostRecentInOrder` comparava `ConversationTurn` inteiros com `Equal`. Um `record` com membro `IReadOnlyList<T>` (aqui `Corrections`) compara a lista por referência, e cada `TutorReplies.Valid` cria uma lista nova; o teste falhava com a janela correta. Passou a comparar a sequência de `StudentMessage`.
+- **Por que importa:** o Red vira falso e custa uma volta; vale para qualquer teste sobre `TutorReply`, `ConversationTurn` e outros DTOs com coleção.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, seção Organização: "para comparar records com coleções, compare uma projeção (ex.: chave) ou use `BeEquivalentTo`; não use `Equal` sobre o record inteiro".
+- **Status:** Proposta
+
+### AP-029 — Mutação de Red que não compila (CA1805)
+
+- **Data / US:** 2026-10-17 / US-003 (Executor E1, T4; `review.md` Rodada 1)
+- **Quem errou:** planejador (prescreveu a mutação `= 0`) e executor (adaptou)
+- **O que aconteceu:** para provar que o teste de caracterização do padrão 10 discrimina, o plano pediu a mutação temporária `= 0`, que não compila (CA1805: inicialização explícita com o valor padrão). O Executor removeu o inicializador, que dá o mesmo valor 0, e registrou a falha obtida.
+- **Por que importa:** com `TreatWarningsAsErrors`, mutações "óbvias" podem ser barradas por analisadores; sem regra, o Executor perde tempo ou desiste da prova de Red. Complementa o AP-017.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, junto do AP-017: "a mutação temporária pode ser qualquer forma equivalente que compile (ex.: remover o inicializador), registrada na tarefa com a falha obtida".
+- **Status:** Proposta
+
+### AP-030 — Ponto único de aplicação da §2.6 virou dois commits
+
+- **Data / US:** 2026-10-17 / US-003 (`review.md` Rodada 1; `plan.md` §12)
+- **Quem errou:** planejador e fluxo do `/us` (instruções divergentes)
+- **O que aconteceu:** o plano e a pré-condição da §5 prometiam um único commit `docs(ai): update architecture and spec for US-003`. O orquestrador, seguindo o fluxo do `/us`, usou dois: `4b82f0a` (spec) e `f522128` (arquitetura e skill). Não houve dano, mas plano e fluxo dizem coisas diferentes.
+- **Por que importa:** quando o plano promete algo que o fluxo não faz, o Revisor pode apontar falso desvio.
+- **Correção (proposta):** alinhar `.claude/agents/planejador.md` ao fluxo do `/us`: o plano prevê dois commits (`docs(ai): update spec for US-XXX` e `docs(ai): update architecture for US-XXX`) antes da T1, em vez de um único. Alternativa: mudar o `/us` para um commit só; a escolha cabe ao usuário.
+- **Status:** Proposta
+
+### AP-031 — Contagens atualizadas só no cabeçalho do plano
+
+- **Data / US:** 2026-10-17 / US-003 (`review.md` Rodada 2, S4 e S5)
+- **Quem errou:** executor
+- **O que aconteceu:** depois do review S3 (+2 métodos, +3 casos), o Executor atualizou o cabeçalho da §4 e a DoD (D2/D5), mas não o detalhamento por classe: ele ainda dizia `Core.Tests: 34 métodos / 48 casos` e `BrainExceptionTests: 2 / 2`, sem `TutorReplyTests`, e a frase da suíte total misturava 148 e 151. Os números finais são 151 casos (Core 102, Console 25, Infrastructure 24). Também ficaram T12 e T13 marcadas `[x]` sem o "feito: `<hash>`" que T1 a T11 têm (S5).
+- **Por que importa:** quem lê o detalhamento (o Documentador, o próximo Planejador) copia o número antigo.
+- **Correção (proposta):** `.claude/agents/executor.md`, etapa de evidências: "mudou uma contagem → atualize o cabeçalho, o detalhamento por classe da §4 e D2/D5/D8, e confira se a soma bate"; e "tarefa marcada `[x]` leva o hash na própria linha".
+- **Status:** Proposta
