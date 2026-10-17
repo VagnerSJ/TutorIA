@@ -438,3 +438,12 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 - **Fixture `tags-labeled-lines.txt`**: reply `I take the train every morning. How do you get to work?`, com pronúncia, vocabulário e elogio nos textos conferidos em `Parse_WhenTagsHaveLabeledFeedbackLines_MapsPronunciationVocabularyAndPraise`. Criada em `d5694e5`.
 - **Desvio de processo (AP-009)**: essas escolhas foram registradas aqui depois dos commits `feat`, e não num commit `docs(ai)` anterior a eles. Nenhuma muda comportamento descrito na spec nem na §2; todas são detalhes que o plano deixava em aberto.
 - Contagens sem alteração: 31 métodos / 44 casos novos; D2 = 93 casos.
+
+### 2026-10-17 — pedido do usuário (no chat, após a revisão de código, rodada 1 de `review.md`)
+
+- Desvios do Executor registrados acima (escolhas de forma após os `feat`, AP-009) **aceitos**.
+- Aplicar as sugestões da revisão de código (`review.md`, Rodada 1):
+  - **S1** — os testes `Parse_WhenJsonIsMalformed_RejectsWithInvalidJson` e `Parse_WhenJsonHasTrailingText_RejectsWithInvalidJson` devem conferir um trecho que só o catálogo `TutorReplyRejections` produz (a forma do objeto JSON esperado), e falhar se a mensagem trouxer só o texto da `JsonException`.
+  - **S3** — fixar por teste (Core) o corte do reply em 80 caracteres + `...` na mensagem `reply must end with a question` e a ausência de `..` antes de `Expected` quando o detalhe da `JsonException` termina em `.`.
+  - **S4** — alinhar código ao plano (§2.1, regra 6): o `TutorReplyValidator` **preserva** `IsRawFallback` e `RawText` recebidos, com teste que fixa isso.
+- S2 (aceito acima) e S5 não serão aplicadas.
