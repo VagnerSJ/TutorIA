@@ -573,3 +573,9 @@ Nenhum desvio de comportamento, de arquitetura nem de contagem (148 casos; `Conv
 - **E5 — Nomes que o plano não fixava** (decididos no Red da T7, `f75cc4b`; este registro veio depois do `feat`, ver "Possível aprendizado" no relatório): métodos `ConversationLog.ReplyRejectedRetrying` (3000) e `ConversationLog.ReplyRejectedAgainUsingRawFallback` (3001); métodos privados do refactor `AskWithFormatRetryAsync` e `CreateRequest` (`3206913`); `ArgumentException` da guarda de `BrainException` com `paramName: "kind"`; `BrainException.InvalidOutput` e `TutorReply.RawFallback` com `ArgumentNullException` para argumentos nulos; o `FakeTutorBrain` sem resposta na fila lança `InvalidOperationException` com mensagem que diz o que falta.
 - **E6 — Esqueleto da T7.** Para não gerar CS9113 (parâmetro do construtor primário não lido), o `SendAsync` do esqueleto citava os campos na mensagem da `NotImplementedException`. Isso foi substituído no Green (`24106f2`).
 - **E7 — `Directory.Packages.props`.** Com a mudança da T1, o `ItemGroup Label="Infrastructure"` ficou vazio e foi removido.
+
+### 2026-10-17 — usuário (sugestões da revisão de código)
+
+Aplicar as sugestões S2 e S3 de `tasks/US-003/review.md` (Rodada 1) antes da documentação:
+- **S2** — `ConversationService.cs:18`: usar uma forma só para as dependências da classe (sem o campo `_logger` que só copia o parâmetro do construtor primário).
+- **S3** — guardas de nulo fora do plano: um teste por guarda do contrato público (no mínimo `BrainException.InvalidOutput` e `TutorReply.RawFallback`); as guardas que ficarem sem teste são registradas aqui como defensivas.
