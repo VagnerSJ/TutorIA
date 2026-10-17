@@ -191,6 +191,8 @@ Alternativas descartadas (detalhes no ADR-004):
 | (apoio: texto livre não é comando) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenUserTypesText_ForwardsItToInputHandler` | Componente |
 | (apoio: linha em branco não vai ao cérebro, RN-CONV05) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenLineIsBlank_IgnoresItAndForwardsNothing` (`[Theory]`: `""`, `"   "`, `"\t"`) | Componente |
 | (apoio: pipe sem `/quit`, D5/D11) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenInputEnds_ReturnsZero` | Componente |
+| (apoio: BOM da entrada redirecionada, P12, D5) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado) | Componente |
+| (apoio: só a primeira linha perde o BOM, P12) | Console.Tests | `ChatSessionTests` | `RunAsync_WhenLaterLineStartsWithByteOrderMark_ForwardsItUnchanged` (`"hello"`, `"﻿/quit"` → os dois encaminhados sem alteração) | Componente |
 | (apoio: implementação provisória sem cérebro, D11) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenUserTypesText_ShowsTutorNotConnected` (entrada `"hello"`) | Componente |
 | (apoio: erro inesperado, P8) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter` na saída; código 1, mensagem curta em `Error`, evento `UnexpectedError` no arquivo) | Componente |
 | (apoio: Ctrl+C encerra limpo, P8 e ARCHITECTURE §9) | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` (`PendingTextReader`; cancela o `ct` depois que a leitura começou) | Componente |
@@ -198,9 +200,9 @@ Alternativas descartadas (detalhes no ADR-004):
 | logs estruturados | Console.Tests | `EnglishTutorAppTests` | `RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile` | Componente (arquivo em pasta temporária) |
 | integração contínua (opcional) | — | — | DoD D10 (inspeção do `ci.yml`) + primeira execução no GitHub após push feito pelo usuário | Verificação manual registrada no review |
 
-Total previsto: **31 métodos de teste** — 16 no Core.Tests e 15 no Console.Tests. Seis são `[Theory]` (19 casos de dados) e 25 são `[Fact]`, totalizando **44 casos executados** (Core.Tests: 11 `[Fact]` + 16 casos = 27; Console.Tests: 14 `[Fact]` + 3 casos = 17).
+Total previsto: **33 métodos de teste** — 16 no Core.Tests e 17 no Console.Tests. Seis são `[Theory]` (19 casos de dados) e 27 são `[Fact]`, totalizando **46 casos executados** (Core.Tests: 11 `[Fact]` + 16 casos = 27; Console.Tests: 16 `[Fact]` + 3 casos = 19). Os 2 métodos de P12 entraram depois da primeira DoD (388afee).
 
-Conferência por classe: `CoreDependencyTests` 3, `BuildSettingsTests` 1, `BrainProvidersTests` 2 (7 casos), `BrainOptionsValidatorTests` 3 (1 Theory com 3 casos), `CoreServiceCollectionExtensionsTests` 1, `TutorModeTests` 1, `LocalCommandParserTests` 5 (2 Theory com 3 + 3 casos); `ChatSessionTests` 7 (1 Theory com 3 casos), `EnglishTutorAppTests` 8.
+Conferência por classe: `CoreDependencyTests` 3, `BuildSettingsTests` 1, `BrainProvidersTests` 2 (7 casos), `BrainOptionsValidatorTests` 3 (1 Theory com 3 casos), `CoreServiceCollectionExtensionsTests` 1, `TutorModeTests` 1, `LocalCommandParserTests` 5 (2 Theory com 3 + 3 casos); `ChatSessionTests` 9 (1 Theory com 3 casos), `EnglishTutorAppTests` 8.
 
 ## 5. Tarefas (ordem de execução TDD)
 
@@ -223,7 +225,7 @@ Pré-condição do Executor: `dotnet --list-sdks` mostra um SDK 10.0.x. Satisfei
 - [x] T10 — Red: `RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile` (lê o arquivo CLEF, faz parse JSON por linha e procura `EventId.Name` = `ApplicationStarted` com `Provider`/`Mode` e `ApplicationStopped` com `ExitCode`). Green: Serilog (`ReadFrom.Configuration`, sink de arquivo, `CompactJsonFormatter`), `AppLog` (1000–1002), `TimeProvider` para `ElapsedMs`. (commits: `test(console): structured start and stop log events` + `feat(console): add serilog file logging`)
 - [x] T11 — Red: `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter`) e `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` (`PendingTextReader`; o teste espera o sinal de leitura iniciada e então cancela o `CancellationTokenSource` passado a `RunAsync`). Ambos falham antes: a exceção e o `OperationCanceledException` escapam de `RunAsync`. Green: token da sessão ligado a `ApplicationStopping`, `catch (OperationCanceledException) when (...IsCancellationRequested)` → 0, `catch` genérico → log `UnexpectedError` (1003) + mensagem curta + `ExitCodes.UnexpectedError`, `ApplicationStopped` em `finally`. (commits: `test(console): unexpected error and cancellation exit codes` + `feat(console): handle cancellation and unexpected errors on exit`)
 - [x] T12 — CI: `.github/workflows/ci.yml` (`ubuntu-latest`, `setup-dotnet@v4` com `global-json-file`, `dotnet --version`, build, testes sem LiveBrain com cobertura, ReportGenerator no step summary, upload do artefato). (commit: `ci(infra): add build and test workflow with coverage`)
-- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; **falta o D13 (usuário)**; D5 com ressalva (P12).
+- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; **falta o D13 (usuário)**. P12 implementado (388afee + e71b316); D1–D5, D11 e D12 refeitos.
 
 ## 6. Pacotes NuGet
 
@@ -284,7 +286,7 @@ P1–P9 foram respondidas em 2026-10-17 (ver "Respostas do usuário" abaixo). No
 - **P10 — `Microsoft.Extensions.Primitives` no Core** (S6). É dependência transitiva do `Microsoft.Extensions.Options` e pode aparecer em `GetReferencedAssemblies` se o Core usar tipos como `IChangeToken`. **Padrão proposto:** aceitar no teste de reflexão só como transitiva; proibir como `PackageReference` direto (teste do `.csproj` e D9); sem mudança na ARCHITECTURE §2, que trata de dependências diretas.
 - **P11 — Runner do CI** (S12). **Padrão proposto:** `ubuntu-latest` (mais rápido; nada específico de Windows nesta US). Rever quando entrar um adaptador só para Windows (ex.: TTS do sistema). Alternativa: `windows-latest`, igual à máquina de desenvolvimento.
 
-- **P12 — BOM no início da entrada redirecionada** (encontrada pelo Executor no D5, 2026-10-17). O Windows PowerShell 5.1 envia o BOM UTF-8 antes do texto em `"/quit" | dotnet run ...`. O `Console.In` entrega `"﻿/quit"`, `Trim()` não remove `U+FEFF` e o `/quit` vira texto livre: na US-001 mostra "not connected"; a partir da US-003/004, iria para o cérebro, violando RN-CONV06. **Proposta:** o `ChatSession` (UI, porque é um detalhe da entrada padrão) remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado). Alternativa: o `LocalCommandParser` ignora `U+FEFF` no `Trim` (regra no Core, vale para qualquer UI). O Executor não implementou: é comportamento fora do plano e aguarda decisão.
+- **P12 — BOM no início da entrada redirecionada** (encontrada pelo Executor no D5, 2026-10-17). O Windows PowerShell 5.1 envia o BOM UTF-8 antes do texto em `"/quit" | dotnet run ...`. O `Console.In` entrega `"﻿/quit"`, `Trim()` não remove `U+FEFF` e o `/quit` vira texto livre: na US-001 mostra "not connected"; a partir da US-003/004, iria para o cérebro, violando RN-CONV06. **Proposta:** o `ChatSession` (UI, porque é um detalhe da entrada padrão) remove um `U+FEFF` inicial **só da primeira linha** lida, com o teste `ChatSessionTests.RunAsync_WhenFirstLineStartsWithByteOrderMark_RecognizesCommand` (entrada `"﻿/quit"` → 0, nada encaminhado). Alternativa: o `LocalCommandParser` ignora `U+FEFF` no `Trim` (regra no Core, vale para qualquer UI). **Resolvido** (2026-10-17): proposta aprovada (ver "Respostas do usuário") e implementada em 388afee (teste) + e71b316 (correção); D5 refeito sem ressalva.
 
 Perguntas anteriores (respondidas):
 
@@ -305,7 +307,7 @@ Executar a partir da raiz do repositório, em PowerShell.
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes (31 métodos, 44 casos: 27 no Core.Tests e 17 no Console.Tests), em < 30 s, sem rede nem GPU |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes (33 métodos, 46 casos: 27 no Core.Tests e 19 no Console.Tests), em < 30 s, sem rede nem GPU |
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` (apagar `TestResults/` antes) | gera `coverage.cobertura.xml` para os dois projetos de teste |
 | D3b | `dotnet tool restore; dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | linha `EnglishTutor.Core` ≥ 80% |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
@@ -335,7 +337,23 @@ Decisão P12 (2026-10-17), no chat: aprovada a proposta — o `ChatSession` remo
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
 
-### DoD (2026-10-17, commit d21deae, PowerShell 5.1, SDK 10.0.402)
+### DoD após P12 (2026-10-17, commit e71b316, PowerShell 5.1.26100, SDK 10.0.402)
+
+P12 resolvido: 388afee `test(console): byte order mark on first input line (P12)` (Red: `Expected _handler.Inputs to be empty, but found at least one item {"﻿/quit"}`; o caso da linha posterior já passava, é guarda) + e71b316 `fix(console): strip byte order mark from first input line (P12)`. Itens não listados abaixo (D6–D10) não dependem da mudança e mantêm o resultado da rodada anterior.
+
+| # | Resultado | Status |
+|---|---|---|
+| D1 | `dotnet build` → `0 Aviso(s)`, `0 Erro(s)`, 2,1 s | ✅ |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` → Core.Tests 27 passed / 0 failed; Console.Tests 19 passed / 0 failed (46 casos, 33 métodos); ~0,4 s de execução, sem rede nem GPU | ✅ |
+| D3 | `TestResults/` e `coverage/` apagados antes; 2 `coverage.cobertura.xml`; 46 passed | ✅ |
+| D3b | ReportGenerator (TextSummary): `EnglishTutor.Core 100%`; `EnglishTutor.Console 92.9%` (`ChatSession` 100%); geral 94,5% (242/256 linhas) | ✅ |
+| D4 | `dotnet format --verify-no-changes` → saída vazia, exit 0 | ✅ |
+| D5 | `"/quit" \| dotnet run ...` (Windows PowerShell 5.1, com BOM) → cabeçalho `Brain: ClaudeCode \| Mode: free-conversation`, dicas `/help`/`/quit`, um único prompt `> `, **sem** `The tutor is not connected yet.`; `exit: 0`. Conferência extra: `"/quit","hello" \| dotnet run ...` → mesma saída, `hello` não é lido (encerrou pelo `/quit`, não pelo EOF) | ✅ |
+| D11 | `"hello" \| dotnet run ...` → `The tutor is not connected yet.`; `exit: 0` | ✅ |
+| D12 | `git status --short` vazio após D3–D5 e D11 | ✅ (repetir após D13) |
+| D13 | **Pendente do usuário** (manual, terminal interativo) | ⏳ |
+
+### DoD (2026-10-17, commit d21deae, PowerShell 5.1, SDK 10.0.402) — rodada anterior, antes de P12
 
 | # | Resultado | Status |
 |---|---|---|
