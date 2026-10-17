@@ -74,6 +74,7 @@ US: **$0** · Etapa pedida: **$1** (vazio = detectar automaticamente)
 
 - Mostre: commits da branch (`git log develop..HEAD --oneline`), resultado da revisão, documentos gerados.
 - **Pergunte** antes do merge: `git switch develop && git merge --no-ff feature/...`. Nunca faça push sem pedido explícito.
+- O destino da US é sempre `develop`. Nunca faça merge em `main` dentro do `/us`: `main` só recebe `develop` depois de testado, quando o usuário pedir.
 
 ## Regras
 

@@ -36,7 +36,7 @@ Toda funcionalidade é conduzida por `/us US-XXX`:
 - `EnglishTutor.Core` não referencia pacotes externos (só BCL, `Microsoft.Extensions.*.Abstractions` e `Microsoft.Extensions.Options`).
 - `CancellationToken` em todo método assíncrono público.
 - Commits convencionais com escopo: `feat(core):`, `feat(brain):`, `test(core):`, `docs(ai):`, `chore(infra):`.
-- Branches: `main` (estável) ← `develop` (integração) ← `feature/US-XXX_slug`.
+- Branches: `main` (só o que já foi testado) ← `develop` (tudo o que já foi desenvolvido) ← `feature/US-XXX_slug` (ex.: `feature/US-001_fundacao-solucao`), criada a partir de `develop`. US pronta → merge `--no-ff` da feature em `develop`. `develop` → `main` só quando o usuário pedir.
 - Código, nomes e mensagens de commit em inglês; documentação e specs em português.
 - Nunca commitar modelos, bancos SQLite, áudios ou `appsettings.*.local.json`.
 
