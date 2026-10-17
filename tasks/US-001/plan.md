@@ -232,7 +232,7 @@ Pré-condição do Executor: `dotnet --list-sdks` mostra um SDK 10.0.x. Satisfei
 - [x] T10 — Red: `RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile` (lê o arquivo CLEF, faz parse JSON por linha e procura `EventId.Name` = `ApplicationStarted` com `Provider`/`Mode` e `ApplicationStopped` com `ExitCode`). Green: Serilog (`ReadFrom.Configuration`, sink de arquivo, `CompactJsonFormatter`), `AppLog` (1000–1002), `TimeProvider` para `ElapsedMs`. (commits: `test(console): structured start and stop log events` + `feat(console): add serilog file logging`)
 - [x] T11 — Red: `RunAsync_WhenUnexpectedErrorOccurs_ReturnsOneAndLogsUnexpectedError` (`ThrowingTextWriter`) e `RunAsync_WhenCancelledWhileWaitingForInput_ReturnsZero` (`PendingTextReader`; o teste espera o sinal de leitura iniciada e então cancela o `CancellationTokenSource` passado a `RunAsync`). Ambos falham antes: a exceção e o `OperationCanceledException` escapam de `RunAsync`. Green: token da sessão ligado a `ApplicationStopping`, `catch (OperationCanceledException) when (...IsCancellationRequested)` → 0, `catch` genérico → log `UnexpectedError` (1003) + mensagem curta + `ExitCodes.UnexpectedError`, `ApplicationStopped` em `finally`. (commits: `test(console): unexpected error and cancellation exit codes` + `feat(console): handle cancellation and unexpected errors on exit`)
 - [x] T12 — CI: `.github/workflows/ci.yml` (`ubuntu-latest`, `setup-dotnet@v4` com `global-json-file`, `dotnet --version`, build, testes sem LiveBrain com cobertura, ReportGenerator no step summary, upload do artefato). (commit: `ci(infra): add build and test workflow with coverage`)
-- [ ] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; **falta o D13 (usuário)**. P12 implementado (388afee + e71b316); D1–D5, D11 e D12 refeitos. Após a T14, D1–D5, D11 e D12 refeitos de novo.
+- [x] T13 — DoD: rodar D1–D12, pedir ao usuário o D13 (Ctrl+C interativo) e registrar o resultado, colar tudo em §11 e marcar as tarefas. (commit: `docs(ai): add DoD evidence for US-001`) — D1–D12 rodados e registrados em §11; D13 executado pelo usuário e registrado em §11 (✅). P12 implementado (388afee + e71b316); D1–D5, D11 e D12 refeitos. Após a T14, D1–D5, D11 e D12 refeitos de novo.
 - [x] T14 — Sugestões S1–S4 da revisão de código (Rodada 1, `review.md`; pedido em §12). S1 (refactor, sem Red): escape `'\uFEFF'` / `"\uFEFF/quit"` no `ChatSession`, nos testes e nos documentos. S2–S4: Red com 3 testes novos em `EnglishTutorAppTests` (§4) + `CancellingTextWriter` e `ForeignCancellationTextReader`; Green em 3 commits `fix(console)`, um por item. (commits: 6d68c9e `refactor(console): use escape for byte order mark character (review S1)`, 9c35276 `docs(ai): replace literal byte order mark with escape in US-001 docs (review S1)`, 4303f24 `test(console): ... (review S2-S4)`, c173601 `fix(console): ... (review S2)`, 54778b9 `fix(console): ... (review S3)`, db60928 `fix(console): ... (review S4)`)
 
 ## 6. Pacotes NuGet
@@ -344,6 +344,15 @@ Decisão P12 (2026-10-17), no chat: aprovada a proposta — o `ChatSession` remo
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+### D13 e D12 final (2026-10-17, commit 888421a, executado pelo usuário no Windows PowerShell)
+
+| # | Resultado | Status |
+|---|---|---|
+| D13 | Executável aberto, prompt `> ` exibido, Ctrl+C pressionado: processo encerrou sem stack trace; `$LASTEXITCODE` = `0`; última linha do log: `{"@mt":"Application stopped with exit code {ExitCode} after {ElapsedMs} ms","ExitCode":0,"ElapsedMs":7088,"EventId":{"Id":1001,"Name":"ApplicationStopped"}}` (16:55:44Z). Exercita o caminho `ConsoleLifetime` → `ApplicationStopping` | ✅ |
+| D12 | `git status --short` vazio após o D13 | ✅ |
+
+Com isso, D1–D13 estão verdes (D10 por inspeção; a primeira execução do CI depende do push do usuário). Registrado pelo orquestrador a partir da saída colada pelo usuário no chat.
 
 ### DoD após T14 — review S1–S4 (2026-10-17, commit db60928, PowerShell 5.1.26100, SDK 10.0.402)
 
