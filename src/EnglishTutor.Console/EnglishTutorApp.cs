@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace EnglishTutor.Console;
 
@@ -26,43 +27,67 @@ public static class EnglishTutorApp
         var timeProvider = host.Services.GetRequiredService<TimeProvider>();
         var startedAt = timeProvider.GetTimestamp();
 
+        var exitCode = ExitCodes.UnexpectedError;
+        var hostStarted = false;
+        CancellationTokenSource? session = null;
         try
         {
             // Triggers ValidateOnStart: an invalid Brain:Provider fails here, before the session opens.
             await host.StartAsync(ct);
+            hostStarted = true;
+
+            // Ctrl+C reaches the session through ConsoleLifetime -> StopApplication() -> ApplicationStopping.
+            var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
+            session = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.ApplicationStopping);
+            exitCode = await RunSessionAsync(host.Services, options, logger, session.Token);
         }
         catch (OptionsValidationException exception)
         {
             logger.StartupFailed(string.Join(" ", exception.Failures));
             await WriteInvalidConfigurationAsync(options.Error, exception, ct);
-            var elapsedMs = ElapsedMs(timeProvider, startedAt);
-            logger.ApplicationStopped(ExitCodes.InvalidConfiguration, elapsedMs);
-            return ExitCodes.InvalidConfiguration;
+            exitCode = ExitCodes.InvalidConfiguration;
         }
-
-        try
+        catch (OperationCanceledException) when (ct.IsCancellationRequested || session is { IsCancellationRequested: true })
         {
-            var provider = CanonicalProvider(host.Services);
-            var mode = TutorMode.Default;
-            logger.ApplicationStarted(provider, mode.Name);
-
-            var session = new ChatSession(
-                options.Input,
-                options.Output,
-                new TutorNotConnectedInputHandler(options.Output),
-                provider,
-                mode);
-            var exitCode = await session.RunAsync(ct);
-
-            var elapsedMs = ElapsedMs(timeProvider, startedAt);
-            logger.ApplicationStopped(exitCode, elapsedMs);
-            return exitCode;
+            // Cancellation requested by the caller or by Ctrl+C is a clean exit; any other cancellation propagates.
+            exitCode = ExitCodes.Success;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.UnexpectedError(exception);
+            await options.Error.WriteLineAsync(ConsoleText.UnexpectedError.AsMemory(), CancellationToken.None);
+            exitCode = ExitCodes.UnexpectedError;
         }
         finally
         {
-            // Graceful stop even when the caller's token is already cancelled.
-            await host.StopAsync(CancellationToken.None);
+            session?.Dispose();
+            if (hostStarted)
+            {
+                // Graceful stop even when the caller's token is already cancelled.
+                await host.StopAsync(CancellationToken.None);
+            }
+
+            var elapsedMs = ElapsedMs(timeProvider, startedAt);
+            logger.ApplicationStopped(exitCode, elapsedMs);
         }
+
+        return exitCode;
+    }
+
+    private static Task<int> RunSessionAsync(
+        IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
+    {
+        var provider = CanonicalProvider(services);
+        var mode = TutorMode.Default;
+        logger.ApplicationStarted(provider, mode.Name);
+
+        var session = new ChatSession(
+            options.Input,
+            options.Output,
+            new TutorNotConnectedInputHandler(options.Output),
+            provider,
+            mode);
+        return session.RunAsync(ct);
     }
 
     private static IHost BuildHost(AppRunOptions options)

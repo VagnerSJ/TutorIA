@@ -18,4 +18,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1002, Level = LogLevel.Error,
         Message = "Startup failed because of invalid configuration: {Failures}")]
     public static partial void StartupFailed(this ILogger logger, string failures);
+
+    // Critical is written as Fatal by Serilog.
+    [LoggerMessage(EventId = 1003, Level = LogLevel.Critical,
+        Message = "Unexpected error; the application will exit")]
+    public static partial void UnexpectedError(this ILogger logger, Exception exception);
 }
