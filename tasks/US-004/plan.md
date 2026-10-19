@@ -1,13 +1,15 @@
 # Plano — US-004 Conversar por texto com o professor via Claude Code
 
-Status: Aprovado em 2026-10-17
+Status: Aguardando aprovação (revisão de 2026-10-19: RN-FEED01 alterada, §2.10 e T18–T22; a versão anterior foi aprovada em 2026-10-17)
 Branch: feature/US-004_conversa-texto-claude-code
 Spec: specs/sprints/SPRINT_1.md#us-004
-Regras: RN-BRAIN01, RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-CONV01, RN-CONV03, RN-CONV05, RN-CONV06, RN-FEED01–05 (RN-BRAIN07/09 só no limite descrito em §8); ARCHITECTURE §2 (R1–R4), §3, §5, §6.1, §6.3, §9, §10; ADR-001, ADR-002, ADR-004, ADR-005, ADR-006, ADR-007 (Aceito, novo)
+Regras: RN-BRAIN01, RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-CONV01, RN-CONV03, RN-CONV05, RN-CONV06, RN-FEED01 (alterada em 2026-10-19, §2.10), RN-FEED02–05 (RN-BRAIN07/09 só no limite descrito em §8); ARCHITECTURE §2 (R1–R4), §3, §5, §6.1, §6.2, §6.3, §9, §10; ADR-001, ADR-002 (texto revisado na §2.10), ADR-004, ADR-005 (texto revisado na §2.10), ADR-006, ADR-007 (Aceito, novo)
 
 ## 1. Objetivo
 
 Ligar o console ao `ConversationService` com o primeiro cérebro real, o `ClaudeCodeTutorBrain`: um processo `claude -p` isolado por turno, com histórico controlado pela aplicação, `--resume` como otimização, leitura da saída JSON pelo parser único e medição de latência JsonSchema × Tags. No console entram `/mode`, a exibição de reply + feedback e o bind de `Conversation:MaxTurnsInWindow`.
+
+Revisão de 2026-10-19: o validador do Core passa a exigir **exatamente uma** pergunta em qualquer posição do `reply` (RN-FEED01 alterada), com um separador de frases próprio do Core, só com BCL (§2.10).
 
 ## 2. Abordagem
 
@@ -375,9 +377,153 @@ São defensivas e ficam sem teste:
 - os `ArgumentNullException.ThrowIfNull` dos métodos públicos novos (`ClaudeCodeTutorBrain.SendAsync`, `ClaudeCodePromptRenderer.Render`, `FileTutorPromptSource` (construtor), `ConversationInputHandler` (construtor e `HandleAsync`), `ClaudeCodeOptionsValidator.Validate`, `AddEnglishTutorInfrastructure`);
 - a `ArgumentException` de `Render` com lista vazia;
 - a `InvalidOperationException` do adaptador quando `TryGetCanonical` falha para `OutputMode` (só acontece se o validador for contornado; o validador recusa o valor antes, com teste);
-- no `EnglishTutorApp`, a `AggregateException` com alguma interna que não é `OptionsValidationException` continuar como erro inesperado (o `ValidateOnStart` só junta `OptionsValidationException`; um validador que lançasse em vez de devolver `Fail` seria bug, e o caminho é o `catch (Exception)` já testado).
+- no `EnglishTutorApp`, a `AggregateException` com alguma interna que não é `OptionsValidationException` continuar como erro inesperado (o `ValidateOnStart` só junta `OptionsValidationException`; um validador que lançasse em vez de devolver `Fail` seria bug, e o caminho é o `catch (Exception)` já testado);
+- (revisão de 2026-10-19) os `ArgumentNullException.ThrowIfNull` de `ReplySentences.Split`, `ReplySentences.IsQuestion` e `TutorReplyRejections.ReplyMustAskExactlyOneQuestion`, e a `ArgumentOutOfRangeException` de `ReplyMustAskExactlyOneQuestion` com `questionCount` negativo ou igual a 1 (o único chamador, o `TutorReplyValidator`, só a chama com contagem diferente de 1, vinda de `Count`).
 
 Só o próprio código os chama, sempre com valores válidos. A US que criar outro chamador acrescenta o teste.
+
+### 2.10 Revisão de 2026-10-19 — RN-FEED01: exatamente uma pergunta (resolve o B1 de `review.md`)
+
+A spec já foi alterada no commit `ea8744d` (`docs(ai): update spec for US-004`): RN-FEED01 e o histórico em `specs/BUSINESS_RULES.md`; em `specs/sprints/SPRINT_1.md`, o cenário "reply sem pergunta" da US-002 (motivo `reply must ask the student exactly one question`), o cenário 1 da US-004 ("no máximo 3 frases e exatamente uma pergunta"), os cenários novos "pergunta seguida de incentivo é aceita" e "reply com duas perguntas é inválido" e o D6 da US-004. O critério do D5 ("5/5 no formato") não muda: passa a medir a regra nova.
+
+Notação: neste plano, caracteres fora do ASCII aparecem como `U+XXXX`; no código e nos testes, eles vão como escape C# (barra invertida + `u` + os 4 dígitos), como manda o `padroes-codigo` (AP-007).
+
+#### 2.10.1 Separador de frases no Core (`src/EnglishTutor.Core/Brain/ReplySentences.cs`)
+
+```csharp
+namespace EnglishTutor.Core.Brain;
+
+// Splits a tutor reply into sentences for RN-FEED01. BCL only (R1).
+public static class ReplySentences
+{
+    public static IReadOnlyList<string> Split(string text);
+    public static bool IsQuestion(string sentence);
+}
+```
+
+Fica no Core porque a regra de negócio (RN-FEED01) mora no `TutorReplyValidator` (ADR-005, R4). É `public` porque os testes `LiveBrain` da Infrastructure contam frases e perguntas com o mesmo separador (P18, P24), em vez de manter um regex próprio. Usa só `string`/`char` da BCL (a R1 proíbe pacotes de terceiros, não a BCL). A forma (laço sobre os caracteres ou `Regex` da BCL) é livre para o Executor, desde que o comportamento seja o da tabela de bordas da §4.
+
+Definições:
+
+- **Terminadores:** `.`, `!`, `?` e reticências U+2026.
+- **Fechos:** `"`, `'`, `)`, `]`, U+201D (aspas duplas de fecho) e U+2019 (aspas simples de fecho).
+- **Limite de frase (`Split`):** logo depois de uma sequência de um ou mais terminadores, seguida de zero ou mais fechos (que ficam na frase que termina), seguida de:
+  - (a) fim do texto; ou
+  - (b) um ou mais caracteres de espaço em branco (`char.IsWhiteSpace`, inclui `\n`) cujo próximo caractere não branco **não** é letra minúscula (`char.IsLower`).
+
+  Terminador seguido de caractere que não é branco nem fecho (ex.: `2.0`, `example.com?q=1`) não é limite. Terminador seguido de espaço e de letra minúscula (ex.: `"why not?" to`, `e.g. xUnit`, `Well... what`) não é limite.
+- Cada frase é o trecho entre limites, com `Trim()`; trechos vazios são descartados. Texto vazio ou só com espaços → lista vazia. O último trecho é uma frase mesmo sem terminador (ex.: `Tell me more`).
+- **Pergunta (`IsQuestion`, P21):** depois de `Trim()` e de remover os fechos do fim, a sequência final de terminadores contém `?`. Assim, `Really?!`, `Why?"` e `Why?` seguido de U+201D são perguntas; `He asked "why?" twice.` e `Tell me more` não são.
+
+Limites conhecidos (P22), aceitos: abreviação seguida de maiúscula (`Mr. Smith`) vira limite, mas isso só muda a contagem de frases, que o Core não valida (P18), e nunca a de perguntas; frase nova que começa com minúscula depois de `?` não é separada (duas perguntas assim contam como uma); pergunta citada seguida de maiúscula (`said "Really?" Then`) conta como pergunta.
+
+#### 2.10.2 Motivo e mensagem de rejeição (`TutorReplyRejections`)
+
+```csharp
+public const string ReplyMustAskExactlyOneQuestionReason = "reply must ask the student exactly one question";
+public static TutorReplyRejection ReplyMustAskExactlyOneQuestion(string reply, int questionCount);
+```
+
+Substituem `ReplyMustEndWithQuestionReason` e `ReplyMustEndWithQuestion(string)`, que saem no Refactor da T20 (não sobra chamador). A citação do reply continua cortada em 80 caracteres + `...` (US-002, review S3). Mensagem (P23), no formato do catálogo (`<Reason>: <o que está errado>. Expected <o que se espera>.`):
+
+| `questionCount` | Mensagem |
+|---|---|
+| 0 | `reply must ask the student exactly one question: the reply "<citado>" has no question. Expected 1 to 3 short sentences with exactly one question to the student (one sentence ending with "?", in any position); the other sentences are comments or encouragement.` |
+| ≥ 2 | `reply must ask the student exactly one question: the reply "<citado>" has <n> questions. Expected 1 to 3 short sentences with exactly one question to the student (one sentence ending with "?", in any position); the other sentences are comments or encouragement.` |
+
+A instrução da retentativa (RN-BRAIN04) não muda de código: `TurnMessageBuilder.BuildFormatCorrection` já embute `rejection.Message`, então passa a pedir "exatamente uma pergunta" sozinha. Nenhum teste do `ConversationService` confere o texto do motivo antigo (Grep por `must end with a question` em `tests/`: só `TutorReplyValidatorTests`, `TutorReplyRejectionsTests` e `TutorReplyParserTests`, tratados na T19 e na T20).
+
+#### 2.10.3 Validador (`TutorReplyValidator.Validate`)
+
+Ordem das regras, com a 2ª trocada:
+
+1. `reply` com `Trim()` vazio → `MissingReply()` (sem mudança).
+2. `questionCount = ReplySentences.Split(reply).Count(ReplySentences.IsQuestion)`; `questionCount != 1` → `ReplyMustAskExactlyOneQuestion(reply, questionCount)`.
+3. Correções, opcionais, `IsRawFallback` e `RawText`: sem mudança.
+
+A contagem de frases (1 a 3) continua fora do validador (P18).
+
+#### 2.10.4 Testes existentes que mudam (sem enfraquecer; a regra mudou)
+
+| Teste atual | Mudança | Tarefa |
+|---|---|---|
+| `TutorReplyValidatorTests.Validate_WhenReplyDoesNotEndWithQuestion_RejectsWithQuestionReason` (2 casos) | Renomeado para `Validate_WhenReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason`; motivo novo; mensagem contém `has no question`. O caso `"Is it good? I like that."` sai, porque passou a ser válido (o equivalente válido está em `Validate_WhenReplyAsksOneQuestionInAnyPosition_ReturnsValidReply`); entram `"Great job! Tell me more."` e `"Hmm... what a day."` (3 casos) | T20 |
+| `TutorReplyRejectionsTests.Rejection_ForEachReason_MessageStartsWithReasonAndStatesExpectation` | A linha de `ReplyMustEndWithQuestion` vira `ReplyMustAskExactlyOneQuestion("I like that.", 0)`, com o trecho esperado `the reply "I like that." has no question` (mesma contagem de casos) | T19 |
+| `TutorReplyRejectionsTests.ReplyMustEndWithQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis` | Renomeado para `ReplyMustAskExactlyOneQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis`; confere `the reply "<80 caracteres>..." has`; o comentário do teste deixa de citar o motivo antigo | T19 |
+| `TutorReplyRejectionsTests.ReplyMustEndWithQuestion_WhenReplyHas80Characters_QuotesItWhole` | Renomeado para `ReplyMustAskExactlyOneQuestion_WhenReplyHas80Characters_QuotesItWhole`; confere `the reply "<80 caracteres>" has` | T19 |
+| `TutorReplyParserTests.Parse_WhenJsonReplyHasNoFinalQuestion_RejectsWithQuestionReason` | Renomeado para `Parse_WhenJsonReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason`; motivo novo (fixture `json-reply-without-question.json` sem mudança) | T20 |
+| `TutorReplyParserTests.Parse_WhenTagsReplyHasNoFinalQuestion_RejectsWithQuestionReason` | Renomeado para `Parse_WhenTagsReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason`; motivo novo | T20 |
+| `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion` | Renomeado para `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion`; `EndWith("?")` e o regex `SentenceEnd` saem; `ReplySentences.Split(reply.Reply)` com no máximo 3 itens e exatamente 1 com `IsQuestion` | T21 |
+| `ClaudeCodeTutorBrainLiveTests.SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply` | Última asserção `reply2.Reply.Should().EndWith("?")` → exatamente uma pergunta (`ReplySentences`) | T21 |
+| `FixtureRecorderLiveTests.SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes` | `OnlyContain(reply => reply.EndsWith('?'))` → cada reply com exatamente uma pergunta | T21 |
+| `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` e `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedTagsOutput_ReturnsTutorReply` | `reply.Reply.Should().EndWith("?")` → exatamente uma pergunta. As fixtures não são regravadas: as duas têm uma pergunta, no fim | T21 |
+
+Os outros testes do validador, do parser, do `ConversationService` e do console seguem sem mudança: todos os replies válidos deles têm uma única pergunta (`Reply <label>?`, fixtures `json-valid.json`, `tags-valid.txt` etc.), e o rejeitado `"I like that."` continua rejeitado.
+
+#### 2.10.5 Prompts (tarefa do Executor, T22; commit `feat(brain)`, review S1)
+
+O reforço de `2cb0f7a` ("a pergunta é a última frase") passa a contradizer a regra. Texto novo, identificado pelo texto antigo (AP-023):
+
+- `prompts/tutor.md`, texto antigo:
+  `- End with exactly ONE question to keep the conversation going. The question is always the LAST sentence of the reply: nothing comes after it (no comment, invitation, or "Tell me more" sentence), and the reply ends with "?".`
+  Texto novo:
+  `- Ask exactly ONE question to keep the conversation going: exactly one sentence of the reply ends with "?". The question can come anywhere in the reply, and the other sentences are a short comment or encouragement (for example: "Was it busy in the morning? Tell me about your commute."). Never ask a second question, not even a short one like "Right?" or "And you?".`
+- `prompts/format.json.md`, texto antigo:
+  `- `reply`: the spoken part (string): 2–3 short sentences whose LAST sentence is the one question. The string ends with "?"; never add a sentence after the question.`
+  Texto novo:
+  `- `reply`: the spoken part (string): 2–3 short sentences with exactly one question (exactly one sentence ends with "?", in any position); the other sentences are comments or encouragement, never a second question.`
+- `prompts/format.tags.md`, texto antigo:
+  `The spoken part: 2–3 short sentences. The LAST sentence is the one question, and the text ends with "?"; never add a sentence after the question.`
+  Texto novo:
+  `The spoken part: 2–3 short sentences with exactly one question (exactly one sentence ends with "?", in any position); the other sentences are comments or encouragement, never a second question.`
+
+As demais linhas dos prompts não mudam (os modos `job-interview` e `listening-practice` já dizem "one question at a time").
+
+#### 2.10.6 Documentos (propostas; aplicadas pelo orquestrador depois da aprovação e antes da T18, em dois commits, AP-030)
+
+**`docs(ai): update spec for US-004`** (o `ea8744d` não alterou o `PRODUCT.md`, que ainda repete a regra antiga; P25):
+
+- `specs/PRODUCT.md`, linha do OA1, texto antigo:
+  `| OA1 | Conversação do dia a dia | Modo `free-conversation`: respostas curtas que sempre terminam em pergunta, mantendo o aluno falando |`
+  Texto novo:
+  `| OA1 | Conversação do dia a dia | Modo `free-conversation`: respostas curtas que sempre fazem exatamente uma pergunta, mantendo o aluno falando |`
+
+**`docs(ai): update architecture for US-004`:**
+
+- `ARCHITECTURE.md` §3, texto antigo:
+  `                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, FeedbackFormatter,`
+  Texto novo:
+  `                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,`
+- `ARCHITECTURE.md` §6.2, texto antigo:
+  `- As regras de conteúdo verificáveis (reply não vazio e terminando em `?`, no máximo 2 correções, correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.`
+  Texto novo:
+  `- As regras de conteúdo verificáveis (reply não vazio e com exatamente uma pergunta, isto é, uma única frase terminada em `?`, em qualquer posição, com as frases separadas por `ReplySentences`; no máximo 2 correções; correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.`
+- `docs/adr/ADR-002-contrato-saida-estruturada.md` (Proposto), item 1 da Decisão, texto antigo:
+  `     "reply": "string (1–3 frases, termina com '?')",`
+  Texto novo:
+  `     "reply": "string (1–3 frases, com exatamente uma pergunta, em qualquer posição)",`
+- ADR-002, item 5 da Decisão, texto antigo:
+  `5. Regras que o schema não garante (reply termina com pergunta, no máximo 2 correções) continuam validadas pelo parser, com a retentativa da RN-BRAIN04.`
+  Texto novo:
+  `5. Regras que o schema não garante (reply com exatamente uma pergunta, RN-FEED01; no máximo 2 correções) continuam validadas pelo parser, com a retentativa da RN-BRAIN04.`
+- `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md` (Aceito; a decisão de onde as regras moram não muda, só a lista de regras): depois da linha antiga `- **Data:** 2026-10-17`, acrescentar:
+  `- **Revisado:** 2026-10-19 (RN-FEED01 passou a "exatamente uma pergunta"; US-004)`
+- ADR-005, Contexto, texto antigo: `"Reply termina com pergunta" (RN-FEED01)`
+  Texto novo: `"Reply com exatamente uma pergunta" (RN-FEED01)`
+- ADR-005, item 1 da Decisão, texto antigo: `reply não vazio, reply terminando em `?`, no máximo 2 correções`
+  Texto novo: `reply não vazio, reply com exatamente uma pergunta (uma única frase terminada em `?`, em qualquer posição; as frases são separadas por `ReplySentences`, também no Core), no máximo 2 correções`
+- ADR-005, Consequências, texto antigo:
+  `- O que precisa ser medido ou revisitado: se o `eval` (US-009) mostrar muitas rejeições por "reply must end with a question", rever a rigidez da regra (ex.: aceitar `?"` ou `?)` no fim).`
+  Texto novo:
+  `- O que precisa ser medido ou revisitado: se o `eval` (US-009) mostrar muitas rejeições por "reply must ask the student exactly one question", rever a regra ou o separador de frases (`ReplySentences`; limites conhecidos em `tasks/US-004/plan.md` §9 P22).`
+- `docs/us/US-002.md` (resumo da US-002, que repete a regra antiga), texto antigo:
+  `reply que não termina em `?` rejeita (`reply must end with a question`);`
+  Texto novo:
+  `reply sem exatamente uma pergunta rejeita (`reply must ask the student exactly one question`; regra alterada em 2026-10-19 pela US-004);`
+
+**Repetições em `CLAUDE.md` e skills** (Grep por `pergunta|question|termina em|terminando` em `CLAUDE.md` e `.claude/**`): nenhuma linha repete a RN-FEED01 nem a §6.2. **Sem alteração.**
+
+Nenhum ADR novo: a decisão técnica (separador no Core, regra de limite) é pequena e fica registrada no ADR-005 revisado e nas P20–P22.
 
 ### Alternativas descartadas
 
@@ -390,17 +536,25 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 - Comando `measure-latency` no console: o `AddCommandLine` atual trataria o argumento como configuração. O teste `LiveBrain` de medição basta para a D7, e a US-009 cria o comando `eval` (P15).
 - `ITutorBrain` "não conectado" para Ollama: provisório descartável. O handler não conectado já existe (P7).
 - Gravar fixtures à mão no PowerShell: o JSON Schema na linha de comando do PowerShell 5.1 quebra as aspas. O teste gravador (`LiveBrain`) usa o mesmo adaptador (P16).
+- (2026-10-19) Contar os `?` do texto inteiro: um `"why not?"` citado no meio da frase contaria como pergunta; a regra fala em frases (P20).
+- (2026-10-19) Separador com lista de abreviações (`Mr.`, `e.g.`): mais código para um efeito que não muda a contagem de perguntas (P22).
+- (2026-10-19) Pacote de tokenização de frases: viola a R1.
+- (2026-10-19) Considerar pergunta só a frase cujo último caractere é `?`: `Really?! What happened next?` passaria como uma pergunta (P21).
 
 ## 3. Arquivos afetados
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
 | Criar | `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` | Decisão (Aceito em 2026-10-17), criada junto com este plano; itens 3 e 5 e "Consequências" revisados na rodada 1; item 5 e contagem de turnos em "Consequências" revisados na rodada 2 |
-| Alterar | `ARCHITECTURE.md` | §3, §5, §6.3 (texto em §2.8), pelo orquestrador antes da T1 |
+| Alterar | `ARCHITECTURE.md` | §3, §5, §6.3 (texto em §2.8), pelo orquestrador antes da T1; §3 e §6.2 (texto em §2.10.6), pelo orquestrador antes da T18 |
 | Alterar | `.claude/skills/padroes-codigo/SKILL.md` | 2 linhas de "DI e configuração" (§2.8), pelo orquestrador antes da T1 |
 | Alterar | `.claude/skills/tdd-dotnet/SKILL.md` | Caminho da fixture (§2.8), pelo orquestrador antes da T1 |
-| Alterar | `specs/sprints/SPRINT_1.md` | Cenário "falha do cérebro no console não encerra a sessão" e D7 na US-005; cenário "console conversa com o Ollama" na US-006 (§2.8), pelo orquestrador antes da T1 |
-| Alterar | `docs/adr/ADR-002-contrato-saida-estruturada.md` | Tabela de latência JsonSchema × Tags (D7), pelo Executor na T11 | — alterado em 2fd8419 (seção "Medição (US-004)")
+| Alterar | `specs/sprints/SPRINT_1.md` | Cenário "falha do cérebro no console não encerra a sessão" e D7 na US-005; cenário "console conversa com o Ollama" na US-006 (§2.8), pelo orquestrador antes da T1. RN-FEED01: US-002 "reply sem pergunta", US-004 cenário 1, dois cenários novos e D6 — já alterado em `ea8744d` |
+| Alterar | `specs/BUSINESS_RULES.md` | RN-FEED01 + histórico — já alterado em `ea8744d` |
+| Alterar | `specs/PRODUCT.md` | OA1 (§2.10.6), pelo orquestrador antes da T18 |
+| Alterar | `docs/adr/ADR-002-contrato-saida-estruturada.md` | Tabela de latência JsonSchema × Tags (D7), pelo Executor na T11 — alterado em 2fd8419 (seção "Medição (US-004)"); itens 1 e 5 da Decisão (§2.10.6), pelo orquestrador antes da T18 |
+| Alterar | `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md` | "Revisado", Contexto, item 1 e Consequências (§2.10.6), pelo orquestrador antes da T18 |
+| Alterar | `docs/us/US-002.md` | Regra do validador (§2.10.6), pelo orquestrador antes da T18 |
 | Alterar | `src/EnglishTutor.Console/EnglishTutor.Console.csproj` | Cópia de `prompts/**` para a saída |
 | Alterar | `tests/EnglishTutor.Infrastructure.Tests/EnglishTutor.Infrastructure.Tests.csproj` | Cópia de `prompts/**`; `PackageReference` a `Microsoft.Extensions.DependencyInjection` |
 | Alterar | `src/EnglishTutor.Infrastructure/EnglishTutor.Infrastructure.csproj` | `PackageReference` a `Microsoft.Extensions.Options` e `Microsoft.Extensions.DependencyInjection.Abstractions` |
@@ -419,6 +573,9 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 | Criar | `src/EnglishTutor.Infrastructure/DependencyInjection/InfrastructureServiceCollectionExtensions.cs` | `AddEnglishTutorInfrastructure(promptsDirectory)` |
 | Alterar | `src/EnglishTutor.Core/DependencyInjection/CoreServiceCollectionExtensions.cs` | Registrar `ConversationService` |
 | Alterar | `src/EnglishTutor.Core/Conversation/LocalCommands.cs` | `/mode` em `Available` |
+| Criar | `src/EnglishTutor.Core/Brain/ReplySentences.cs` | (2026-10-19) Separador de frases e detecção de pergunta (§2.10.1) |
+| Alterar | `src/EnglishTutor.Core/Brain/TutorReplyRejections.cs` | (2026-10-19) Motivo e mensagem `reply must ask the student exactly one question`; saem o motivo e a fábrica antigos (§2.10.2) |
+| Alterar | `src/EnglishTutor.Core/Brain/TutorReplyValidator.cs` | (2026-10-19) Regra de exatamente uma pergunta (§2.10.3) |
 | Alterar | `src/EnglishTutor.Console/Ui/IChatInputHandler.cs` | `Mode` e `ChangeMode` |
 | Alterar | `src/EnglishTutor.Console/Ui/TutorNotConnectedInputHandler.cs` | Modo local; uso só com Ollama |
 | Criar | `src/EnglishTutor.Console/Ui/ConversationInputHandler.cs` | Delegação ao `ConversationService` + exibição |
@@ -428,15 +585,16 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 | Alterar | `src/EnglishTutor.Console/EnglishTutorApp.cs` | Infrastructure, binds, handler por provedor; configuração inválida em várias seções (P19) |
 | Alterar | `src/EnglishTutor.Console/Program.cs` | `OutputEncoding` UTF-8 sem BOM |
 | Alterar | `src/EnglishTutor.Console/appsettings.json` | `Brain:ClaudeCode` e `Conversation:MaxTurnsInWindow` |
+| Alterar | `prompts/tutor.md`, `prompts/format.json.md`, `prompts/format.tags.md` | Reforço de `2cb0f7a` (pergunta como última frase); (2026-10-19) texto da regra nova (§2.10.5), pelo Executor na T22 |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Fakes/FakeProcessRunner.cs` | Fila de `ProcessResult`; registra `Requests`, `Tokens`; callback `OnRun(ProcessRequest)` para inspecionar arquivos durante a execução |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/ClaudeOutputs.cs` | Monta stdout da CLI. Os três auxiliares produzem o **objeto de resultado** da CLI, no mesmo formato das fixtures gravadas, sempre com `"type": "result"` e com os campos que decidem a linha da §2.5 declarados (review S3 da rodada 2): `Structured(sessionId, replyJson)` → `"type": "result"`, `"subtype": "success"`, `"is_error": false`, `"session_id"`, `"result": ""`, `"structured_output": <replyJson>`; `Text(sessionId, resultText)` → `"type": "result"`, `"subtype": "success"`, `"is_error": false`, `"session_id"`, `"result": <resultText>`, sem `structured_output`; `Error(resultText, structuredReplyJson = null)` → `"type": "result"`, `"subtype": "error"`, `"is_error": true`, `"session_id": "s-error"`, `"result": <resultText>` e `structured_output` só quando informado. Mais `ValidReplyJson(label)` (`reply` = `Reply <label>?`, `praise` = `Praise <label>`) |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/ManualTimeProvider.cs` | `TimeProvider` com `Advance(TimeSpan)` |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/RecordingProcessRunner.cs` | (LiveBrain) envolve o `ProcessRunner` real e guarda requests/resultados |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LiveClaudeCode.cs` | (LiveBrain) monta o adaptador real com pasta temporária, `prompts/` da saída e `ENGLISHTUTOR_CLAUDE_PATH` (padrão `claude`); o system prompt dos requests é o conteúdo de `AppContext.BaseDirectory/prompts/tutor.md` (o mesmo que o app usa; review S9) |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LatencySummary.cs` | Média e p95 por posto mais próximo |
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/claude-json-structured.json` | Saída real, `OutputMode = JsonSchema`, frase "I have worked with C# since five years" | — criado em f3f153c (gravado sem as variáveis herdadas, §12 E3)
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/claude-json-tags.json` | Saída real, `OutputMode = Tags`, mesma frase | — criado em f3f153c (gravado sem as variáveis herdadas, §12 E3)
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/ClaudeCodeTutorBrainTests.cs` | Adaptador com fake de processo |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/claude-json-structured.json` | Saída real, `OutputMode = JsonSchema`, frase "I have worked with C# since five years" — criado em f3f153c (gravado sem as variáveis herdadas, §12 E3) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/claude-json-tags.json` | Saída real, `OutputMode = Tags`, mesma frase — criado em f3f153c (gravado sem as variáveis herdadas, §12 E3) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/ClaudeCodeTutorBrainTests.cs` | Adaptador com fake de processo; (2026-10-19) 2 asserções de pergunta na T21 |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/ClaudeCodePromptRendererTests.cs` | Formato do texto único |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/TutorReplySchemaTests.cs` | Schema canônico |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/ClaudeCodeOptionsTests.cs` | Padrões |
@@ -444,10 +602,14 @@ Só o próprio código os chama, sempre com valores válidos. A US que criar out
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/FileTutorPromptSourceTests.cs` | Leitura de `tutor.md` |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/DependencyInjection/InfrastructureServiceCollectionExtensionsTests.cs` | Registros |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LatencySummaryTests.cs` | p95 nos dois lados do posto |
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/ClaudeCodeTutorBrainLiveTests.cs` | `LiveBrain`: fumaça, cenário 1, retomada |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/ClaudeCodeTutorBrainLiveTests.cs` | `LiveBrain`: fumaça, cenário 1, retomada; (2026-10-19) regra de uma pergunta via `ReplySentences` na T21 |
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/LatencyMeasurementLiveTests.cs` | `LiveBrain`: medição D7 (nome sem "ClaudeCode", fora do filtro do D5) |
-| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/FixtureRecorderLiveTests.cs` | `LiveBrain`: grava as fixtures em `bin/.../recorded-fixtures/` (fora do filtro do D5) |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Brain/FixtureRecorderLiveTests.cs` | `LiveBrain`: grava as fixtures em `bin/.../recorded-fixtures/` (fora do filtro do D5); (2026-10-19) asserção de pergunta na T21 |
+| Alterar | `tests/EnglishTutor.Infrastructure.Tests/Brain/TutorReplyParserTests.cs` | (2026-10-19) 2 testes novos (cenários novos da US-004) e 2 renomeados (motivo novo), na T20 |
 | Alterar | `tests/EnglishTutor.Core.Tests/DependencyInjection/CoreServiceCollectionExtensionsTests.cs` | `ConversationService` registrado |
+| Criar | `tests/EnglishTutor.Core.Tests/Brain/ReplySentencesTests.cs` | (2026-10-19) Bordas do separador (T18) |
+| Alterar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyRejectionsTests.cs` | (2026-10-19) Mensagem nova, 2 renomeados e 1 novo (T19) |
+| Alterar | `tests/EnglishTutor.Core.Tests/Brain/TutorReplyValidatorTests.cs` | (2026-10-19) 2 testes novos e 1 renomeado (T20) |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/ScriptedTutorBrain.cs` | `ITutorBrain` com fila (`Returns`, `Throws`) e `Requests`; sem resposta na fila lança `InvalidOperationException` (nenhum teste do console chama o processo real) |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/FixedTutorPromptSource.cs` | System prompt fixo |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/ConsoleTutorReplies.cs` | `Valid(label)`: `Reply <label>?`, `raw answer <label>`, `Correction("orig <label>", "fixed <label>", "why <label>")` (AP-026) |
@@ -473,9 +635,23 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 
 | Cenário | Projeto de teste | Classe | Método (Metodo_Cenario_Resultado) | Tipo |
 |---|---|---|---|---|
-| frase com erro gramatical | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion` (`"I have worked with C# since five years"` via `TurnMessageBuilder.Build(..., [], FreeConversation)`; `Reply` termina em `?`; no máximo 3 frases, contando terminadores `.`, `!`, `?` seguidos de espaço ou fim; alguma `Correction` com `Original` contendo `since five years` e `Corrected` contendo `for five years`, sem diferenciar maiúsculas) | LiveBrain |
+| frase com erro gramatical | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion` (renomeado na T21; antes `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion`. `"I have worked with C# since five years"` via `TurnMessageBuilder.Build(..., [], FreeConversation)`; `ReplySentences.Split(Reply)` com no máximo 3 itens e exatamente 1 com `ReplySentences.IsQuestion`; alguma `Correction` com `Original` contendo `since five years` e `Corrected` contendo `for five years`, sem diferenciar maiúsculas) | LiveBrain |
 | frase com erro gramatical (offline, com a saída gravada) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` (ver "leitura da saída gravada") | Unidade (caracterização) |
-| frase com erro gramatical (D5) | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat` (5 frases da tabela abaixo, cada uma num request de 1 mensagem; conta `InvalidOutput` como fora do formato; espera 5/5 no formato e ≥ 4 com `Corrected` contendo o trecho esperado, sem diferenciar maiúsculas) | LiveBrain |
+| frase com erro gramatical (D5) | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat` (5 frases da tabela abaixo, cada uma num request de 1 mensagem; conta `InvalidOutput` como fora do formato; espera 5/5 no formato e ≥ 4 com `Corrected` contendo o trecho esperado, sem diferenciar maiúsculas. Código sem mudança; a partir da T20, "no formato" usa a RN-FEED01 nova) | LiveBrain |
+| pergunta seguida de incentivo é aceita | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonReplyAsksQuestionThenEncourages_ReturnsReply` (`{"reply":"Was it busy in the morning? Tell me about your commute.","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}` → `IsValid`; `Reply` = `Was it busy in the morning? Tell me about your commute.`) | Unidade |
+| pergunta seguida de incentivo é aceita (regra no Core, bordas) | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyAsksOneQuestionInAnyPosition_ReturnsValidReply` (`[Theory]`, 4 casos, todos terminados em `.`: `"Was it busy in the morning? Tell me about your commute."`; `"Did you really say \"why not?\" to your boss? Tell me more."` (pergunta citada no meio); `"I met Mr. Smith there. Do you know him? He is nice."` (abreviação); `"Hmm... do you mean the bus? Tell me more."` (reticências); nos 4, `IsValid` e `Reply` = o texto) | Unidade |
+| pergunta seguida de incentivo é aceita (apoio, P20: separador) | Core.Tests | `ReplySentencesTests` | `Split_WithReplyText_ReturnsSentencesAtBoundaries` (`[Theory]`, 10 casos da tabela "Bordas do separador" abaixo) | Unidade |
+| pergunta seguida de incentivo é aceita (apoio, P20: texto vazio) | Core.Tests | `ReplySentencesTests` | `Split_WhenTextIsBlank_ReturnsNoSentences` (`[Theory]`: `""` e `" \n "` → lista vazia) | Unidade |
+| reply com duas perguntas é inválido | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonReplyAsksTwoQuestions_RejectsWithExactlyOneQuestionReason` (`{"reply":"Was it busy? How long was the trip?","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}` → inválido; `Reason` = `reply must ask the student exactly one question`; `Message` contém `has 2 questions`) | Unidade |
+| reply com duas perguntas é inválido (regra no Core, bordas) | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason` (`[Theory]`, 4 casos, todos terminados em `?`: `"Was it busy? How long was the trip?"`; `"Really?! What happened next?"` (P21); `"Your boss said \"Really?\" Then what did you say?"` (citação seguida de maiúscula, P22); `"Was it busy?\nHow long was the trip?"` (quebra de linha); nos 4, inválido, `Reason` = `reply must ask the student exactly one question` e `Message` contém `has 2 questions`) | Unidade |
+| reply com duas perguntas é inválido (apoio, P21: o que é pergunta) | Core.Tests | `ReplySentencesTests` | `IsQuestion_WithSentence_ReturnsWhetherItEndsWithQuestionMark` (`[Theory]`, 7 casos: `"How are you?"` → true; `"Really?!"` → true; `Why?` seguido de U+201D → true; `"He asked \"why?\" twice."` → false; `"Tell me more."` → false; `"Tell me more"` → false; `"Wow!"` → false) | Unidade |
+| reply sem pergunta (US-002, motivo novo) | Core.Tests | `TutorReplyValidatorTests` | `Validate_WhenReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` (renomeado na T20; antes `Validate_WhenReplyDoesNotEndWithQuestion_RejectsWithQuestionReason`. `[Theory]`: `"I like that."`, `"Great job! Tell me more."`, `"Hmm... what a day."`; inválido; `Reason` = `reply must ask the student exactly one question`; `Message` contém `"<reply>"` e `has no question`) | Unidade |
+| reply sem pergunta (US-002, motivo novo) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenJsonReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` (renomeado na T20; antes `Parse_WhenJsonReplyHasNoFinalQuestion_RejectsWithQuestionReason`; fixture `json-reply-without-question.json`; `Reason` = `reply must ask the student exactly one question`) | Unidade |
+| reply sem pergunta (US-002, mesma regra nos dois formatos) | Infrastructure.Tests | `TutorReplyParserTests` | `Parse_WhenTagsReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` (renomeado na T20; antes `Parse_WhenTagsReplyHasNoFinalQuestion_RejectsWithQuestionReason`; `<reply>I like that.</reply><feedback>- Praise: Nice sentence.</feedback>`; motivo novo) | Unidade |
+| reply sem pergunta (US-002 D6: mensagem) | Core.Tests | `TutorReplyRejectionsTests` | `Rejection_ForEachReason_MessageStartsWithReasonAndStatesExpectation` (linha alterada na T19: `ReplyMustAskExactlyOneQuestion("I like that.", 0)`, motivo novo, trecho `the reply "I like that." has no question`, `Expected `) | Unidade |
+| reply sem pergunta (apoio, AP-016: corte em 80) | Core.Tests | `TutorReplyRejectionsTests` | `ReplyMustAskExactlyOneQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis` (renomeado na T19; 81 caracteres → `the reply "<80>..." has`; não contém o reply inteiro) | Unidade |
+| reply sem pergunta (apoio, AP-016: corte em 80, outro lado) | Core.Tests | `TutorReplyRejectionsTests` | `ReplyMustAskExactlyOneQuestion_WhenReplyHas80Characters_QuotesItWhole` (renomeado na T19; 80 caracteres → `the reply "<80>" has`; sem `...`) | Unidade |
+| reply sem pergunta / duas perguntas (apoio, P23, AP-016: contagem) | Core.Tests | `TutorReplyRejectionsTests` | `ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound` (`[Theory]`: (`"I like that."`, 0) → contém `the reply "I like that." has no question`; (`"Was it busy? How long was the trip?"`, 2) → contém `has 2 questions` e não contém `no question`; (`"Why? When? Where?"`, 3) → contém `has 3 questions`; nos 3, `Expected 1 to 3 short sentences with exactly one question`) | Unidade |
 | processo isolado e sem ferramentas | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_Always_RunsIsolatedClaudeWithoutTools` (`FileName == "claude-under-test"`; `Arguments` contém `-p`; valor depois de `--output-format` = `json`; depois de `--tools` = `""` (string vazia); depois de `--disallowedTools` = `mcp__*`; contém `--strict-mcp-config`; depois de `--permission-mode` = `dontAsk`; depois de `--model` = `model-under-test`; contém `--system-prompt-file`; **não** contém `--bare`) | Unidade |
 | processo isolado e sem ferramentas | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty` (pasta configurada ainda inexistente; `OnRun` registra `Directory.Exists` = `true` e nenhuma entrada na pasta; `ProcessRequest.WorkingDirectory` = caminho completo dela) | Unidade |
 | processo isolado (apoio, AP-016: expansão de variável) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithEnvironmentVariableInWorkingDirectory_ExpandsIt` (variável de ambiente com nome único por teste, ex.: `ENGLISHTUTOR_TEST_<guid>` = pasta temporária, criada e removida no teste; `WorkingDirectory = "%ENGLISHTUTOR_TEST_<guid>%/brain"` → `ProcessRequest.WorkingDirectory` = `<temp>/brain` em caminho completo, sem `%`) | Unidade |
@@ -489,8 +665,8 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 | continuidade de sessão (apoio) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenUseResumeIsDisabled_SendsFullTranscriptWithoutResume` (`UseResume = false`; mesmos 2 turnos do teste de retomada; 2ª chamada sem `--resume` e stdin = texto renderizado das 3 mensagens) | Unidade |
 | continuidade de sessão (apoio, P1, ADR-007) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenRequestDoesNotExtendKnownSession_StartsNewSessionWithFullTranscript` (`[Theory]`, 5 casos: `"tutor-differs"`, 2º request com `Assistant("another raw answer")`; `"window-slid"`, depois de 2 turnos, 3º request sem o 1º turno; `"after-failure"`, 1ª chamada ok com `s-1`, 2ª falha com exit 1, 3ª repete o request da 2ª; `"system-prompt-changed"` (review S2), 2º request estende exatamente o 1º mas com `SystemPrompt = "SYSTEM PROMPT v2 for test"`; `"session-id-missing"` (review S5c), 1ª saída `Structured("", ValidReplyJson("t1"))` e 2º request que estende exatamente o 1º; em todos, a última chamada não tem `--resume` e o stdin é o texto renderizado) | Unidade |
 | continuidade de sessão (apoio, ADR-006 × ADR-007) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenRetryingRejectedAnswer_ResumesWithOnlyFormatCorrection` (1ª saída `Structured("s-1", {"reply":"I like that.",...})` → `BrainException` com `IsInvalidOutput`; 2º request = `[User(m1), Assistant(ex.RawText), User(TurnMessageBuilder.BuildFormatCorrection(ex.Rejection))]`; 2ª chamada: valor depois de `--resume` = `s-1`, stdin = a instrução de correção) | Unidade |
-| leitura da saída gravada | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` (stdout = `Fixtures/ClaudeCode/claude-json-structured.json`; `Reply` termina em `?`; `Corrections` tem um item com `Original` **contendo** `since five years` e `Corrected` **contendo** `for five years`, sem diferenciar maiúsculas, porque o texto real pode trazer a frase inteira (review S13); o 2º turno que estende o 1º tem, depois de `--resume`, o `session_id` lido da fixture com `JsonDocument` no próprio teste) | Unidade (caracterização) |
-| leitura da saída gravada (apoio, OutputMode Tags) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedTagsOutput_ReturnsTutorReply` (`OutputMode = Tags`; stdout = `claude-json-tags.json`; `Reply` termina em `?`; `RawText` = campo `result` da fixture) | Unidade (caracterização) |
+| leitura da saída gravada | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId` (stdout = `Fixtures/ClaudeCode/claude-json-structured.json`; `Reply` com exatamente uma pergunta (`ReplySentences`; até a T21, termina em `?`); `Corrections` tem um item com `Original` **contendo** `since five years` e `Corrected` **contendo** `for five years`, sem diferenciar maiúsculas, porque o texto real pode trazer a frase inteira (review S13); o 2º turno que estende o 1º tem, depois de `--resume`, o `session_id` lido da fixture com `JsonDocument` no próprio teste) | Unidade (caracterização) |
+| leitura da saída gravada (apoio, OutputMode Tags) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WithRecordedTagsOutput_ReturnsTutorReply` (`OutputMode = Tags`; stdout = `claude-json-tags.json`; `Reply` com exatamente uma pergunta (`ReplySentences`; até a T21, termina em `?`); `RawText` = campo `result` da fixture) | Unidade (caracterização) |
 | leitura da saída (apoio, ADR-006) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenAnswerIsOutOfFormat_ThrowsInvalidOutputWithRawText` (`Tags`; `Text("s-1", "Sure! Here is my answer without tags.")`; `BrainException` com `IsInvalidOutput`, `Rejection!.Reason == TutorReplyRejections.MissingReplyReason`, `RawText` = o texto) | Unidade |
 | leitura da saída (apoio, P5, AP-015/016: linha 1 da §2.5) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenClaudeReportsFailure_ThrowsUnknownWithDetail` (`[Theory]`: `"exit-code"` com exit 1, stdout vazio e stderr `"\n  boom stderr detail  \nsecond stderr line"` → `Message` contém `Claude Code failed (exit code 1): boom stderr detail` e não contém `second stderr line`; `"is-error"` com exit 1, stdout `Error("boom result detail")` e stderr `ignored stderr` → `Message` contém `Claude Code failed (exit code 1): boom result detail` e não contém `ignored stderr`; nos dois, `Kind == Unknown` e o arquivo temporário do system prompt, lido no `OnRun`, não existe depois da exceção (review S6)) | Unidade |
 | leitura da saída (apoio, P5, B3: linha 3 da §2.5, só ela satisfaz) | Infrastructure.Tests | `ClaudeCodeTutorBrainTests` | `SendAsync_WhenClaudeReportsErrorWithExitCodeZero_ThrowsUnknownWithoutParsing` (`[Theory]`, `OutputMode = JsonSchema`, exit **0**, stdout `Error(<result>, ValidReplyJson("t1"))` (um `structured_output` **válido**, para que ignorar `is_error` devolva uma resposta e o teste falhe): `"result-detail"`, `result` = `boom result detail` e stderr `ignored stderr` → `Message` contém `Claude Code reported an error: boom result detail` e não contém `ignored stderr`; `"blank-result-uses-stderr"` (review S5a), `result` = `"   "` e stderr `"\nfirst stderr t2\nsecond stderr t2"` → contém `Claude Code reported an error: first stderr t2` e não contém `second stderr t2`; `"no-details"` (review S5b), `result` = `""` e stderr `""` → contém `Claude Code reported an error: no error details were printed`; nos três, `Kind == Unknown`, `IsInvalidOutput == false` e não contém `Reply t1?`) | Unidade |
@@ -528,8 +704,8 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 | (apoio, P13) | Infrastructure.Tests | `InfrastructureServiceCollectionExtensionsTests` | `AddEnglishTutorInfrastructure_Always_RegistersClaudeCodeOptionsValidator` (`OutputMode = "Json"` → ler `IOptions<ClaudeCodeOptions>.Value` lança `OptionsValidationException` citando `'Json'`) | Unidade |
 | console conversa (apoio: DI do serviço) | Core.Tests | `CoreServiceCollectionExtensionsTests` | `AddEnglishTutorCore_WithBrainAndPromptSource_RegistersConversationServiceAsSingleton` (com `FakeTutorBrain`, `FakeTutorPromptSource` e `NullLogger<>`: duas resoluções devolvem a mesma instância) | Unidade |
 | continuidade de sessão (apoio, P1: `SessionHint`) | Core.Tests | `ConversationServiceTests` | `SendAsync_InJobInterviewMode_SendsStandardTurnMessageLast` (existente, sem mudança: confere `SessionHint` nulo) | Unidade (regressão) |
-| continuidade de sessão (apoio, LiveBrain) | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply` (`RecordingProcessRunner`; 2 turnos como no teste unitário de retomada; a 2ª chamada tem `--resume` com o `session_id` da 1ª; a 2ª resposta é válida) | LiveBrain |
-| leitura da saída gravada (gravação, P16) | Infrastructure.Tests | `FixtureRecorderLiveTests` | `SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes` (`RecordingProcessRunner`; a frase do cenário 1 em `JsonSchema` e em `Tags`; grava os stdouts em `AppContext.BaseDirectory/recorded-fixtures/claude-json-structured.json` e `claude-json-tags.json`; as duas respostas são válidas) | LiveBrain |
+| continuidade de sessão (apoio, LiveBrain) | Infrastructure.Tests | `ClaudeCodeTutorBrainLiveTests` | `SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply` (`RecordingProcessRunner`; 2 turnos como no teste unitário de retomada; a 2ª chamada tem `--resume` com o `session_id` da 1ª; a 2ª resposta é válida e tem exatamente uma pergunta (`ReplySentences`, a partir da T21)) | LiveBrain |
+| leitura da saída gravada (gravação, P16) | Infrastructure.Tests | `FixtureRecorderLiveTests` | `SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes` (`RecordingProcessRunner`; a frase do cenário 1 em `JsonSchema` e em `Tags`; grava os stdouts em `AppContext.BaseDirectory/recorded-fixtures/claude-json-structured.json` e `claude-json-tags.json`; as duas respostas são válidas e têm exatamente uma pergunta (`ReplySentences`, a partir da T21)) | LiveBrain |
 
 **Frases de fumaça e da medição** (D5, D7):
 
@@ -541,12 +717,28 @@ Nos testes do adaptador, a pasta de trabalho é uma pasta temporária única por
 | 4 | `I am working here since 2020` | `have been working` |
 | 5 | `We discussed about the new architecture` | `discussed the new architecture` |
 
+**Bordas do separador** (`ReplySentencesTests.Split_WithReplyText_ReturnsSentencesAtBoundaries`, P20, AP-016; caracteres fora do ASCII como escape no código, AP-007):
+
+| # | Entrada | Frases esperadas | Lado do limite conferido |
+|---|---|---|---|
+| 1 | `Was it busy in the morning? Tell me about your commute.` | `Was it busy in the morning?` · `Tell me about your commute.` | `?` + espaço + maiúscula → limite |
+| 2 | `Great job!\nWhat did you do next?` | `Great job!` · `What did you do next?` | quebra de linha conta como espaço |
+| 3 | `Did you really say "why not?" to your boss?` | a entrada inteira (1 frase) | `?` + fecho + espaço + minúscula → não é limite |
+| 4 | `Your boss said "Really?" Then what did you say?` | `Your boss said "Really?"` · `Then what did you say?` | `?` + fecho + espaço + maiúscula → limite; o fecho fica na frase |
+| 5 | `Hmm... do you mean the bus?` | a entrada inteira (1 frase) | reticências + espaço + minúscula → não é limite |
+| 6 | `Hmm` + U+2026 + ` Do you mean the bus?` | `Hmm` + U+2026 · `Do you mean the bus?` | reticências Unicode + espaço + maiúscula → limite |
+| 7 | `We use tools, e.g. xUnit. Do you test your code?` | `We use tools, e.g. xUnit.` · `Do you test your code?` | abreviação + espaço + minúscula → não é limite |
+| 8 | `Version 2.0 is out. Have you tried it?` | `Version 2.0 is out.` · `Have you tried it?` | terminador seguido de não branco → não é limite |
+| 9 | `Really?! Tell me more` | `Really?!` · `Tell me more` | sequência de terminadores; última frase sem terminador |
+| 10 | `  What do you do at work?  ` | `What do you do at work?` | `Trim()`; fim do texto → limite |
+
 **Testes existentes alterados** (com o motivo; nenhum é enfraquecido):
 
 - `ChatSessionTests.RunAsync_WhenUserTypesUnknownCommand_ShowsUnknownCommandAndAvailableCommands`: a expectativa passa de `Available commands: /help, /quit` para a linha exata `Available commands: /help, /mode, /quit`, porque `/mode` entra em `Available`.
 - `ChatSessionTests.RunAsync_AfterUnknownCommand_KeepsSessionOpenAndForwardsNothing`: a entrada `"/mode interview"` vira `"/foo bar"`, e a expectativa vira `Unknown command "/foo".`, porque `/mode` deixa de ser desconhecido (efeito colateral previsto no plano da US-003).
 - `EnglishTutorAppTests.RunAsync_WhenUserTypesText_ShowsTutorNotConnected` → renomeado para `RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected`, com Provider `Ollama` (P7). Com `ClaudeCode`, o texto livre agora vai ao cérebro.
 - `ChatSessionTests.CreateSession` e `EnglishTutorAppTests.CreateOptions` (helpers): o primeiro deixa de passar `TutorMode`; o segundo passa a registrar sempre um `ScriptedTutorBrain` sem respostas e um `FixedTutorPromptSource` via `ConfigureServices`, para nenhum teste do console lançar o processo real.
+- (2026-10-19, RN-FEED01) os 10 itens da tabela da §2.10.4. Eles mudam porque a regra mudou na spec (`ea8744d`), não para fazer teste passar: os casos que viraram válidos saem dos testes de rejeição e entram nos de aceitação, e as asserções `EndWith("?")` viram "exatamente uma pergunta".
 
 **Contagens previstas (fora do `LiveBrain`): 49 métodos novos, 65 casos novos.**
 
@@ -572,9 +764,23 @@ Suíte após a US (D2): **216 casos** = Core.Tests 102 + 1 = 103; Console.Tests 
 
 **Estado final (2026-10-19):** os números previstos acima se confirmaram: 49 métodos novos / 65 casos novos; suíte com 216 casos (Core.Tests 103, Console.Tests 41, Infrastructure.Tests 72); `ClaudeCodeTutorBrainTests` 20 / 31; `LiveBrain` 5 / 5.
 
+**Contagens da revisão de 2026-10-19 (RN-FEED01, T18–T20): +8 métodos novos, +33 casos novos** (renomeações não contam; a linha alterada da `Rejection_ForEachReason_MessageStartsWithReasonAndStatesExpectation` não muda a contagem):
+
+- Core.Tests: +6 métodos / +31 casos.
+  - `ReplySentencesTests` (nova): 3 / 19 (`Split_WithReplyText_ReturnsSentencesAtBoundaries` 10, `Split_WhenTextIsBlank_ReturnsNoSentences` 2, `IsQuestion_WithSentence_ReturnsWhetherItEndsWithQuestionMark` 7).
+  - `TutorReplyRejectionsTests`: +1 / +3 (`ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound` 3; 2 renomeados).
+  - `TutorReplyValidatorTests`: +2 / +9 (`Validate_WhenReplyAsksOneQuestionInAnyPosition_ReturnsValidReply` 4, `Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason` 4; `Validate_WhenReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` passa de 2 para 3 casos, +1).
+- Infrastructure.Tests: +2 métodos / +2 casos (`TutorReplyParserTests`: `Parse_WhenJsonReplyAsksQuestionThenEncourages_ReturnsReply` e `Parse_WhenJsonReplyAsksTwoQuestions_RejectsWithExactlyOneQuestionReason`; 2 renomeados). `ClaudeCodeTutorBrainTests` continua 20 / 31 (D11).
+- Console.Tests: sem mudança (41).
+- `LiveBrain`: continua 5 métodos / 5 casos (1 renomeado).
+
+Total da US com a revisão: 57 métodos novos / 98 casos novos. Suíte após a revisão (D2): **249 casos** = Core.Tests 103 + 31 = 134; Console.Tests 41; Infrastructure.Tests 72 + 2 = 74.
+
 ## 5. Tarefas (ordem de execução TDD)
 
 **Pré-condição** (antes da T1): o orquestrador aplica a §2.8 em dois commits, `docs(ai): update spec for US-004` (US-005 e US-006 no `SPRINT_1.md`) e `docs(ai): update architecture for US-004` (`ARCHITECTURE.md` §3/§5/§6.3, `padroes-codigo`, `tdd-dotnet`). Junto vai o ADR-007 em "Aceito", se aprovado.
+
+**Pré-condição da revisão de 2026-10-19** (antes da T18): a spec da RN-FEED01 já está em `ea8744d`. Depois da nova aprovação, o orquestrador aplica a §2.10.6 em dois commits: `docs(ai): update spec for US-004` (`specs/PRODUCT.md`) e `docs(ai): update architecture for US-004` (`ARCHITECTURE.md` §3/§6.2, ADR-002, ADR-005, `docs/us/US-002.md`). Nenhuma tarefa da §5 altera esses documentos.
 
 Regras que valem para todas as tarefas:
 
@@ -583,6 +789,7 @@ Regras que valem para todas as tarefas:
 - Escolha de forma não prevista aqui vai para a §12 num commit `docs(ai)` **antes** do `feat` (AP-014, AP-027).
 - Os nomes de teste são os da §4, por extenso (AP-025).
 - Os testes `LiveBrain` exigem o Claude Code CLI instalado (`claude.exe` do instalador nativo) e autenticado.
+- (2026-10-19) Quando a §5 fixa o tipo e o escopo do commit, use esse; para divergir, registre na §12 **antes** do commit (review S1).
 
 - [x] T1 — Red: `PromptFilesDeploymentTests.ApplicationFolder_Always_ContainsTutorAndFormatPrompts`, que falha porque `prompts/` não está na saída. Green: `<None Include="..\..\prompts\**" Link=...>` no `EnglishTutor.Console.csproj` e no `EnglishTutor.Infrastructure.Tests.csproj`. No mesmo commit `chore`, entram os `PackageReference` da §6 (Infrastructure: `Microsoft.Extensions.Options` e `Microsoft.Extensions.DependencyInjection.Abstractions`; Infrastructure.Tests: `Microsoft.Extensions.DependencyInjection`), com build verde. (commits: `test(console): prompt files deployed with the app` + `chore(infra): copy prompts to outputs and add options packages`) — feito: fc57ab3, fe52dc9
   Escolhas de forma: nenhuma
@@ -643,7 +850,7 @@ Regras que valem para todas as tarefas:
   Escolhas de forma: nenhuma
 - [x] T9 — Red: esqueleto `ProcessRunner` (`RunAsync` lança `NotImplementedException`), `RecordingProcessRunner`, `LiveClaudeCode` (system prompt lido de `AppContext.BaseDirectory/prompts/tutor.md`, review S9) e os testes `LiveBrain` (todos com `[Trait("Category", "LiveBrain")]`):
   - `ClaudeCodeTutorBrainLiveTests.SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat`
-  - `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion`
+  - `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion` (renomeado na T21 para `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion`)
   - `ClaudeCodeTutorBrainLiveTests.SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply`
   - `FixtureRecorderLiveTests.SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes`
 
@@ -704,9 +911,45 @@ Regras que valem para todas as tarefas:
   Escolhas de forma: nenhuma
 - [x] T17 — Red (B1, P19): `EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration` (2 casos). Com os binds da T16, os dois casos falham com código 1 ≠ 2 e `An unexpected error occurred. See the log file for details.` em `Error`. O Executor confirma no Red que o motivo é o descrito: o evento `UnexpectedError` (1003) do log tem `AggregateException` com `OptionsValidationException` internas. Se o Red não acontecer por esse motivo, parar e registrar na §12. Green: P19 / §2.6 (falhas de validação de `OptionsValidationException` ou de `AggregateException` só com `OptionsValidationException`; `Invalid configuration:` + uma linha por falha; `StartupFailed` com todas; `ExitCodes.InvalidConfiguration`). Os testes de configuração inválida da US-001 e o da T16 seguem verdes. (commits: `test(console): invalid configuration in several sections` + `feat(console): explain every options validation failure at startup`) — feito: ef51f51, bfc45e8 (Red: 2 casos com código 1 ≠ 2; motivo confirmado rodando o app com `Brain__Provider=Inexistente` e `Conversation__MaxTurnsInWindow=0`: evento `UnexpectedError` com `System.AggregateException` contendo duas `OptionsValidationException`)
   Escolhas de forma: nenhuma
-- [ ] T18 — DoD: rodar D1–D15, colar em §11 e marcar a §5 com os hashes. Cada `[x]` leva o hash na própria linha (AP-031). (commit: `docs(ai): add DoD evidence for US-004`) — **rodada completa** em §11: todos verdes, menos o D5, que é intermitente (§12 E3); fica aberta até a decisão do usuário
+- [ ] T18 — (2026-10-19, P20/P21) Red: esqueleto `ReplySentences` (§2.10.1) com `Split` e `IsQuestion` lançando `NotImplementedException`. Testes, todos falhando com `NotImplementedException` (3 métodos / 19 casos):
+  - `ReplySentencesTests.Split_WithReplyText_ReturnsSentencesAtBoundaries` (10 casos da tabela "Bordas do separador", §4)
+  - `ReplySentencesTests.Split_WhenTextIsBlank_ReturnsNoSentences` (2 casos)
+  - `ReplySentencesTests.IsQuestion_WithSentence_ReturnsWhetherItEndsWithQuestionMark` (7 casos)
 
-Conferência das contagens por tarefa: `ClaudeCodeTutorBrainTests` = T5 5/6 + T6 4/5 + T7 4/9 + T8 5/9 + T10 2/2 = 20 métodos / 31 casos. Console.Tests = T1 1/1 + T14 4/4 + T15 3/4 + T16 5/5 + T17 1/2 = 14 / 16. Infrastructure.Tests = T2 4/7 + T3 1/1 + T4 2/2 + `ClaudeCodeTutorBrainTests` 20/31 + T11 2/2 + T12 3/3 + T13 2/2 = 34 / 48. Core.Tests = T13 1/1. Total: 49 / 65.
+  Green: definições da §2.10.1, só com BCL (`CoreDependencyTests` continua verde). Nesta tarefa ninguém chama o `ReplySentences` ainda: o validador muda na T20. (commits: `test(core): split tutor reply into sentences` + `feat(core): split tutor reply into sentences and detect questions`)
+  Escolhas de forma: nenhuma
+- [ ] T19 — (2026-10-19, P23) Red: esqueleto em `TutorReplyRejections` com a constante `ReplyMustAskExactlyOneQuestionReason` completa (é dado) e a fábrica `ReplyMustAskExactlyOneQuestion(string reply, int questionCount)` lançando `NotImplementedException`. `ReplyMustEndWithQuestionReason` e `ReplyMustEndWithQuestion` ficam até a T20, porque o validador ainda os usa. Testes (6 casos falhando com `NotImplementedException`):
+  - `TutorReplyRejectionsTests.Rejection_ForEachReason_MessageStartsWithReasonAndStatesExpectation` (linha alterada para a fábrica nova, §2.10.4; só esse caso falha, os outros 3 seguem verdes)
+  - `TutorReplyRejectionsTests.ReplyMustAskExactlyOneQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis` (renomeado)
+  - `TutorReplyRejectionsTests.ReplyMustAskExactlyOneQuestion_WhenReplyHas80Characters_QuotesItWhole` (renomeado)
+  - `TutorReplyRejectionsTests.ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound` (3 casos)
+
+  Green: mensagens da §2.10.2 (os dois ramos, `has no question` e `has <n> questions`; corte em 80 caracteres reaproveitado). (commits: `test(core): rejection message for exactly one question` + `feat(core): explain the exactly-one-question rejection`)
+  Escolhas de forma: nenhuma
+- [ ] T20 — (2026-10-19, RN-FEED01) Red, sem esqueleto novo (tudo já compila):
+  - `TutorReplyValidatorTests.Validate_WhenReplyAsksOneQuestionInAnyPosition_ReturnsValidReply` (4 casos): falham porque a regra antiga recusa reply que não termina em `?` (`IsValid` = `false`).
+  - `TutorReplyValidatorTests.Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason` (4 casos): falham porque os 4 terminam em `?` e a regra antiga os aceita (`IsValid` = `true`).
+  - `TutorReplyValidatorTests.Validate_WhenReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` (3 casos; renomeado, §2.10.4): falham no `Reason` (`reply must end with a question` ≠ `reply must ask the student exactly one question`).
+  - `TutorReplyParserTests.Parse_WhenJsonReplyAsksQuestionThenEncourages_ReturnsReply`: falha porque o reply é recusado.
+  - `TutorReplyParserTests.Parse_WhenJsonReplyAsksTwoQuestions_RejectsWithExactlyOneQuestionReason`: falha porque o reply é aceito.
+  - `TutorReplyParserTests.Parse_WhenJsonReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` e `TutorReplyParserTests.Parse_WhenTagsReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason` (renomeados): falham no `Reason`.
+
+  São 11 casos do Core e 4 da Infrastructure vermelhos pelos motivos acima; o Executor confere antes do Green. Os demais testes do validador, do parser, do `ConversationService`, do adaptador e do console seguem verdes. Green: §2.10.3 (`ReplySentences.Split` + `Count(ReplySentences.IsQuestion)` + `ReplyMustAskExactlyOneQuestion`). Refactor: remover `ReplyMustEndWithQuestionReason` e `ReplyMustEndWithQuestion` (sem chamador). D2 com 249 casos verdes no fim da tarefa. (commits: `test(core): reply asks exactly one question` + `test(infra): parser applies the one-question rule` + `feat(core): accept exactly one question in any position of the reply` + `refactor(core): remove the final-question rejection`)
+  Escolhas de forma: nenhuma
+- [ ] T21 — (2026-10-19, P18/P24) Ajuste de asserções em testes existentes, sem teste novo (§2.10.4):
+  - `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion` (renomeado de `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion`; o regex `SentenceEnd` sai);
+  - `ClaudeCodeTutorBrainLiveTests.SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply`;
+  - `FixtureRecorderLiveTests.SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes`;
+  - `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId`;
+  - `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedTagsOutput_ReturnsTutorReply`.
+
+  Estado de Red: nenhum. O comportamento conferido não muda (as fixtures têm uma pergunta, no fim); a asserção passa a seguir a regra da spec. Os 2 testes unitários seguem verdes (D11: 31 casos). Os 3 `LiveBrain` rodam no D5/T23, não aqui, para não gastar a assinatura antes do ajuste de prompt (T22). (commit: `test(infra): check the one-question rule in live and fixture tests`)
+  Escolhas de forma: nenhuma
+- [ ] T22 — (2026-10-19) Prompts: aplicar os textos novos da §2.10.5 em `prompts/tutor.md`, `prompts/format.json.md` e `prompts/format.tags.md` (só as 3 linhas citadas). Sem teste unitário de conteúdo de prompt: `PromptFilesDeploymentTests.ApplicationFolder_Always_ContainsTutorAndFormatPrompts` continua verde, o D16 confere que o texto antigo saiu, e o efeito no modelo é medido no D5 (T23). (commit: `feat(brain): describe the one-question rule in the tutor prompts`, review S1)
+  Escolhas de forma: nenhuma
+- [ ] T23 — DoD (era a T18 antes da revisão de 2026-10-19): rodar D1–D18, colar em §11 (numa seção nova, sem apagar a rodada anterior) e marcar a §5 com os hashes. Cada `[x]` leva o hash na própria linha (AP-031). O D5 roda 5 vezes seguidas, no ambiente descrito na §10. Se alguma rodada do D5 ficar vermelha, registrar a resposta recusada e o motivo na §11 e na §12 e parar: a próxima decisão é do usuário. (commit: `docs(ai): add DoD evidence for US-004`) — rodada anterior (antes da revisão) em §11: todos verdes, menos o D5, intermitente (§12 E3/E4)
+
+Conferência das contagens por tarefa: `ClaudeCodeTutorBrainTests` = T5 5/6 + T6 4/5 + T7 4/9 + T8 5/9 + T10 2/2 = 20 métodos / 31 casos. Console.Tests = T1 1/1 + T14 4/4 + T15 3/4 + T16 5/5 + T17 1/2 = 14 / 16. Infrastructure.Tests = T2 4/7 + T3 1/1 + T4 2/2 + `ClaudeCodeTutorBrainTests` 20/31 + T11 2/2 + T12 3/3 + T13 2/2 + T20 2/2 = 36 / 50. Core.Tests = T13 1/1 + T18 3/19 + T19 1/3 + T20 2/9 = 7 / 32. Total: 57 / 98 (antes da revisão: 49 / 65; revisão: +8 / +33).
 
 ## 6. Pacotes NuGet
 
@@ -716,7 +959,7 @@ Conferência das contagens por tarefa: `ClaudeCodeTutorBrainTests` = T5 5/6 + T6
 | Microsoft.Extensions.DependencyInjection.Abstractions (10.0.13, já no CPM, grupo "Core") | Infrastructure | `TryAddSingleton`/`TryAddEnumerable` na extensão de registro (hoje vem só de forma transitiva) |
 | Microsoft.Extensions.DependencyInjection (10.0.13, já no CPM, grupo "Tests") | Infrastructure.Tests | `ServiceCollection.BuildServiceProvider()` nos testes de registro |
 
-Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core (`CoreDependencyTests` não muda). `NullLogger<>` vem de `Microsoft.Extensions.Logging.Abstractions`, que já está nos projetos. Sem `Microsoft.Extensions.TimeProvider.Testing`: o `ManualTimeProvider` de ~15 linhas basta.
+Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core (`CoreDependencyTests` não muda). `NullLogger<>` vem de `Microsoft.Extensions.Logging.Abstractions`, que já está nos projetos. Sem `Microsoft.Extensions.TimeProvider.Testing`: o `ManualTimeProvider` de ~15 linhas basta. A revisão de 2026-10-19 não acrescenta pacote: o `ReplySentences` usa só a BCL (R1).
 
 ## 7. Riscos e mitigação
 
@@ -742,8 +985,13 @@ Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core 
 | `RawText` vazio gera `[tutor]` vazio no texto renderizado (ADR-006) | Aceito: o texto único não é recusado pela CLI como uma mensagem `Assistant` vazia seria numa API de chat |
 | Seta `→` ilegível no console do Windows | `OutputEncoding` UTF-8 sem BOM no `Program.cs` (P14); o D6 confere a seta. Efeito colateral conhecido: o code page do console fica UTF-8 depois da execução |
 | Variável de ambiente de teste vaza entre testes | Nome único por teste (`ENGLISHTUTOR_TEST_<guid>`), removido no fim |
-| Asserção satisfeita por texto externo (AP-015) | As mensagens conferidas têm trechos do projeto (`Claude Code failed (exit code`, `Claude Code reported an error:`, `is not a JSON result`, `Expected prompts/tutor.md`, `Invalid configuration:`) |
+| Asserção satisfeita por texto externo (AP-015) | As mensagens conferidas têm trechos do projeto (`Claude Code failed (exit code`, `Claude Code reported an error:`, `is not a JSON result`, `Expected prompts/tutor.md`, `Invalid configuration:`, `reply must ask the student exactly one question`, `has no question`, `has 2 questions`) |
 | Contagens divergentes no fim (AP-031) | Conferência por tarefa no fim da §5; o Executor atualiza cabeçalho, detalhamento, D2 e D11 juntos |
+| (2026-10-19) Com o prompt mais permissivo, o modelo passa a fazer duas perguntas (ex.: "... Right?", "And you?") e o D5 continua intermitente por outro motivo | O texto novo dos prompts proíbe a segunda pergunta e cita os exemplos (§2.10.5). O D5 roda 5 vezes seguidas (§10); qualquer rodada vermelha → parar, registrar a resposta recusada e o motivo (T23). A decisão seguinte (prompt, critério ou modelo) é do usuário |
+| (2026-10-19) O separador erra em casos raros: frase nova começando com minúscula depois de `?` (duas perguntas contadas como uma) ou pergunta citada seguida de maiúscula (contada como pergunta) | Limites aceitos e documentados (P22), com teste do lado conferido (`Your boss said "Really?" Then ...`). Se o `eval` (US-009) mostrar muitas rejeições pelo motivo novo, o ADR-005 revisado manda rever o separador |
+| (2026-10-19) A regra nova vale para todos os provedores (ADR-005) e para a retentativa (RN-BRAIN04) | Regra só no `TutorReplyValidator`; `BuildFormatCorrection` embute a mensagem nova sem mudança de código; a suíte do Core e do parser roda inteira na T20 (D2 com 249) |
+| (2026-10-19) Texto antigo da regra sobrevive em código, testes, prompts ou documentos e gera falso bloqueante (AP-005) | Lista fechada de trechos na §2.10.4–§2.10.6; o D16 procura os textos antigos e espera nenhuma linha |
+| (2026-10-19) Evidência do D5 depende do ambiente de quem roda (variáveis herdadas do app desktop; review S3) | O comando do D5 limpa `CLAUDECODE`, `CLAUDE_CODE_*` e `ANTHROPIC_BASE_URL` antes das 5 rodadas (§10) |
 
 ## 8. Fora de escopo
 
@@ -754,9 +1002,12 @@ Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core 
 - Comando `eval`, golden set e relatório: US-009. O `LatencySummary` desta US mora no projeto de teste, e a US-009 decide se o promove.
 - `ClaudeCodeStreamingBrain` (processo persistente, `stream-json`): Fase 6.
 - Persistência de turnos e resumo de erros recorrentes (RN-PERS*, RN-CONV04), voz e TTS.
-- Validação de "no máximo 3 frases" (RN-FEED01) no Core: fica no prompt e no teste `LiveBrain` (P18). Mudar o `TutorReplyValidator` seria decisão do ADR-005, revisitável na US-009.
+- Validação de "no máximo 3 frases" (RN-FEED01) no Core: fica no prompt e no teste `LiveBrain` do cenário 1, que conta as frases com o `ReplySentences` do Core (P18). Mudar o `TutorReplyValidator` para contar frases seria decisão do ADR-005, revisitável na US-009. Nenhuma US de destino: o "fica no prompt" não adia nada.
 - Remover `BrainRequest.SessionHint` do contrato: fica reservado (P1).
 - Restringir as fontes de configuração de usuário da CLI: risco aceito (§7); sem US de destino até haver decisão de ADR.
+- (2026-10-19) Regravar as fixtures `claude-json-*.json`: desnecessário, as duas já têm exatamente uma pergunta (§2.10.4).
+- (2026-10-19) Lista de abreviações e casos linguísticos além dos da tabela "Bordas do separador": limites aceitos (P22); qualquer mudança passa pelo ADR-005 revisado, com o `eval` da US-009 como gatilho. Não é adiamento com US de destino.
+- (2026-10-19) Privacidade do ambiente herdado pelo processo `claude` (review S2) e teste do `TutorNotConnectedInputHandler.ChangeMode` (review S4): não fazem parte da decisão sobre a RN-FEED01; ficam para decisão do usuário, fora desta revisão.
 
 ## 9. Perguntas em aberto
 
@@ -777,23 +1028,30 @@ Nenhuma versão nova no `Directory.Packages.props` e nenhum pacote novo no Core 
 - **P15 — Forma do "comando de medição" de latência.** **Padrão proposto:** um teste `LiveBrain` (`LatencyMeasurementLiveTests`) rodado com `--logger "console;verbosity=detailed"`, que imprime a tabela. O p95 é por posto mais próximo, `⌈0,95·n⌉`; com n = 5, ele é o maior valor. Alternativa: subcomando no console (fica para o `eval` da US-009). Testes: `LatencySummaryTests.Compute_WithFiveSamples_ReturnsMeanAndMaxAsP95` e `LatencySummaryTests.Compute_WithTwentySamples_ReturnsNineteenthSmallestAsP95`.
 - **P16 — Como as fixtures reais são gravadas.** **Padrão proposto:** pelo `FixtureRecorderLiveTests`, com o mesmo adaptador e um `RecordingProcessRunner`. Ele grava em `bin/.../recorded-fixtures/`, e o Executor copia para `Fixtures/ClaudeCode/` depois de revisar (D13). Alternativa: rodar o `claude` à mão no PowerShell, onde as aspas do schema quebram no 5.1. Teste: `FixtureRecorderLiveTests.SendAsync_WithGrammarErrorSentence_SavesRawOutputOfBothModes`.
 - **P17 — Registro do `ITutorBrain` antes da `BrainFactory`.** **Padrão proposto:** `ClaudeCodeTutorBrain` registrado sempre como `ITutorBrain` pela Infrastructure. O console só o usa com Provider `ClaudeCode` (P7). A US-007 troca pelo registro por configuração. Consequência aceita (review S4 da rodada 2): a seção `Brain:ClaudeCode` é validada na partida com qualquer provedor, então um `Brain:ClaudeCode` inválido impede a partida também com `Brain:Provider = Ollama` (`Invalid configuration:` + a mensagem do validador, código 2). Não fica pendência para a US-007, porque lá o ClaudeCode pode ser o `FallbackProvider` de um Ollama principal (§7). Teste: `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_Always_RegistersClaudeCodeBrainAndFilePromptSource`.
-- **P18 — "No máximo 3 frases" (RN-FEED01).** **Padrão proposto:** conferido só no teste `LiveBrain` do cenário 1 (contando terminadores de frase); o `TutorReplyValidator` (ADR-005) não muda. Teste: `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion`.
+- **P18 — "No máximo 3 frases" (RN-FEED01).** **Padrão proposto (revisto em 2026-10-19):** conferido só no teste `LiveBrain` do cenário 1, contando as frases com `ReplySentences.Split` do Core (o mesmo separador da regra de pergunta), em vez do regex próprio do teste; o `TutorReplyValidator` (ADR-005) não conta frases. Teste: `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion`.
 - **P19 — Configuração inválida em mais de uma seção ao mesmo tempo (B1).** **Padrão proposto:** com `BrainOptions`, `ClaudeCodeOptions` e `ConversationOptions` validadas na partida, o `ValidateOnStart` lança `OptionsValidationException` quando uma só classe falha e `AggregateException` (uma `OptionsValidationException` por classe) quando mais de uma falha. O `EnglishTutorApp` trata as duas formas como configuração inválida: escreve `Invalid configuration:` e uma linha `  <falha>` para cada falha de cada classe, na ordem em que vêm; loga `StartupFailed` com todas; devolve `ExitCodes.InvalidConfiguration`, sem cabeçalho nem prompt (mesmos critérios da US-001, AP-024). `AggregateException` com interna de outro tipo continua erro inesperado (§2.9). Alternativa: um validador único para as três seções (acopla Core e Infrastructure). Teste: `EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration`.
+- **P20 — (2026-10-19) Como o Core separa o reply em frases.** **Padrão proposto:** `ReplySentences.Split` no Core, só com BCL. Há limite depois de uma sequência de terminadores (`.`, `!`, `?`, reticências U+2026), seguida de fechos opcionais, quando vem o fim do texto ou espaço em branco seguido de caractere que não é letra minúscula. As frases saem com `Trim()` e sem vazias (§2.10.1). Alternativas: contar os `?` do texto inteiro (um `?` citado no meio da frase contaria como pergunta) ou usar um pacote de tokenização (viola R1). Teste: `ReplySentencesTests.Split_WithReplyText_ReturnsSentencesAtBoundaries`.
+- **P21 — (2026-10-19) O que é "frase que termina com `?`".** **Padrão proposto:** depois de remover os fechos do fim (`"`, `'`, `)`, `]`, U+201D, U+2019), a sequência final de terminadores contém `?`. Assim, `Really?!`, `What??` e `Why?"` são perguntas. Leitura da RN-FEED01: o sinal que encerra a frase inclui `?`. Alternativa: só o último caractere ser `?`, o que deixaria `Really?! What happened next?` passar como uma pergunta só. Teste: `ReplySentencesTests.IsQuestion_WithSentence_ReturnsWhetherItEndsWithQuestionMark` e `TutorReplyValidatorTests.Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason` (caso `"Really?! What happened next?"`).
+- **P22 — (2026-10-19) Limites aceitos do separador.** **Padrão proposto:** sem lista de abreviações. `Mr. Smith` vira limite, mas isso só muda a contagem de frases (não validada no Core, P18), nunca a de perguntas. Frase nova começando com minúscula depois de `?` não é separada. Pergunta citada seguida de maiúscula (`said "Really?" Then`) conta como pergunta. O `eval` (US-009) é o gatilho para rever (ADR-005 revisado). Teste: `TutorReplyValidatorTests.Validate_WhenReplyAsksOneQuestionInAnyPosition_ReturnsValidReply` (caso `Mr. Smith`) e `TutorReplyValidatorTests.Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason` (caso da citação seguida de maiúscula).
+- **P23 — (2026-10-19) Texto do motivo e da mensagem.** **Padrão proposto:** motivo `reply must ask the student exactly one question` (o da spec), com a mensagem da §2.10.2: `has no question` com 0 e `has <n> questions` com 2 ou mais, citação cortada em 80 caracteres, e `Expected 1 to 3 short sentences with exactly one question to the student (one sentence ending with "?", in any position); the other sentences are comments or encouragement.`. A retentativa usa a mensagem sem mudança no `TurnMessageBuilder`. Teste: `TutorReplyRejectionsTests.ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound`.
+- **P24 — (2026-10-19) Testes de fixture e `LiveBrain` que conferem `EndWith("?")`.** **Padrão proposto:** trocar por "exatamente uma pergunta" com `ReplySentences` (§2.10.4), sem regravar as fixtures (as duas têm uma pergunta). Alternativa: manter `EndWith("?")`, o que faria um teste falhar com uma resposta que a spec aceita. Teste: `ClaudeCodeTutorBrainLiveTests.SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion`.
+- **P25 — (2026-10-19) `specs/PRODUCT.md` (OA1) ainda diz "respostas curtas que sempre terminam em pergunta".** **Padrão proposto:** trocar por "sempre fazem exatamente uma pergunta" no commit `docs(ai): update spec for US-004` antes da T18 (§2.10.6), porque a spec da RN-FEED01 (`ea8744d`) não o alterou. Sem efeito observável (conferido pelo D16).
+- **P26 — (2026-10-19) Quantas rodadas do D5 valem como "verde".** **Padrão proposto:** 5 rodadas completas seguidas, todas verdes, sem as variáveis herdadas do app desktop (comando na §10). O D5 mede no adaptador, **sem** a retentativa do ADR-006, com tolerância zero (5/5 no formato em cada rodada). Qualquer rodada vermelha → parar e registrar (T23); não se repete a rodada para "pegar" uma verde (aprendizado do `review.md`: critério `LiveBrain` precisa dizer a camada e sobreviver a N rodadas seguidas). Teste: `ClaudeCodeTutorBrainLiveTests.SendAsync_WithFiveKnownErrors_FindsAtLeastFourCorrectionsAllInFormat`.
 
 ## 10. Definition of Done (comandos verificáveis)
 
-Executar a partir da raiz do repositório, em PowerShell. As exceções são o D15 (Git Bash) e o D6/D9 (Windows PowerShell 5.1). D5, D6 e D7 exigem o Claude Code CLI instalado e autenticado.
+Executar a partir da raiz do repositório, em PowerShell. As exceções são o D15 (Git Bash) e o D6/D9 (Windows PowerShell 5.1). D5, D6 e D7 exigem o Claude Code CLI instalado e autenticado. **Ambiente dos comandos com o CLI real (D5, D6, D7):** num terminal aberto fora do app desktop ou depois de `Remove-Item Env:CLAUDECODE, Env:ANTHROPIC_BASE_URL -ErrorAction SilentlyContinue; Get-ChildItem Env:CLAUDE_CODE_* | Remove-Item` (review S3; §12 E3).
 
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes: 216 casos (Core.Tests 103, Console.Tests 41, Infrastructure.Tests 72), em < 30 s, sem rede, sem GPU e sem processo real |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes: 249 casos (Core.Tests 134, Console.Tests 41, Infrastructure.Tests 74), em < 30 s, sem rede, sem GPU e sem processo real |
 | D3 | `Remove-Item -Recurse -Force TestResults, coverage -ErrorAction SilentlyContinue; dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults` | gera `coverage.cobertura.xml` para os 3 projetos de teste |
 | D3b | `dotnet tool restore; dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:TextSummary; Get-Content coverage/Summary.txt` | linha `EnglishTutor.Core` ≥ 80% |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
-| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ClaudeCode"` | verde: 5 frases de fumaça com erros conhecidos, ≥ 4 com a correção esperada e 5/5 no formato (os 3 testes de `ClaudeCodeTutorBrainLiveTests`; medição e gravador ficam fora do filtro) |
-| D6 | No Windows PowerShell 5.1: `"I have worked with C# since five years" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` | cabeçalho `Brain: ClaudeCode \| Mode: free-conversation`; `Tutor: ...` terminando em pergunta; linha de feedback com `since five years → for five years` (seta legível); `exit=0` (a entrada termina depois da frase); a primeira linha chega com BOM (AP-006) |
-| D7 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~LatencyMeasurementLiveTests" --logger "console;verbosity=detailed"` | tabela com média e p95 de `JsonSchema` e de `Tags` (5 frases cada), colada nas Evidências e no ADR-002 |
+| D5 | `Remove-Item Env:CLAUDECODE, Env:ANTHROPIC_BASE_URL -ErrorAction SilentlyContinue; Get-ChildItem Env:CLAUDE_CODE_* \| Remove-Item; 1..5 \| ForEach-Object { dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ClaudeCode"; "round $_ exit=$LASTEXITCODE" }` | 5 linhas `round <n> exit=0` (5/5 rodadas seguidas verdes, P26). Camada: o adaptador, sem a retentativa do ADR-006; tolerância zero. Em cada rodada: 5 frases de fumaça com erros conhecidos, ≥ 4 com a correção esperada e 5/5 no formato pela RN-FEED01 nova (os 3 testes de `ClaudeCodeTutorBrainLiveTests`; medição e gravador ficam fora do filtro) |
+| D6 | No Windows PowerShell 5.1, no ambiente acima: `"I have worked with C# since five years" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` | cabeçalho `Brain: ClaudeCode \| Mode: free-conversation`; `Tutor: ...` com exatamente uma pergunta (uma frase terminada em `?`, em qualquer posição); linha de feedback com `since five years → for five years` (seta legível); `exit=0` (a entrada termina depois da frase); a primeira linha chega com BOM (AP-006) |
+| D7 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~LatencyMeasurementLiveTests" --logger "console;verbosity=detailed"` | tabela com média e p95 de `JsonSchema` e de `Tags` (5 frases cada), colada nas Evidências e no ADR-002 (já feito em 2fd8419; não precisa ser repetido na T23) |
 | D8 | `Select-String -Path src/EnglishTutor.Console/appsettings.json -Pattern '"MaxTurnsInWindow": 10'` | uma linha, dentro da seção `Conversation` (RN-CONV03) |
 | D9 | No Windows PowerShell 5.1: `"/mode job-interview", "/help", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` | aviso `Mode changed to "job-interview". It applies from your next sentence.`; `/help` lista `/mode`; nenhum `Unknown command`; `exit=0` |
 | D10 | Inspeção de `tasks/US-004/plan.md` | a P1 decide como a continuidade de sessão chega ao adaptador (`session_id` guardado no adaptador, RN-BRAIN01), com testes |
@@ -802,11 +1060,20 @@ Executar a partir da raiz do repositório, em PowerShell. As exceções são o D
 | D13 | `Select-String -Path tests/EnglishTutor.Infrastructure.Tests/Fixtures/ClaudeCode/*.json -Pattern 'Users','@','sk-ant'` | nenhuma linha (fixtures sem caminho pessoal, e-mail ou chave) |
 | D14 | `git status --short` após D2–D13 | nenhum arquivo de `TestResults/`, `coverage/`, `bin/`, `obj/` ou `logs/` |
 | D15 | (Git Bash) comando do bloco abaixo, com todo o código da US commitado | imprime `0` (código de saída 1 com contagem 0 é o esperado) |
+| D16 | (2026-10-19) comando do bloco abaixo | nenhuma linha (o texto da regra antiga saiu de código, testes, prompts e documentos; AP-005) |
+| D17 | (2026-10-19) `dotnet test tests/EnglishTutor.Core.Tests --filter "FullyQualifiedName~ReplySentencesTests"` | 19 casos verdes (3 métodos) |
+| D18 | (2026-10-19; DoD D5 da US-002) `dotnet test --filter "FullyQualifiedName~TutorReplyParser"` | verde, incluindo fixtures JSON e tags e os 2 testes novos da RN-FEED01 |
 
 D15 (fora da tabela por causa do `|`; forma única do `checklist-revisao` §4, AP-019):
 
 ```bash
 git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'
+```
+
+D16 (PowerShell; fora da tabela por causa do `|`):
+
+```powershell
+Get-ChildItem -Recurse -File src, tests, prompts, docs\adr, docs\us\US-002.md, ARCHITECTURE.md, specs\PRODUCT.md -Include *.cs, *.md | Where-Object { $_.FullName -notlike '*\bin\*' -and $_.FullName -notlike '*\obj\*' } | Select-String -SimpleMatch -Pattern 'must end with a question', 'ReplyMustEndWithQuestion', 'LAST sentence', 'EndWith("?")', 'terminam em pergunta', 'reply termina com pergunta', 'terminando em `?`', "termina com '?'"
 ```
 
 Também entram, da DoD comum:
@@ -816,12 +1083,15 @@ Também entram, da DoD comum:
 - `docs/us/US-004.md` criado;
 - ADR-007 aceito;
 - `ARCHITECTURE.md` §3/§5/§6.3, `padroes-codigo`, `tdd-dotnet` e a US-005 e a US-006 do `SPRINT_1.md` atualizados antes da T1 (§2.8);
+- (2026-10-19) `specs/PRODUCT.md`, `ARCHITECTURE.md` §3/§6.2, ADR-002, ADR-005 e `docs/us/US-002.md` atualizados antes da T18 (§2.10.6);
 - tabela de latência no ADR-002 (D7);
 - merge `--no-ff` em `develop`.
 
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+**Revisão de 2026-10-19 (RN-FEED01):** a rodada abaixo é anterior à mudança da regra. A T23 roda a DoD de novo (D1–D18, com o D5 cinco vezes) e acrescenta uma seção nova no fim desta, sem apagar a anterior.
 
 Rodada final de 2026-10-19, HEAD `c8af838` (último código em `f3f153c`), Claude Code CLI 2.1.304 (instalador nativo, `claude-haiku-5-5`). Uma rodada anterior, sem o CLI (HEAD `bfc45e8`), ficou registrada em §12 E2. **A US não está pronta para fechar: o D5 é intermitente (§12 E3) e depende de uma decisão do usuário.**
 
@@ -960,3 +1230,17 @@ O usuário decidiu tratar o D5 mudando a regra, não o critério do D5 nem o mod
 - **Motivo de rejeição renomeado:** `reply must end with a question` → `reply must ask the student exactly one question` (constante, mensagem detalhada e instrução de retentativa coerentes com a regra nova; ARCHITECTURE §10).
 - O critério do D5 ("5/5 no formato") **não muda**; ele passa a medir a regra nova. O reforço de prompt de `2cb0f7a` pode ser ajustado para descrever a regra nova (uma pergunta, em qualquer posição), sem incentivar duas perguntas.
 - O plano precisa: tarefas em TDD no Core (`TutorReplyValidator`, `TutorReplyRejections` e testes da US-002 que citam o motivo antigo, com o separador de frases definido e testado, inclusive bordas como `?` no meio de aspas, reticências e abreviações, se relevantes); ajuste do teste `LiveBrain` do cenário 1 (`EndWith("?")`); os dois cenários novos da US-004 no mapa da §4; menções em ADR-002 (linhas 20 e 30) e ADR-005 a atualizar; prompts; contagens, §10 e §11 (nova rodada do D5, pelo menos 5 vezes, e D6).
+
+  → Incorporado. O plano volta para "Aguardando aprovação". Item a item:
+  - Regra nova e status → Cabeçalho (Status, Regras, ADRs), §1, §2.10 (abertura).
+  - Separador de frases definido e testado, com bordas (`?` entre aspas, reticências, abreviações, decimal, `?!`, quebra de linha, texto vazio) → §2.10.1, §2 "Alternativas descartadas", §4 (tabela "Bordas do separador"; `ReplySentencesTests.Split_WithReplyText_ReturnsSentencesAtBoundaries`, `ReplySentencesTests.Split_WhenTextIsBlank_ReturnsNoSentences`, `ReplySentencesTests.IsQuestion_WithSentence_ReturnsWhetherItEndsWithQuestionMark`), §5 T18, §9 P20, P21 e P22, §10 D17.
+  - Motivo renomeado, mensagem e retentativa → §2.10.2 (a retentativa embute a mensagem sem mudança no `TurnMessageBuilder`), §2.9 (guardas novas), §4 (`TutorReplyRejectionsTests`: 1 linha alterada, 2 renomeados, `ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound` novo), §5 T19, §9 P23.
+  - `TutorReplyValidator` e testes da US-002 com o motivo antigo → §2.10.3, §2.10.4 (tabela dos 10 testes existentes que mudam, com o motivo), §4 (validador: 2 novos e 1 renomeado; parser: 2 novos e 2 renomeados), §5 T20 (Red por caso, com o motivo esperado; Refactor remove a fábrica antiga).
+  - Dois cenários novos da US-004 no mapa → §4 (linhas "pergunta seguida de incentivo é aceita" e "reply com duas perguntas é inválido", no parser e no validador).
+  - Teste `LiveBrain` do cenário 1 e demais `EndWith("?")` → §2.10.4, §4 (linha do cenário 1 renomeada; linhas da retomada, do gravador e das fixtures anotadas), §5 T9 (nota do nome novo) e T21, §9 P18 (revista) e P24, §8 (fixtures não são regravadas).
+  - ADR-002 (linhas 20 e 30), ADR-005, `ARCHITECTURE.md` §3/§6.2, `docs/us/US-002.md` e `specs/PRODUCT.md` (OA1, que ainda dizia "sempre terminam em pergunta") → §2.10.6 (texto antigo e novo de cada trecho; dois commits do orquestrador antes da T18; `CLAUDE.md` e skills sem alteração, conferido com Grep), §3, §5 (pré-condição da revisão), §9 P25, §10 DoD comum e D16. Nenhum ADR novo. A "ARCHITECTURE §10" citada no pedido corresponde, no texto atual, à §6.2 (onde está a regra do validador e a mensagem de rejeição); a §10 é a estratégia de testes e não muda.
+  - Prompts → §2.10.5 (texto exato das 3 linhas; tarefa do Executor), §5 T22 (commit `feat(brain)`, review S1), §7.
+  - Contagens → §4 ("Contagens da revisão": +8 métodos / +33 casos; Core.Tests 134, Infrastructure.Tests 74, Console.Tests 41), §5 (conferência por tarefa: 57 / 98), §10 D2 (249) e D11 (sem mudança, 31).
+  - §10 e §11 (nova rodada do D5, pelo menos 5 vezes, e D6) → §10 (D5 com 5 rodadas seguidas, limpeza do ambiente e camada medida, review S3 e aprendizado do `review.md`; D6 com "exatamente uma pergunta"; D16–D18), §9 P26, §5 T23 (antiga T18, renumerada para o fim; para na primeira rodada vermelha), §11 (nota: a rodada nova entra numa seção própria).
+  - Riscos → §7 (5 linhas novas: duas perguntas com o prompt permissivo, limites do separador, alcance da regra em todos os provedores, texto antigo sobrevivente, ambiente do D5).
+  - Não incorporado neste item: S2 (privacidade do ambiente herdado) e S4 (teste do `ChangeMode` com Ollama) do `review.md`, que não fazem parte da decisão sobre a RN-FEED01 (§8).
