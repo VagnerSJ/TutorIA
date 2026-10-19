@@ -895,3 +895,10 @@ Plano aprovado pelo usuário no chat, com as sugestões S1–S4 da rodada 2 inco
 ### 2026-10-17 — escolhas de forma do Executor (AP-009, AP-014)
 
 - **E1 (T6)** — Mensagem da `InvalidOperationException` defensiva do adaptador quando `BrainOutputModes.TryGetCanonical` falha (§2.9, sem teste): `Brain:ClaudeCode:OutputMode '<valor>' is invalid. Expected one of: JsonSchema, Tags.`
+- **E2 (T9–T11, bloqueio)** — O Claude Code CLI **não está instalado** nesta máquina (2026-10-17 e de novo em 2026-10-19: `Get-Command claude` vazio, `where.exe claude` sem resultado, sem `%USERPROFILE%\.local\bin\claude.exe`). Conforme a instrução do orquestrador, o Executor parou nesse ponto sem improvisar:
+  - T9: só o Red foi feito (`d6ed73e`; os 4 testes `LiveBrain` falham com `NotImplementedException`). O Green (`ProcessRunner` da §2.1) **não** foi implementado: sem o CLI, não há como ver os testes verdes, e um `feat` sem Green viola o TDD. Até lá, o `ProcessRunner` registrado no DI lança `NotImplementedException`, então o app real com `Brain:Provider = ClaudeCode` encerra com erro inesperado no primeiro turno.
+  - T10: pendente (depende das fixtures gravadas na T9).
+  - T11: feita só a parte unitária (`LatencySummary` + 2 testes) e o código do `LatencyMeasurementLiveTests`, que não foi executado; a tabela no ADR-002 fica pendente.
+  - D5, D6, D7 e D12 (depende do D6): não executados. D2 e D11 ficam com 2 casos a menos que o previsto (sem os 2 testes da T10).
+  - As tarefas T12–T17 não dependem do CLI e foram feitas normalmente.
+  - Para retomar: instalar o CLI pelo instalador nativo (`claude.exe`, ADR-007), autenticar e rodar o Executor a partir do Green da T9.
