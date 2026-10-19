@@ -51,11 +51,26 @@ public sealed class ChatSession(TextReader input, TextWriter output, IChatInputH
                 case LocalCommandKind.Help:
                     await WriteLinesAsync(ConsoleText.Help(), ct);
                     break;
+                case LocalCommandKind.Mode:
+                    await ChangeModeAsync(command.Arguments, ct);
+                    break;
                 default:
                     await WriteLinesAsync(ConsoleText.UnknownCommand(command.Name), ct);
                     break;
             }
         }
+    }
+
+    // RN-CONV06: nothing goes to the brain; the new mode applies from the next sentence (RN-CONV01).
+    private Task ChangeModeAsync(string name, CancellationToken ct)
+    {
+        if (!TutorMode.TryParse(name, out var mode))
+        {
+            return WriteLinesAsync(ConsoleText.ModeNotRecognized(name), ct);
+        }
+
+        inputHandler.ChangeMode(mode);
+        return WriteLinesAsync([ConsoleText.ModeChanged(mode)], ct);
     }
 
     private static string RemoveLeadingByteOrderMark(string line) =>

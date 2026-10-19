@@ -43,6 +43,19 @@ public static class ConsoleText
         .. LocalCommands.Available.Select(command => $"  {command.Name} - {command.Description}"),
     ];
 
+    public static string ModeChanged(TutorMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(mode);
+        return $"Mode changed to \"{mode.Name}\". It applies from your next sentence.";
+    }
+
+    // Blank name: asks for one; unknown name: says which. Both list the modes.
+    public static IReadOnlyList<string> ModeNotRecognized(string name) =>
+    [
+        string.IsNullOrWhiteSpace(name) ? $"Choose a mode: {LocalCommands.Mode} <mode>." : $"Unknown mode \"{name}\".",
+        $"Available modes: {string.Join(", ", TutorMode.All.Select(mode => mode.Name))}",
+    ];
+
     public static IReadOnlyList<string> UnknownCommand(string name) =>
     [
         $"Unknown command \"{name}\".",
