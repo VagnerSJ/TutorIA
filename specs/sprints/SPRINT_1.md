@@ -127,10 +127,10 @@ Cenário: resposta fora do formato
   Quando o parser processa a resposta
   Então o resultado é inválido com o motivo "missing reply"
 
-Cenário: reply sem pergunta final
+Cenário: reply sem pergunta
   Dado um JSON cujo reply é "I like that."
   Quando o parser processa a resposta
-  Então o resultado é inválido com o motivo "reply must end with a question"
+  Então o resultado é inválido com o motivo "reply must ask the student exactly one question"
 
 Cenário: mais de duas correções
   Dado um JSON com 3 correções
@@ -230,8 +230,18 @@ para praticar antes de ter o fluxo de voz.
 Cenário: frase com erro gramatical
   Dado que estou no modo free-conversation
   Quando eu envio "I have worked with C# since five years"
-  Então recebo um reply com no máximo 3 frases terminando em pergunta
+  Então recebo um reply com no máximo 3 frases e exatamente uma pergunta
   E recebo um feedback com a correção "since five years → for five years"
+
+Cenário: pergunta seguida de incentivo é aceita (RN-FEED01, alterada em 2026-10-19)
+  Dado um JSON cujo reply é "Was it busy in the morning? Tell me about your commute."
+  Quando o parser processa a resposta
+  Então obtenho um TutorReply com esse Reply
+
+Cenário: reply com duas perguntas é inválido (RN-FEED01, alterada em 2026-10-19)
+  Dado um JSON cujo reply é "Was it busy? How long was the trip?"
+  Quando o parser processa a resposta
+  Então o resultado é inválido com o motivo "reply must ask the student exactly one question"
 
 Cenário: processo isolado e sem ferramentas
   Dado o provedor ClaudeCode configurado
@@ -288,7 +298,7 @@ Cenário: janela de turnos configurável
 | # | Comando | Esperado |
 |---|---|---|
 | D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ClaudeCode"` | verde: 5 frases de fumaça com erros conhecidos, ≥ 4 com a correção esperada e 5/5 no formato |
-| D6 | `"I have worked with C# since five years" \| dotnet run --project src/EnglishTutor.Console` | reply terminando em pergunta + correção "since five years → for five years" |
+| D6 | `"I have worked with C# since five years" \| dotnet run --project src/EnglishTutor.Console` | reply com exatamente uma pergunta + correção "since five years → for five years" |
 | D7 | Medição de latência JsonSchema × Tags | tabela com média e p95 colada nas Evidências e no ADR-002 |
 | D8 | `Select-String -Path src/EnglishTutor.Console/appsettings.json -Pattern '"MaxTurnsInWindow": 10'` | uma linha, dentro da seção `Conversation` (RN-CONV03) |
 | D9 | No Windows PowerShell 5.1: `"/mode job-interview", "/help", "/quit" \| dotnet run --project src/EnglishTutor.Console` | aviso de troca para `job-interview`; `/help` lista `/mode`; nenhum `Unknown command`; `exit=0` |
