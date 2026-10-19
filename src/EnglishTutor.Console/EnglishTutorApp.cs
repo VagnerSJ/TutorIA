@@ -3,6 +3,8 @@ using EnglishTutor.Console.Ui;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.DependencyInjection;
+using EnglishTutor.Infrastructure.Brain;
+using EnglishTutor.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -99,7 +101,10 @@ public static class EnglishTutorApp
         IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
     {
         var provider = CanonicalProvider(services);
-        var handler = new TutorNotConnectedInputHandler(options.Output);
+        // P7: only ClaudeCode is connected; Ollama keeps the "not connected" handler until US-006.
+        IChatInputHandler handler = provider == BrainProviders.ClaudeCode
+            ? new ConversationInputHandler(services.GetRequiredService<ConversationService>(), options.Output)
+            : new TutorNotConnectedInputHandler(options.Output);
         logger.ApplicationStarted(provider, handler.Mode.Name);
 
         var session = new ChatSession(options.Input, options.Output, handler, provider);
@@ -126,8 +131,15 @@ public static class EnglishTutorApp
 
         builder.Services.Configure<ConsoleLifetimeOptions>(lifetime => lifetime.SuppressStatusMessages = true);
         builder.Services.AddEnglishTutorCore();
+        builder.Services.AddEnglishTutorInfrastructure(Path.Combine(builder.Environment.ContentRootPath, "prompts"));
         builder.Services.AddOptions<BrainOptions>()
             .Bind(builder.Configuration.GetSection(BrainOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<ClaudeCodeOptions>()
+            .Bind(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<ConversationOptions>()
+            .Bind(builder.Configuration.GetSection(ConversationOptions.SectionName))
             .ValidateOnStart();
 
         options.ConfigureServices?.Invoke(builder.Services);
