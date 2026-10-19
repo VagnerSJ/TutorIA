@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Infrastructure.Brain;
@@ -387,6 +388,47 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
 
         ValueAfter(_processRunner.Requests[1], "--resume").Should().Be("s-1");
         _processRunner.Requests[1].StandardInput.Should().Be(correction);
+    }
+
+    // US-004 — Cenário: frase com erro gramatical / leitura da saída gravada (caracterização) — ADR-001, ADR-007
+    [Fact]
+    public async Task SendAsync_WithRecordedStructuredOutput_ReturnsCorrectionAndKeepsSessionId()
+    {
+        var recorded = Fixture.Read(Path.Combine("ClaudeCode", "claude-json-structured.json"));
+        using var document = JsonDocument.Parse(recorded);
+        var recordedSessionId = document.RootElement.GetProperty("session_id").GetString();
+        _processRunner
+            .ReturnsOutput(recorded)
+            .ReturnsOutput(ClaudeOutputs.Structured("s-2", ClaudeOutputs.ValidReplyJson("t2")));
+        var sut = CreateSut(options => options.OutputMode = BrainOutputModes.JsonSchema);
+        var first = Request(User("t1"));
+
+        var reply = await sut.SendAsync(first, TestContext.Current.CancellationToken);
+        await sut.SendAsync(
+            Request(User("t1"), Assistant(reply.RawText), User("t2")), TestContext.Current.CancellationToken);
+
+        reply.Reply.Should().EndWith("?");
+        reply.Corrections.Should().Contain(c =>
+            c.Original.Contains("since five years", StringComparison.OrdinalIgnoreCase)
+            && c.Corrected.Contains("for five years", StringComparison.OrdinalIgnoreCase));
+        recordedSessionId.Should().NotBeNullOrEmpty();
+        ValueAfter(_processRunner.Requests[1], "--resume").Should().Be(recordedSessionId);
+    }
+
+    // US-004 — leitura da saída gravada (apoio, OutputMode Tags; caracterização) — ADR-002
+    [Fact]
+    public async Task SendAsync_WithRecordedTagsOutput_ReturnsTutorReply()
+    {
+        var recorded = Fixture.Read(Path.Combine("ClaudeCode", "claude-json-tags.json"));
+        using var document = JsonDocument.Parse(recorded);
+        var recordedResult = document.RootElement.GetProperty("result").GetString();
+        _processRunner.ReturnsOutput(recorded);
+        var sut = CreateSut(options => options.OutputMode = BrainOutputModes.Tags);
+
+        var reply = await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        reply.Reply.Should().EndWith("?");
+        reply.RawText.Should().Be(recordedResult);
     }
 
     public void Dispose()
