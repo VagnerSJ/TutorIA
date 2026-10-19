@@ -148,8 +148,7 @@ public sealed class ChatSessionTests : IDisposable
         new(new StringReader(string.Join('\n', lines) + (lines.Length > 0 ? "\n" : string.Empty)),
             _output,
             _handler,
-            "ClaudeCode",
-            TutorMode.Default);
+            "ClaudeCode");
 
     private static int CountOccurrences(string text, string value)
     {

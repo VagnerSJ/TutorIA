@@ -99,15 +99,10 @@ public static class EnglishTutorApp
         IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
     {
         var provider = CanonicalProvider(services);
-        var mode = TutorMode.Default;
-        logger.ApplicationStarted(provider, mode.Name);
+        var handler = new TutorNotConnectedInputHandler(options.Output);
+        logger.ApplicationStarted(provider, handler.Mode.Name);
 
-        var session = new ChatSession(
-            options.Input,
-            options.Output,
-            new TutorNotConnectedInputHandler(options.Output),
-            provider,
-            mode);
+        var session = new ChatSession(options.Input, options.Output, handler, provider);
         return session.RunAsync(ct);
     }
 
