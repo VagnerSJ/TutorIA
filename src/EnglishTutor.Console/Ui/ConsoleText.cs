@@ -1,3 +1,4 @@
+using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 
 namespace EnglishTutor.Console.Ui;
@@ -15,6 +16,19 @@ public static class ConsoleText
 
     // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
     public static string StartupFailed(string reason) => $"The application could not start: {reason}";
+
+    public const string FeedbackHeader = "Feedback:";
+
+    // US-004 P8: "Tutor: <reply>", then the feedback lines when there are any (none for a raw fallback).
+    public static IReadOnlyList<string> TutorReply(TutorReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var feedback = FeedbackFormatter.Format(reply);
+        return feedback.Count == 0
+            ? [$"Tutor: {reply.Reply}"]
+            : [$"Tutor: {reply.Reply}", FeedbackHeader, .. feedback.Select(line => $"  - {line}")];
+    }
 
     public static IReadOnlyList<string> Header(string provider, TutorMode mode) =>
     [

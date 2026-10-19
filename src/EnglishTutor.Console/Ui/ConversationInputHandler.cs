@@ -17,9 +17,29 @@ public sealed class ConversationInputHandler : IChatInputHandler
         _output = output;
     }
 
-    public TutorMode Mode => throw new NotImplementedException();
+    public TutorMode Mode => _conversation.Mode;
 
-    public void ChangeMode(TutorMode mode) => throw new NotImplementedException();
+    public void ChangeMode(TutorMode mode) => _conversation.ChangeMode(mode);
 
-    public Task HandleAsync(string text, CancellationToken ct) => throw new NotImplementedException();
+    public async Task HandleAsync(string text, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        var result = await _conversation.SendAsync(text, ct);
+        if (!result.IsReplied)
+        {
+            await WriteLinesAsync([result.Warning], ct);
+            return;
+        }
+
+        await WriteLinesAsync(ConsoleText.TutorReply(result.Reply), ct);
+    }
+
+    private async Task WriteLinesAsync(IReadOnlyList<string> lines, CancellationToken ct)
+    {
+        foreach (var line in lines)
+        {
+            await _output.WriteLineAsync(line.AsMemory(), ct);
+        }
+    }
 }
