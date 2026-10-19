@@ -263,6 +263,36 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().BeEmpty();
     }
 
+    // US-004 — Cenário: janela de turnos configurável (apoio, P19, B1: várias seções inválidas)
+    [Theory]
+    [InlineData("Inexistente", "Brain:ClaudeCode:OutputMode", "JsonSchema",
+        "Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.")]
+    [InlineData("ClaudeCode", "Brain:ClaudeCode:OutputMode", "Json",
+        "Brain:ClaudeCode:OutputMode 'Json' is invalid. Accepted values: JsonSchema, Tags.")]
+    public async Task RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration(
+        string provider, string otherKey, string otherValue, string expectedFailure)
+    {
+        var options = CreateOptions(provider, "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                provider,
+                extraValues: new Dictionary<string, string?>
+                {
+                    ["Conversation:MaxTurnsInWindow"] = "0",
+                    [otherKey] = otherValue,
+                }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain(expectedFailure)
+            .And.Contain("Conversation:MaxTurnsInWindow must be at least 1 (found 0)")
+            .And.NotContain("An unexpected error occurred");
+        _output.ToString().Should().BeEmpty();
+    }
+
     // US-004 — apoio, P11: falha do cérebro até a US-005.
     // Substituído na US-005, cenário "falha do cérebro no console não encerra a sessão".
     [Fact]
