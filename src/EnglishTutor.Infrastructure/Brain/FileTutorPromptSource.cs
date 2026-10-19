@@ -13,5 +13,17 @@ public sealed class FileTutorPromptSource : ITutorPromptSource
         _files = files;
     }
 
-    public Task<string> GetSystemPromptAsync(CancellationToken ct) => throw new NotImplementedException();
+    public async Task<string> GetSystemPromptAsync(CancellationToken ct)
+    {
+        var path = _files.TutorPath;
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                $"System prompt file not found at '{path}'. " +
+                "Expected prompts/tutor.md next to the application (copied from the repository's prompts folder).",
+                path);
+        }
+
+        return await File.ReadAllTextAsync(path, ct);
+    }
 }
