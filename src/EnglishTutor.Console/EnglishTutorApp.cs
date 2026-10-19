@@ -56,11 +56,11 @@ public static class EnglishTutorApp
             session = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.ApplicationStopping);
             exitCode = await RunSessionAsync(host.Services, options, logger, session.Token);
         }
-        catch (OptionsValidationException exception)
+        catch (Exception exception) when (ValidationFailures(exception) is { } failures)
         {
-            logger.StartupFailed(string.Join(" ", exception.Failures));
+            logger.StartupFailed(string.Join(" ", failures));
             // CancellationToken.None: a cancellation arriving now must not hide the explanation.
-            await WriteInvalidConfigurationAsync(options.Error, exception, CancellationToken.None);
+            await WriteInvalidConfigurationAsync(options.Error, failures, CancellationToken.None);
             exitCode = ExitCodes.InvalidConfiguration;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested || session is { IsCancellationRequested: true })
@@ -171,11 +171,22 @@ public static class EnglishTutorApp
     private static long ElapsedMs(TimeProvider timeProvider, long startedAt) =>
         (long)timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
 
+    // P19: one invalid Options class throws OptionsValidationException; several throw an AggregateException with
+    // one OptionsValidationException each. Any other inner exception keeps the unexpected-error path.
+    private static List<string>? ValidationFailures(Exception exception) => exception switch
+    {
+        OptionsValidationException validation => [.. validation.Failures],
+        AggregateException aggregate when aggregate.InnerExceptions.Count > 0
+            && aggregate.InnerExceptions.All(inner => inner is OptionsValidationException) =>
+            [.. aggregate.InnerExceptions.Cast<OptionsValidationException>().SelectMany(inner => inner.Failures)],
+        _ => null,
+    };
+
     private static async Task WriteInvalidConfigurationAsync(
-        TextWriter error, OptionsValidationException exception, CancellationToken ct)
+        TextWriter error, IReadOnlyList<string> failures, CancellationToken ct)
     {
         await error.WriteLineAsync(ConsoleText.InvalidConfiguration.AsMemory(), ct);
-        foreach (var failure in exception.Failures)
+        foreach (var failure in failures)
         {
             await error.WriteLineAsync($"  {failure}".AsMemory(), ct);
         }
