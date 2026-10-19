@@ -30,18 +30,18 @@ public sealed class ChatSessionTests : IDisposable
         await sut.RunAsync(TestContext.Current.CancellationToken);
 
         _output.ToString().Should().Contain("Unknown command \"/xyz\".");
-        _output.ToString().Should().Contain("Available commands: /help, /quit");
+        _output.ToString().Split(Environment.NewLine).Should().Contain("Available commands: /help, /mode, /quit");
     }
 
     // US-001 — Cenário: comando local desconhecido — RN-CONV06
     [Fact]
     public async Task RunAsync_AfterUnknownCommand_KeepsSessionOpenAndForwardsNothing()
     {
-        var sut = CreateSession("/xyz", "/mode interview", "/quit");
+        var sut = CreateSession("/xyz", "/foo bar", "/quit");
 
         var exitCode = await sut.RunAsync(TestContext.Current.CancellationToken);
 
-        _output.ToString().Should().Contain("Unknown command \"/mode\".",
+        _output.ToString().Should().Contain("Unknown command \"/foo\".",
             because: "the session must keep reading after an unknown command");
         exitCode.Should().Be(0);
         _handler.Inputs.Should().BeEmpty();
@@ -140,6 +140,49 @@ public sealed class ChatSessionTests : IDisposable
 
         exitCode.Should().Be(0);
         _handler.Inputs.Should().Equal("hello", "\uFEFF/quit");
+    }
+
+    // US-004 — Cenário: troca de modo pelo console — RN-CONV01, RN-CONV06
+    [Fact]
+    public async Task RunAsync_WhenUserTypesModeWithKnownName_ChangesModeAndConfirms()
+    {
+        var sut = CreateSession("/mode job-interview", "/quit");
+
+        await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        _handler.ModeChanges.Should().Equal(TutorMode.JobInterview);
+        _output.ToString().Should().Contain("Mode changed to \"job-interview\". It applies from your next sentence.");
+        _handler.Inputs.Should().BeEmpty();
+    }
+
+    // US-004 — Cenário: troca de modo pelo console — RN-CONV06
+    [Fact]
+    public async Task RunAsync_WhenUserTypesHelp_ListsModeCommandWithAllModes()
+    {
+        var sut = CreateSession("/help", "/quit");
+
+        await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        _output.ToString().Split(Environment.NewLine).Should()
+            .Contain("  /mode - Change the mode: free-conversation, job-interview, listening-practice");
+    }
+
+    // US-004 — Cenário: modo desconhecido pelo console — RN-CONV01, RN-CONV06
+    [Theory]
+    [InlineData("/mode interview", "Unknown mode \"interview\".")]
+    [InlineData("/mode", "Choose a mode: /mode <mode>.")]
+    public async Task RunAsync_WhenUserTypesModeWithUnknownOrMissingName_ShowsAvailableModesAndKeepsMode(
+        string command, string firstLine)
+    {
+        var sut = CreateSession(command, "/quit");
+
+        await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        _output.ToString().Should().Contain(
+            firstLine + Environment.NewLine + "Available modes: free-conversation, job-interview, listening-practice");
+        _handler.ModeChanges.Should().BeEmpty();
+        _handler.Mode.Should().Be(TutorMode.FreeConversation);
+        _handler.Inputs.Should().BeEmpty();
     }
 
     public void Dispose() => _output.Dispose();
