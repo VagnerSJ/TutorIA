@@ -846,6 +846,18 @@ Rodada final de 2026-10-19, HEAD `c8af838` (último código em `f3f153c`), Claud
 
 Risco S11 (§7), anotação pedida: o `claude --help` (2.1.304) oferece `--setting-sources <sources>` (lista de fontes de configuração a carregar), `--settings <file-or-json>` e `--exclude-dynamic-system-prompt-sections`. Qualquer um deles poderia restringir a configuração de usuário. Adotar é decisão de ADR em outra US, não do Executor. A herança de variáveis do app desktop também levou dados da conta ao contexto (§12 E3).
 
+**Nova medição depois da opção (a) do E3** (2026-10-19; prompts em `2cb0f7a`: `tutor.md`, `format.json.md` e, para os dois modos ficarem coerentes, `format.tags.md` dizem que a pergunta é a última frase do `reply` e que nada vem depois dela). Tudo sem as variáveis herdadas do app desktop:
+
+| Medição | Antes (prompts de `f3f153c`) | Depois (`2cb0f7a`) |
+|---|---|---|
+| Diagnóstico por chamada (5 frases × 4 rodadas, processo novo por chamada; teste temporário, não commitado) | 4/20 fora do formato (20%) | 0/20 na 1ª rodada + 2/20 na 2ª = **2/40 (5%)** |
+| Rodadas completas do D5 (`Category=LiveBrain&FullyQualifiedName~ClaudeCode`) | 1 verde de 3 | **2 verdes de 5** (rodadas 1 e 3; as outras falharam em `WithFiveKnownErrors` ou `WithGrammarErrorSentence` por `reply must end with a question`) |
+| Respostas fora do formato dentro das rodadas do D5 (8 chamadas por rodada) | — | 4/40 (10%) |
+
+Exemplos que continuam recusados: `"... What kind of projects do you work on there? I'd love to hear more about your day-to-day work."` e `"... Which kind of projects do you usually build with it? Tell me about your most recent one."`. As correções esperadas seguem ≥ 4/5 em todas as rodadas.
+
+Depois da mudança de prompts: D1 → 0 Aviso(s), 0 Erro(s); D2 → 216 passed (103 + 41 + 72), 0 failed; D4 → código de saída 0 (2026-10-19, 2cb0f7a). **O D5 continua ❌ intermitente**: a taxa caiu de cerca de 20% para 5–10% por chamada, mas "5/5 no formato" ainda falha em 3 de 5 rodadas. A T18 fica aberta (§12 E4).
+
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
@@ -938,3 +950,4 @@ Opção (a): reforçar em `prompts/tutor.md` e `prompts/format.json.md` que a pe
 - O Executor faz a alteração dos prompts num commit próprio (`feat(brain)` ou `fix(brain)`), sem tocar em `format.tags.md` além do necessário para manter os dois modos coerentes.
 - Depois, roda o D5 várias vezes (pelo menos 5 rodadas completas, sem as variáveis herdadas do app desktop) e registra na §11 a taxa de respostas fora do formato antes × depois e quantas rodadas do D5 ficaram verdes.
 - Se o D5 continuar intermitente, o Executor registra o resultado e para; a próxima decisão é do usuário.
+- **E4 (D5 depois da opção (a) — parada)** — O reforço nos prompts (`2cb0f7a`) reduziu as respostas fora do formato de cerca de 20% (4/20) para 5–10% (2/40 no diagnóstico, 4/40 nas rodadas do D5), mas o D5 ficou verde em só 2 de 5 rodadas. Detalhes na §11. Conforme a instrução, o Executor registrou o resultado e parou, sem mexer em spec, testes, validador ou modelo. A T18 continua aberta. O que resta é decisão do usuário: outro ajuste de prompt, aceitar a taxa (a retentativa do ADR-006 cobre no app) mudando o critério do D5 na spec, ou trocar o modelo. Escopo do commit: os prompts entraram como `docs(ai)`; eles mudam o comportamento do professor, e `feat(brain)` seria mais preciso.
