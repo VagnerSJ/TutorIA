@@ -130,6 +130,7 @@ public static class EnglishTutorApp
             .Bind(builder.Configuration.GetSection(BrainOptions.SectionName))
             .ValidateOnStart();
 
+        options.ConfigureServices?.Invoke(builder.Services);
         return builder.Build();
     }
 

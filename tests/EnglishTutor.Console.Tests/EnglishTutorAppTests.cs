@@ -1,11 +1,15 @@
 using System.Text.Json;
 using EnglishTutor.Console.Tests.Support;
+using EnglishTutor.Core.Brain;
+using EnglishTutor.Core.Conversation;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EnglishTutor.Console.Tests;
 
 public sealed class EnglishTutorAppTests : IDisposable
 {
+    private readonly ScriptedTutorBrain _brain = new();
     private readonly StringWriter _output = new();
     private readonly StringWriter _error = new();
     private readonly string _logDirectory =
@@ -61,15 +65,16 @@ public sealed class EnglishTutorAppTests : IDisposable
         exitCode.Should().Be(0);
     }
 
-    // US-001 — apoio: implementação provisória sem cérebro (D11)
+    // US-001 — apoio: implementação provisória sem cérebro (D11); US-004 — apoio, P7: Ollama ainda não conectado
     [Fact]
-    public async Task RunAsync_WhenUserTypesText_ShowsTutorNotConnected()
+    public async Task RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected()
     {
-        var options = CreateOptions("ClaudeCode", "hello");
+        var options = CreateOptions("Ollama", "hello");
 
         await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
 
         _output.ToString().Should().Contain("The tutor is not connected yet.");
+        _brain.Requests.Should().BeEmpty();
     }
 
     // US-001 — Cenário: logs estruturados
@@ -187,6 +192,91 @@ public sealed class EnglishTutorAppTests : IDisposable
         aborted.TryGetProperty("ElapsedMs", out _).Should().BeTrue();
     }
 
+    // US-004 — Cenário: console conversa pelo ConversationService — RN-BRAIN01, RN-CONV03
+    [Fact]
+    public async Task RunAsync_WhenUserSendsTwoSentences_SecondRequestCarriesFirstTurnAndShowsBothReplies()
+    {
+        _brain.Returns(ConsoleTutorReplies.Valid("t1")).Returns(ConsoleTutorReplies.Valid("t2"));
+        var options = CreateOptions("ClaudeCode", "first sentence t1", "second sentence t2", "/quit");
+
+        await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        _brain.Requests.Should().HaveCount(2);
+        var messages = _brain.Requests[1].Messages;
+        messages.Should().HaveCount(3);
+        messages[0].Role.Should().Be(BrainRole.User);
+        messages[0].Content.Should().Contain("first sentence t1");
+        messages[1].Should().Be(new BrainMessage(BrainRole.Assistant, "raw answer t1"));
+        messages[2].Role.Should().Be(BrainRole.User);
+        messages[2].Content.Should().Contain("second sentence t2");
+        var lines = _output.ToString().Split(Environment.NewLine);
+        lines.Should().Contain(line => line.EndsWith("Tutor: Reply t1?", StringComparison.Ordinal));
+        lines.Should().Contain("  - orig t1 → fixed t1 (why t1)");
+        lines.Should().Contain(line => line.EndsWith("Tutor: Reply t2?", StringComparison.Ordinal));
+        lines.Should().Contain("  - orig t2 → fixed t2 (why t2)");
+        _output.ToString().Should().NotContain("The tutor is not connected yet.");
+    }
+
+    // US-004 — Cenário: troca de modo pelo console — RN-CONV01
+    [Fact]
+    public async Task RunAsync_AfterModeCommand_NextBrainMessageCarriesNewMode()
+    {
+        _brain.Returns(ConsoleTutorReplies.Valid("t1"));
+        var options = CreateOptions("ClaudeCode", "/mode job-interview", "sentence t1", "/quit");
+
+        await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        _brain.Requests.Should().ContainSingle()
+            .Which.Messages[^1].Content.Should().EndWith("Mode: job-interview");
+        _output.ToString().Should().Contain("Mode changed to \"job-interview\". It applies from your next sentence.");
+    }
+
+    // US-004 — Cenário: modo desconhecido pelo console — RN-CONV01, RN-CONV06
+    [Fact]
+    public async Task RunAsync_AfterUnknownMode_SendsNothingAndKeepsFreeConversation()
+    {
+        _brain.Returns(ConsoleTutorReplies.Valid("t1"));
+        var options = CreateOptions("ClaudeCode", "/mode interview", "sentence t1", "/quit");
+
+        await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        _brain.Requests.Should().ContainSingle()
+            .Which.Messages[^1].Content.Should().EndWith("Mode: free-conversation");
+    }
+
+    // US-004 — Cenário: janela de turnos configurável — RN-CONV03
+    [Fact]
+    public async Task RunAsync_WhenMaxTurnsInWindowIsZero_ExitsWithInvalidConfigurationBeforePrompt()
+    {
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode", extraValues: new Dictionary<string, string?> { ["Conversation:MaxTurnsInWindow"] = "0" }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Conversation:MaxTurnsInWindow must be at least 1 (found 0)")
+            .And.Contain("Expected");
+        _output.ToString().Should().BeEmpty();
+    }
+
+    // US-004 — apoio, P11: falha do cérebro até a US-005.
+    // Substituído na US-005, cenário "falha do cérebro no console não encerra a sessão".
+    [Fact]
+    public async Task RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError()
+    {
+        _brain.Throws(new BrainException(BrainErrorKind.Unknown, "Claude Code failed (exit code 1): test"));
+        var options = CreateOptions("ClaudeCode", "sentence t1", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.UnexpectedError);
+        _error.ToString().Should().Contain("An unexpected error occurred. See the log file for details.");
+    }
+
     public void Dispose()
     {
         _output.Dispose();
@@ -202,7 +292,12 @@ public sealed class EnglishTutorAppTests : IDisposable
             new StringReader(Lines(lines)),
             _output,
             _error,
-            TestConfiguration.Create(provider));
+            TestConfiguration.Create(provider),
+            ConfigureServices: services =>
+            {
+                services.AddSingleton<ITutorBrain>(_brain);
+                services.AddSingleton<ITutorPromptSource>(new FixedTutorPromptSource());
+            });
 
     private List<JsonElement> ReadLogEvents()
     {
