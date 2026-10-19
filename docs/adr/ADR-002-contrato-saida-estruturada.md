@@ -41,3 +41,14 @@ Fatos verificados na documentação do Claude Code v2.1.299:
 
 - Correções chegam estruturadas → `RecurringErrors` (RN-PERS02) e o `eval` (US-009) ficam triviais.
 - Risco: latência extra do `--json-schema` no Claude Code e dificuldade de streaming do TTS na Fase 6. A US-004 mede JsonSchema × Tags; se a diferença for grande, este ADR será revisto (por exemplo, tags no modo streaming).
+
+## Medição (US-004)
+
+2026-10-19 — `LatencyMeasurementLiveTests` (D7), 5 frases de fumaça da US-004 por modo, cada uma num processo `claude -p` novo (sem `--resume`), modelo `haiku` (`claude-haiku-5-5`), Claude Code CLI 2.1.304 (instalador nativo), AMD Ryzen 9 5900X, 32 GB, Windows 11. Tempo medido em volta de `ClaudeCodeTutorBrain.SendAsync` (inclui o arranque do processo).
+
+| Modo | n | média (ms) | p95 (ms) | fora do formato |
+|---|---|---|---|---|
+| JsonSchema | 5 | 4982 | 5554 | 0 |
+| Tags | 5 | 3642 | 4183 | 1 |
+
+Leitura: o `--json-schema` custou cerca de 1,3 s a mais por turno nesta amostra, mas deu 5/5 no formato, contra 4/5 no modo Tags. Amostra pequena; a decisão (JsonSchema como padrão) não muda nesta US, e a US-009 repete a medição com o golden set.
