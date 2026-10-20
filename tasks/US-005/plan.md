@@ -521,3 +521,18 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-20 — Usuário (no chat)
+
+> "Aprovado, incorpore todas as sugestões S1–S8"
+
+Plano aprovado com a condição de incorporar as sugestões S1 a S8 de `tasks/US-005/plan-review.md` (Rodada 1). Os padrões propostos para P1 a P16 foram aceitos, inclusive a mudança do D5 na spec (P4 e P15).
+
+- **S1:** incluir um caso de classificação em que o `result` de erro não casa com nenhum padrão e o stderr casa, para provar as duas fontes.
+- **S2:** incluir um teste com o cancelamento do chamador e o tempo estourado ao mesmo tempo, provando a parte `!ct.IsCancellationRequested` do filtro, ou retirar a afirmação do plano.
+- **S3:** a T1 e a T4b devem dizer que as mutações são aplicadas depois do Green commitado e desfeitas pela edição inversa.
+- **S4:** o comando de gravação das fixtures usa os mesmos argumentos de isolamento do adaptador (RN-BRAIN06), ou o `README.md` das fixtures registra a diferença.
+- **S5:** no esperado do D6, dizer como o tratamento do BOM é observado, ou retirar o item.
+- **S6:** registrar na P9 (e no ADR-008, "Consequências") que os códigos de início diferentes de 2 e 3 (5, 193) viram `Unknown` e não acionam o fallback da US-007.
+- **S7:** o esqueleto do Red da T5 inclui a nova construção do `ConversationInputHandler` no `EnglishTutorApp`, sem `catch` e sem mudar comportamento, para que o Red compile.
+- **S8:** o Planejador decide se a mensagem de `NotAuthenticated` também menciona a `ANTHROPIC_API_KEY` do ambiente, e registra a decisão.
