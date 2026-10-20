@@ -59,6 +59,7 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 - Siga `ARCHITECTURE.md` e o plano. Se precisar desviar (o plano está errado ou incompleto), **pare**, explique o desvio e proponha a alteração **no plan.md** (seção "Perguntas em aberto") — não decida sozinho mudanças de comportamento ou de arquitetura. Intenção muda no documento primeiro, depois no código.
 - Quando o pedido (plano, comentário do usuário ou sugestão de revisão) deixar uma escolha de forma em aberto (texto de mensagem, nome ou Id de evento, código de saída etc.), registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` **antes** do commit `feat`/`fix` que a implementa (AP-009).
 - Quando a §12 (decisão do usuário) fixa o tipo ou o escopo de um commit, use exatamente esse; para divergir, registre o motivo na §12 **antes** do commit. Arquivo de `prompts/` que muda o comportamento do professor é `feat(brain)` ou `fix(brain)`, nunca `docs(ai)` (AP-033).
+- Literais de string com `\`, `\u`, aspas ou `%` são editados com a ferramenta de edição de arquivo, não com `perl`, `sed` ou `awk` em linha de comando, que passam o texto por camadas de escape do shell. Se for inevitável, confira o `git diff` do trecho e rode o D15 antes de seguir (AP-038).
 - Nunca enfraqueça ou apague um teste para fazê-lo passar.
 - Não use `--no-verify`, não faça push, não faça merge em `develop`/`main`.
 - Testes que chamam provedores reais levam `[Trait("Category","LiveBrain")]`.

@@ -362,7 +362,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** segundo o relato do usuário, o Executor usou `perl` em linha de comando para alterar literais de string de código C#. Barras invertidas, `\uXXXX` e aspas passam por camadas de interpretação do shell e do perl e saem alterados. Os detalhes do incidente não estão em `plan.md`. Parente do AP-007 (escapes corrompidos por ferramentas de edição).
 - **Por que importa:** a corrupção é silenciosa em literais e só aparece em teste ou no D15; o hook de formatação não a pega.
 - **Correção (proposta):** `.claude/agents/executor.md` e `.claude/skills/tdd-dotnet/SKILL.md`: "literais de string com `\`, `\u`, aspas ou `%` são editados com a ferramenta de edição de arquivo, não com `perl`/`sed`/`awk` em linha de comando; se for inevitável, confira o `git diff` do trecho e rode o D15 antes de seguir".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 38")
 
 ### AP-039 — `ValidateOnStart` com várias Options muda a exceção de partida; normalização sem teste no consumidor
 

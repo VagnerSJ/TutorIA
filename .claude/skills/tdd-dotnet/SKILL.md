@@ -35,6 +35,7 @@ tests/EnglishTutor.Infrastructure.Tests/
 - FluentAssertions 7 não informa a análise de nulidade: depois de `result.IsValid.Should().BeTrue()`, o `[MemberNotNullWhen]` não vale e `result.Reply.Reply` gera CS8602 (erro, com `TreatWarningsAsErrors`). Acesse `result.Reply!` (o `!` é seguro porque a asserção anterior já falha o teste); idem `result.Rejection!` depois de `IsValid.Should().BeFalse()`. Não use `if` no teste para contornar (AP-020).
 - Para comparar records com coleções, compare uma projeção (ex.: `turns.Select(t => t.StudentMessage)`) ou use `BeEquivalentTo`; não use `Equal`/`Be` sobre o record inteiro, porque o membro `IReadOnlyList<T>` é comparado por referência (AP-028).
 - Quando a mensagem embute texto de biblioteca externa (ex.: `JsonException.Message`), confira um trecho que só o código do projeto produz (AP-015).
+- Literais de string com `\`, `\u`, aspas ou `%` em testes e código são editados com a ferramenta de edição de arquivo, não com `perl`/`sed`/`awk` em linha de comando; se for inevitável, confira o `git diff` do trecho e rode o D15 (AP-038).
 - Valores distintos: em testes de preservação de campo, de janela, de histórico ou de retentativa, cada campo e cada turno têm textos únicos (aluno ≠ professor, `Reply` ≠ `RawText`, resposta rejeitada ≠ aceita), para nenhuma asserção passar por coincidência (AP-017, AP-026).
 
 ## Fakes x mocks
