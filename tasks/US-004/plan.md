@@ -1,6 +1,6 @@
 # Plano — US-004 Conversar por texto com o professor via Claude Code
 
-Status: Aguardando aprovação (revisão de 2026-10-19: RN-FEED01 alterada, §2.10 e T18–T23; a versão anterior foi aprovada em 2026-10-17; revisão de 2026-10-20: sugestões S1–S6 da Rodada 4 incorporadas e S7 aceita como risco, §12)
+Status: Aprovado em 2026-10-20 (revisão da RN-FEED01, §2.10 e T18–T23; a versão anterior foi aprovada em 2026-10-17)
 Branch: feature/US-004_conversa-texto-claude-code
 Spec: specs/sprints/SPRINT_1.md#us-004
 Regras: RN-BRAIN01, RN-BRAIN02, RN-BRAIN05, RN-BRAIN06, RN-CONV01, RN-CONV03, RN-CONV05, RN-CONV06, RN-FEED01 (alterada em 2026-10-19, §2.10), RN-FEED02–05 (RN-BRAIN07/09 só no limite descrito em §8); ARCHITECTURE §2 (R1–R4), §3, §5, §6.1, §6.2, §6.3, §9, §10; ADR-001, ADR-002 (texto revisado na §2.10), ADR-004, ADR-005 (texto revisado na §2.10), ADR-006, ADR-007 (Aceito, novo)
@@ -1286,3 +1286,12 @@ Depois dos ajustes e de uma revisão do plano sem bloqueantes, o plano está apr
   - **S5** → Decisão: o exemplo do `tdd-dotnet` acompanha a regra nova (`SendAsync_WithValidOutput_ReturnsReplyWithOneQuestion`). §2.10.6 (texto antigo e novo; commit `docs(ai): update architecture for US-004` do orquestrador, antes da T18; parágrafo "Repetições em `CLAUDE.md` e skills" corrigido), §3 (linha do `tdd-dotnet`), §5 (pré-condição da revisão), §10 D16 (varre `.claude\skills`, padrão `ReturnsReplyEndingWithQuestion`) e DoD comum.
   - **S6** → `IsQuestion_WithSentence_ReturnsWhetherItEndsWithQuestionMark` virou `IsQuestion_WithSentence_ReturnsWhetherFinalPunctuationContainsQuestionMark`, igual na §4 (linha do mapa e contagens), §5 T18 e §9 P21; também no histórico acima (resposta de 2026-10-19), para uma busca pelo nome antigo não achar mais nada. A contagem (7 casos) não muda.
   - **S7** → §7 (linha nova: risco aceito de forma explícita, com motivo, mitigações em vigor e condição para revisitar; sem US de destino, sem ADR agora e sem promessa), §8 (item reescrito; o teste do `TutorNotConnectedInputHandler.ChangeMode`, S4 do `review.md`, ficou em item próprio, ainda para decisão do usuário), §1 e o fecho da resposta de 2026-10-19 acima. Nada a registrar em spec de destino (AP-022), porque não há US de destino. A decisão fica aqui na §12 antes da próxima revisão de código.
+
+### 2026-10-20 — aprovação do usuário (revisão da RN-FEED01)
+
+Plano revisado aprovado pelo usuário no chat, com as sugestões S1–S6 da rodada 4 incorporadas e a rodada 5 da revisão do plano sem bloqueantes.
+
+- Perguntas em aberto P20–P26: valem as respostas padrão propostas na §9.
+- S7 (privacidade do ambiente herdado): risco aceito de forma explícita por enquanto (§7, §8).
+- §2.10.6 aplicada antes da T18: `docs(ai): update spec for US-004` (`specs/PRODUCT.md`) e `docs(ai): update architecture for US-004` (`ARCHITECTURE.md`, ADR-002, ADR-005, `docs/us/US-002.md`, `tdd-dotnet`).
+- As sugestões S1 e S2 da rodada 5 são ajustes de texto (frase do D6 na sessão do D5; a frase "não achar mais nada" da §12) e não bloqueiam; o Executor aplica a S1 ao rodar o D6 na mesma sessão limpa do D5.
