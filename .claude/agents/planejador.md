@@ -86,6 +86,7 @@ Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada li
 | ... | (específicos da US: execução do console, eval, etc.) | ... |
 US que mexe no console: inclua ao menos um comando com pipe no Windows PowerShell 5.1 (BOM na entrada redirecionada, AP-006).
 Checagem de caracteres invisíveis: copie a forma única do `checklist-revisao` §4 (com `LC_ALL=C`), sem reescrever (AP-019).
+Critério `LiveBrain` sobre saída de modelo: diga em que camada ele mede (adaptador ou serviço com retentativa), que tolerância aceita e quantas rodadas seguidas precisa sobreviver (ex.: 3 a 5). Se a tolerância for zero, registre o risco de oscilação e quem decide o que fazer quando ficar vermelho (o usuário, com registro prévio na spec) (AP-032).
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._

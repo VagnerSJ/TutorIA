@@ -308,7 +308,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o D5 da US-004 exigia "5/5 no formato" medido no adaptador, sem a retentativa do ADR-006 que o produto tem. Com o modelo `haiku`, 5 a 20% das chamadas saíam fora do formato, e o D5 ficou vermelho de forma intermitente (2 verdes em 5 rodadas depois do primeiro reforço de prompt). O que resolveu foi mudar a regra (RN-FEED01, "exatamente uma pergunta") e reforçar o prompt, não o critério: 5 rodadas de 8 chamadas verdes, o que é compatível com uma taxa baixa, mas não a prova (risco residual registrado em `docs/us/US-004.md`).
 - **Por que importa:** critério de 100% sobre saída de modelo mede sorte; a DoD vira intermitente e o fluxo trava no fim, depois de todo o código pronto.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md` §0 (revisão de plano): todo critério `LiveBrain` diz em que camada mede (adaptador ou serviço com retentativa), qual tolerância aceita e quantas rodadas seguidas precisa sobreviver (ex.: 3 a 5) antes da aprovação do plano; (b) se a tolerância for zero, o plano registra o risco de oscilação e quem decide o que fazer quando ficar vermelho (usuário, com registro prévio na spec).
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 32")
 
 ### AP-033 — Tipo de commit diferente do que o usuário decidiu
 

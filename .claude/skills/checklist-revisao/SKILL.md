@@ -17,6 +17,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Consistência interna: §3 (arquivos) × §4 (testes) × §5 (tarefas) × §6 (pacotes), com contagens que batem e nomes de teste da §5 idênticos aos da §4 (AP-025).
 - Transformações citadas nas tabelas de mensagens da §2 (corte, normalização, limite) têm teste nos dois lados do limite (AP-016); asserção sobre mensagem que embute texto de biblioteca confere um trecho que só o projeto produz (AP-015).
 - [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
+- Critério `LiveBrain` sobre saída de modelo diz a camada medida (adaptador ou serviço com retentativa), a tolerância e quantas rodadas seguidas precisa sobreviver; com tolerância zero, o plano registra o risco de oscilação e quem decide quando ficar vermelho (AP-032).
 - Alteração proposta na `ARCHITECTURE.md` lista também as linhas do `CLAUDE.md` e das skills que repetem a mesma regra.
 - Riscos técnicos e ambiguidades que travariam o Executor estão tratados ou viraram pergunta em aberto.
 - Viabilidade técnica no SDK e nas bibliotecas em uso.
