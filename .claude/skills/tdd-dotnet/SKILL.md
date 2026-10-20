@@ -37,6 +37,7 @@ tests/EnglishTutor.Infrastructure.Tests/
 - Quando a mensagem embute texto de biblioteca externa (ex.: `JsonException.Message`), confira um trecho que só o código do projeto produz (AP-015).
 - Literais de string com `\`, `\u`, aspas ou `%` em testes e código são editados com a ferramenta de edição de arquivo, não com `perl`/`sed`/`awk` em linha de comando; se for inevitável, confira o `git diff` do trecho e rode o D15 (AP-038).
 - Tabela de decisão (linhas avaliadas em ordem, ou que se sobrepõem): cada linha tem um caso de teste que só ela satisfaz; condição composta ("A ou B") tem um caso por parte; auxiliares de teste que montam a entrada declaram os campos que decidem a linha (ex.: `"type": "result"`), para o caso não cair em silêncio numa linha anterior (AP-041).
+- Ao trocar o nome de um cenário (ou o texto de um rótulo) em comentários de teste, releia cada comentário alterado contra o corpo do teste, não só o texto antigo: a substituição mecânica pode deixar um rótulo que não descreve mais o que o teste cobre (AP-042).
 - Valores distintos: em testes de preservação de campo, de janela, de histórico ou de retentativa, cada campo e cada turno têm textos únicos (aluno ≠ professor, `Reply` ≠ `RawText`, resposta rejeitada ≠ aceita), para nenhuma asserção passar por coincidência (AP-017, AP-026).
 
 ## Fakes x mocks

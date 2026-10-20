@@ -398,4 +398,4 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** ao trocar o nome antigo do cenário pelo novo (S2 da Rodada 4), o comentário de `Validate_WhenReplyEndsWithQuestionFollowedBySpaces_IsValidAndTrimmed` ficou `Cenário: reply sem pergunta (apoio, P6)`, que não descreve o que o teste cobre. Sem efeito observável, só rótulo.
 - **Por que importa:** comentário que mente confunde quem lê o mapa cenário → teste.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "ao trocar o nome de um cenário, releia cada comentário alterado contra o corpo do teste, não só o texto antigo".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 42")
