@@ -95,16 +95,41 @@ public sealed class TutorReplyParserTests
         result.Rejection!.Message.Should().Contain("\"corrections\" is a string").And.Contain("Expected ");
     }
 
-    // US-002 — Cenário: reply sem pergunta final — RN-FEED01
+    // US-002 — Cenário: reply sem pergunta — RN-FEED01
     [Fact]
-    public void Parse_WhenJsonReplyHasNoFinalQuestion_RejectsWithQuestionReason()
+    public void Parse_WhenJsonReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason()
     {
         var raw = Fixture.Read("TutorReply/json-reply-without-question.json");
 
         var result = _sut.Parse(raw);
 
         result.IsValid.Should().BeFalse();
-        result.Rejection!.Reason.Should().Be("reply must end with a question");
+        result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
+    }
+
+    // US-004 — Cenário: pergunta seguida de incentivo é aceita — RN-FEED01
+    [Fact]
+    public void Parse_WhenJsonReplyAsksQuestionThenEncourages_ReturnsReply()
+    {
+        var raw = """{"reply":"Was it busy in the morning? Tell me about your commute.","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}""";
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be("Was it busy in the morning? Tell me about your commute.");
+    }
+
+    // US-004 — Cenário: reply com duas perguntas é inválido — RN-FEED01
+    [Fact]
+    public void Parse_WhenJsonReplyAsksTwoQuestions_RejectsWithExactlyOneQuestionReason()
+    {
+        var raw = """{"reply":"Was it busy? How long was the trip?","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}""";
+
+        var result = _sut.Parse(raw);
+
+        result.IsValid.Should().BeFalse();
+        result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
+        result.Rejection!.Message.Should().Contain("has 2 questions");
     }
 
     // US-002 — Cenário: mais de duas correções — RN-FEED02
@@ -206,14 +231,14 @@ public sealed class TutorReplyParserTests
         result.Reply!.Praise.Should().BeNull();
     }
 
-    // US-002 — Cenário: reply sem pergunta final (mesma regra nos dois formatos) — RN-BRAIN03, RN-FEED01
+    // US-002 — Cenário: reply sem pergunta (mesma regra nos dois formatos) — RN-BRAIN03, RN-FEED01
     [Fact]
-    public void Parse_WhenTagsReplyHasNoFinalQuestion_RejectsWithQuestionReason()
+    public void Parse_WhenTagsReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason()
     {
         var result = _sut.Parse("<reply>I like that.</reply><feedback>- Praise: Nice sentence.</feedback>");
 
         result.IsValid.Should().BeFalse();
-        result.Rejection!.Reason.Should().Be("reply must end with a question");
+        result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
     }
 
     // US-002 — Cenário: resposta fora do formato — RN-FEED01
