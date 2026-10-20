@@ -389,7 +389,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** na tabela de `ClaudeCodeOutput.Read` (§2.5) as linhas se sobrepõem (código ≠ 0 e `is_error`), e um caso de teste podia cair numa linha anterior e deixar a seguinte sem cobertura. Depois, a linha 2 tinha condição composta ("não é JSON" ou "não é `type: result`") e o auxiliar de teste decidia em silêncio qual linha casava. Corrigido com casos como `other-type` e `json-array`, que usam um `structured_output` válido, e auxiliares que declaram `"type": "result"`. Variação do AP-016.
 - **Por que importa:** o teste passa pela linha errada e a regra certa fica sem prova.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "em tabela de decisão, cada linha tem um caso que só ela satisfaz; condição composta tem um caso por parte; auxiliares de teste que montam a entrada declaram os campos que decidem a linha".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 41")
 
 ### AP-042 — Rótulo de comentário alterado por substituição mecânica deixa de descrever o teste
 

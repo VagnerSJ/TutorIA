@@ -36,6 +36,7 @@ tests/EnglishTutor.Infrastructure.Tests/
 - Para comparar records com coleções, compare uma projeção (ex.: `turns.Select(t => t.StudentMessage)`) ou use `BeEquivalentTo`; não use `Equal`/`Be` sobre o record inteiro, porque o membro `IReadOnlyList<T>` é comparado por referência (AP-028).
 - Quando a mensagem embute texto de biblioteca externa (ex.: `JsonException.Message`), confira um trecho que só o código do projeto produz (AP-015).
 - Literais de string com `\`, `\u`, aspas ou `%` em testes e código são editados com a ferramenta de edição de arquivo, não com `perl`/`sed`/`awk` em linha de comando; se for inevitável, confira o `git diff` do trecho e rode o D15 (AP-038).
+- Tabela de decisão (linhas avaliadas em ordem, ou que se sobrepõem): cada linha tem um caso de teste que só ela satisfaz; condição composta ("A ou B") tem um caso por parte; auxiliares de teste que montam a entrada declaram os campos que decidem a linha (ex.: `"type": "result"`), para o caso não cair em silêncio numa linha anterior (AP-041).
 - Valores distintos: em testes de preservação de campo, de janela, de histórico ou de retentativa, cada campo e cada turno têm textos únicos (aluno ≠ professor, `Reply` ≠ `RawText`, resposta rejeitada ≠ aceita), para nenhuma asserção passar por coincidência (AP-017, AP-026).
 
 ## Fakes x mocks
