@@ -1244,3 +1244,12 @@ O usuário decidiu tratar o D5 mudando a regra, não o critério do D5 nem o mod
   - §10 e §11 (nova rodada do D5, pelo menos 5 vezes, e D6) → §10 (D5 com 5 rodadas seguidas, limpeza do ambiente e camada medida, review S3 e aprendizado do `review.md`; D6 com "exatamente uma pergunta"; D16–D18), §9 P26, §5 T23 (antiga T18, renumerada para o fim; para na primeira rodada vermelha), §11 (nota: a rodada nova entra numa seção própria).
   - Riscos → §7 (5 linhas novas: duas perguntas com o prompt permissivo, limites do separador, alcance da regra em todos os provedores, texto antigo sobrevivente, ambiente do D5).
   - Não incorporado neste item: S2 (privacidade do ambiente herdado) e S4 (teste do `ChangeMode` com Ollama) do `review.md`, que não fazem parte da decisão sobre a RN-FEED01 (§8).
+
+### 2026-10-20 — pedido do usuário (sugestões da rodada 4, `plan-review.md`)
+
+O usuário aprovou o plano revisado (RN-FEED01 nova, T18–T23, P20–P26 com as respostas padrão) e pediu:
+
+- Incorporar as sugestões **S1–S6** da Rodada 4 (texto completo e "Esperado" em [plan-review.md](plan-review.md), Rodada 4).
+- **S7 — risco de privacidade do ambiente herdado (S2 do `review.md`): aceito de forma explícita por enquanto.** O processo `claude` herda o ambiente de quem abre o console (`CLAUDECODE`, `CLAUDE_CODE_*`, `ANTHROPIC_BASE_URL`); numa gravação, o nome do titular da conta chegou ao contexto do professor. Sem US de destino e sem ADR agora. Registrar na §7 e na §8 como risco aceito (junto ao S11), com o motivo e a condição para revisitar (ex.: quando o app for distribuído a outras pessoas ou aberto por um app desktop), sem criar promessa para outra US (AP-022). As fixtures commitadas foram gravadas sem as variáveis herdadas.
+
+Depois dos ajustes e de uma revisão do plano sem bloqueantes, o plano está aprovado pelo usuário.
