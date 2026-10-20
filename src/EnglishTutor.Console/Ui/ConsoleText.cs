@@ -1,3 +1,4 @@
+using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 
 namespace EnglishTutor.Console.Ui;
@@ -16,6 +17,19 @@ public static class ConsoleText
     // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
     public static string StartupFailed(string reason) => $"The application could not start: {reason}";
 
+    public const string FeedbackHeader = "Feedback:";
+
+    // US-004 P8: "Tutor: <reply>", then the feedback lines when there are any (none for a raw fallback).
+    public static IReadOnlyList<string> TutorReply(TutorReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var feedback = FeedbackFormatter.Format(reply);
+        return feedback.Count == 0
+            ? [$"Tutor: {reply.Reply}"]
+            : [$"Tutor: {reply.Reply}", FeedbackHeader, .. feedback.Select(line => $"  - {line}")];
+    }
+
     public static IReadOnlyList<string> Header(string provider, TutorMode mode) =>
     [
         "EnglishTutor",
@@ -27,6 +41,19 @@ public static class ConsoleText
     [
         "Available commands:",
         .. LocalCommands.Available.Select(command => $"  {command.Name} - {command.Description}"),
+    ];
+
+    public static string ModeChanged(TutorMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(mode);
+        return $"Mode changed to \"{mode.Name}\". It applies from your next sentence.";
+    }
+
+    // Blank name: asks for one; unknown name: says which. Both list the modes.
+    public static IReadOnlyList<string> ModeNotRecognized(string name) =>
+    [
+        string.IsNullOrWhiteSpace(name) ? $"Choose a mode: {LocalCommands.Mode} <mode>." : $"Unknown mode \"{name}\".",
+        $"Available modes: {string.Join(", ", TutorMode.All.Select(mode => mode.Name))}",
     ];
 
     public static IReadOnlyList<string> UnknownCommand(string name) =>

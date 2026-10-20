@@ -52,7 +52,7 @@ Cinco hábitos de trabalho com IA estão embutidos na estrutura: contexto curto 
 
 ## Como rodar
 
-> Disponível desde a US-001 (casca de console: cabeçalho, `/help`, `/quit`; ainda sem professor). Logs em `logs/`. Detalhes em [docs/us/US-001.md](docs/us/US-001.md). Desde a US-002 existe o parser da resposta do professor (JSON e tags), ainda sem uso no console: [docs/us/US-002.md](docs/us/US-002.md). Desde a US-003 o Core tem o `ConversationService` (histórico, janela de turnos, retentativa de formato), ainda sem cérebro real ligado; no console, linha em branco mostra um aviso local: [docs/us/US-003.md](docs/us/US-003.md).
+> Disponível desde a US-001 (casca de console: cabeçalho, `/help`, `/quit`). Logs em `logs/`. Detalhes em [docs/us/US-001.md](docs/us/US-001.md). Desde a US-002 existe o parser da resposta do professor (JSON e tags), ainda sem uso no console: [docs/us/US-002.md](docs/us/US-002.md). Desde a US-003 o Core tem o `ConversationService` (histórico, janela de turnos, retentativa de formato), ainda sem cérebro real ligado; no console, linha em branco mostra um aviso local: [docs/us/US-003.md](docs/us/US-003.md). Desde a US-004 o console conversa por texto com o professor via Claude Code (`claude -p`, requer a CLI instalada e autenticada): mostra o reply e o feedback, e `/mode` troca o modo; com `Brain:Provider = Ollama` ainda responde que o professor não está conectado: [docs/us/US-004.md](docs/us/US-004.md).
 
 ```bash
 dotnet build

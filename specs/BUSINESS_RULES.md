@@ -19,7 +19,7 @@ Regras numeradas e estáveis. Testes e planos devem citar o ID (ex.: `// RN-FEED
 
 ## Feedback (RN-FEED)
 
-- **RN-FEED01** — O `reply` tem de 1 a 3 frases curtas em inglês, nível B1–B2, e termina com **uma** pergunta. Nunca contém correções.
+- **RN-FEED01** — O `reply` tem de 1 a 3 frases curtas em inglês, nível B1–B2, e faz **exatamente uma** pergunta ao aluno: uma única frase termina com `?`, em qualquer posição; as outras frases são comentário ou incentivo (ex.: "Was it busy in the morning? Tell me about your commute."). Nunca contém correções.
 - **RN-FEED02** — O feedback traz **no máximo 2** correções gramaticais/de vocabulário, cada uma com `original → corrected` e uma explicação curta.
 - **RN-FEED03** — Se não houver erros, o feedback traz um elogio (`praise`) a algo bem feito.
 - **RN-FEED04** — Para cada palavra de baixa confiança informada, o feedback pode trazer uma dica de pronúncia simples (ex.: `beach /biːtʃ/ — long 'ee' sound`).
@@ -56,3 +56,4 @@ Regras numeradas e estáveis. Testes e planos devem citar o ID (ex.: `// RN-FEED
 | Data | Regra | Alteração |
 |---|---|---|
 | 2026-10-17 | todas | Versão inicial |
+| 2026-10-19 | RN-FEED01 | "termina com uma pergunta" → "faz exatamente uma pergunta" (uma única frase termina com `?`, em qualquer posição). Motivo: o modelo fecha o `reply` com uma frase de incentivo depois da pergunta, o que é pedagogicamente válido (US-004, D5, `tasks/US-004/plan.md` §12 E3/E4). |

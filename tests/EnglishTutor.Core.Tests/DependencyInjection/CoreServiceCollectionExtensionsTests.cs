@@ -1,7 +1,10 @@
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.DependencyInjection;
+using EnglishTutor.Core.Tests.Fakes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace EnglishTutor.Core.Tests.DependencyInjection;
@@ -39,5 +42,22 @@ public sealed class CoreServiceCollectionExtensionsTests
         read.Should().Throw<OptionsValidationException>()
             .Which.Failures.Should().ContainSingle(
                 failure => failure.Contains("Conversation:MaxTurnsInWindow", StringComparison.Ordinal));
+    }
+
+    // US-004 — Cenário: console conversa pelo ConversationService (apoio: DI do serviço)
+    [Fact]
+    public void AddEnglishTutorCore_WithBrainAndPromptSource_RegistersConversationServiceAsSingleton()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ITutorBrain>(new FakeTutorBrain());
+        services.AddSingleton<ITutorPromptSource>(new FakeTutorPromptSource("system prompt"));
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+
+        services.AddEnglishTutorCore();
+
+        using var provider = services.BuildServiceProvider();
+        var first = provider.GetService<ConversationService>();
+        first.Should().NotBeNull();
+        provider.GetService<ConversationService>().Should().BeSameAs(first);
     }
 }

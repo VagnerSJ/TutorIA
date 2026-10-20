@@ -16,9 +16,11 @@ public static class TutorReplyValidator
             return TutorReplyParseResult.Invalid(TutorReplyRejections.MissingReply());
         }
 
-        if (!reply.EndsWith('?'))
+        // RN-FEED01: exactly one question, in any position; the sentences come from ReplySentences.
+        var questionCount = ReplySentences.Split(reply).Count(ReplySentences.IsQuestion);
+        if (questionCount != 1)
         {
-            return TutorReplyParseResult.Invalid(TutorReplyRejections.ReplyMustEndWithQuestion(reply));
+            return TutorReplyParseResult.Invalid(TutorReplyRejections.ReplyMustAskExactlyOneQuestion(reply, questionCount));
         }
 
         var warnings = new List<string>();

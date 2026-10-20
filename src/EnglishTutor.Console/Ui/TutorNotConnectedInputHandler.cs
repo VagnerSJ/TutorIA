@@ -1,8 +1,18 @@
+using EnglishTutor.Core.Conversation;
+
 namespace EnglishTutor.Console.Ui;
 
-// Provisional handler for US-001: no brain exists yet. Replaced by one that delegates to ConversationService (US-003/004).
+// Used only with Brain:Provider = Ollama until US-006 connects it (US-004 P7).
 public sealed class TutorNotConnectedInputHandler(TextWriter output) : IChatInputHandler
 {
+    public TutorMode Mode { get; private set; } = TutorMode.Default;
+
+    public void ChangeMode(TutorMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(mode);
+        Mode = mode;
+    }
+
     public Task HandleAsync(string text, CancellationToken ct) =>
         output.WriteLineAsync(ConsoleText.TutorNotConnected.AsMemory(), ct);
 }

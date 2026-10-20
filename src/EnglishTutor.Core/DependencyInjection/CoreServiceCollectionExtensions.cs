@@ -16,6 +16,9 @@ public static class CoreServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<BrainOptions>, BrainOptionsValidator>());
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<ConversationOptions>, ConversationOptionsValidator>());
+
+        // One session per process: the service owns the history and the mode (US-004).
+        services.TryAddSingleton<ConversationService>();
         return services;
     }
 }

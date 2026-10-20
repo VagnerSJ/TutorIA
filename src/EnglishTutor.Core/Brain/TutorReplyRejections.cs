@@ -6,7 +6,7 @@ public static class TutorReplyRejections
 {
     public const string MissingReplyReason = "missing reply";
 
-    public const string ReplyMustEndWithQuestionReason = "reply must end with a question";
+    public const string ReplyMustAskExactlyOneQuestionReason = "reply must ask the student exactly one question";
 
     public const string InvalidJsonReason = "invalid JSON";
 
@@ -19,14 +19,16 @@ public static class TutorReplyRejections
         $"{MissingReplyReason}: the answer has no reply text. Expected a JSON object with a non-empty \"reply\" string, " +
         "or the spoken text inside <reply>...</reply> followed by <feedback>...</feedback>.");
 
-    public static TutorReplyRejection ReplyMustEndWithQuestion(string reply)
+    public static TutorReplyRejection ReplyMustAskExactlyOneQuestion(string reply, int questionCount)
     {
         ArgumentNullException.ThrowIfNull(reply);
-        var quoted = reply.Length > _maxQuotedReplyLength ? reply[.._maxQuotedReplyLength] + "..." : reply;
+        var quoted = Quote(reply);
+        var found = questionCount == 0 ? "has no question" : $"has {questionCount} questions";
         return new(
-            ReplyMustEndWithQuestionReason,
-            $"{ReplyMustEndWithQuestionReason}: the reply \"{quoted}\" does not end with \"?\". " +
-            "Expected 1 to 3 short sentences that end with one question to the student.");
+            ReplyMustAskExactlyOneQuestionReason,
+            $"{ReplyMustAskExactlyOneQuestionReason}: the reply \"{quoted}\" {found}. " +
+            "Expected 1 to 3 short sentences with exactly one question to the student " +
+            "(one sentence ending with \"?\", in any position); the other sentences are comments or encouragement.");
     }
 
     public static TutorReplyRejection InvalidJson(string detail)
@@ -47,4 +49,7 @@ public static class TutorReplyRejections
             $"{InvalidCorrectionsReason}: \"corrections\" is a {foundKind}. Expected an array of objects " +
             "{\"original\", \"corrected\", \"explanation\"} (an empty array when there are no errors).");
     }
+
+    private static string Quote(string reply) =>
+        reply.Length > _maxQuotedReplyLength ? reply[.._maxQuotedReplyLength] + "..." : reply;
 }

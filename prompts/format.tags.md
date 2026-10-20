@@ -3,7 +3,7 @@
 Always answer in exactly this format, with nothing before or after it:
 
 <reply>
-The spoken part: 2–3 short sentences ending with one question.
+The spoken part: at most 3 short sentences (never a 4th) with exactly one question (exactly one sentence ends with "?", in any position, and the reply contains no other "?"); the other sentences are comments or encouragement, never a second question.
 </reply>
 <feedback>
 - original → corrected (short explanation)

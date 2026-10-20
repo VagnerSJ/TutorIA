@@ -3,6 +3,8 @@ using EnglishTutor.Console.Ui;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.DependencyInjection;
+using EnglishTutor.Infrastructure.Brain;
+using EnglishTutor.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -54,11 +56,11 @@ public static class EnglishTutorApp
             session = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.ApplicationStopping);
             exitCode = await RunSessionAsync(host.Services, options, logger, session.Token);
         }
-        catch (OptionsValidationException exception)
+        catch (Exception exception) when (ValidationFailures(exception) is { } failures)
         {
-            logger.StartupFailed(string.Join(" ", exception.Failures));
+            logger.StartupFailed(string.Join(" ", failures));
             // CancellationToken.None: a cancellation arriving now must not hide the explanation.
-            await WriteInvalidConfigurationAsync(options.Error, exception, CancellationToken.None);
+            await WriteInvalidConfigurationAsync(options.Error, failures, CancellationToken.None);
             exitCode = ExitCodes.InvalidConfiguration;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested || session is { IsCancellationRequested: true })
@@ -99,15 +101,13 @@ public static class EnglishTutorApp
         IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
     {
         var provider = CanonicalProvider(services);
-        var mode = TutorMode.Default;
-        logger.ApplicationStarted(provider, mode.Name);
+        // P7: only ClaudeCode is connected; Ollama keeps the "not connected" handler until US-006.
+        IChatInputHandler handler = provider == BrainProviders.ClaudeCode
+            ? new ConversationInputHandler(services.GetRequiredService<ConversationService>(), options.Output)
+            : new TutorNotConnectedInputHandler(options.Output);
+        logger.ApplicationStarted(provider, handler.Mode.Name);
 
-        var session = new ChatSession(
-            options.Input,
-            options.Output,
-            new TutorNotConnectedInputHandler(options.Output),
-            provider,
-            mode);
+        var session = new ChatSession(options.Input, options.Output, handler, provider);
         return session.RunAsync(ct);
     }
 
@@ -131,10 +131,18 @@ public static class EnglishTutorApp
 
         builder.Services.Configure<ConsoleLifetimeOptions>(lifetime => lifetime.SuppressStatusMessages = true);
         builder.Services.AddEnglishTutorCore();
+        builder.Services.AddEnglishTutorInfrastructure(Path.Combine(builder.Environment.ContentRootPath, "prompts"));
         builder.Services.AddOptions<BrainOptions>()
             .Bind(builder.Configuration.GetSection(BrainOptions.SectionName))
             .ValidateOnStart();
+        builder.Services.AddOptions<ClaudeCodeOptions>()
+            .Bind(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<ConversationOptions>()
+            .Bind(builder.Configuration.GetSection(ConversationOptions.SectionName))
+            .ValidateOnStart();
 
+        options.ConfigureServices?.Invoke(builder.Services);
         return builder.Build();
     }
 
@@ -163,11 +171,22 @@ public static class EnglishTutorApp
     private static long ElapsedMs(TimeProvider timeProvider, long startedAt) =>
         (long)timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
 
+    // P19: one invalid Options class throws OptionsValidationException; several throw an AggregateException with
+    // one OptionsValidationException each. Any other inner exception keeps the unexpected-error path.
+    private static List<string>? ValidationFailures(Exception exception) => exception switch
+    {
+        OptionsValidationException validation => [.. validation.Failures],
+        AggregateException aggregate when aggregate.InnerExceptions.Count > 0
+            && aggregate.InnerExceptions.All(inner => inner is OptionsValidationException) =>
+            [.. aggregate.InnerExceptions.Cast<OptionsValidationException>().SelectMany(inner => inner.Failures)],
+        _ => null,
+    };
+
     private static async Task WriteInvalidConfigurationAsync(
-        TextWriter error, OptionsValidationException exception, CancellationToken ct)
+        TextWriter error, IReadOnlyList<string> failures, CancellationToken ct)
     {
         await error.WriteLineAsync(ConsoleText.InvalidConfiguration.AsMemory(), ct);
-        foreach (var failure in exception.Failures)
+        foreach (var failure in failures)
         {
             await error.WriteLineAsync($"  {failure}".AsMemory(), ct);
         }

@@ -12,7 +12,7 @@ Um professor de inglês **por voz**, pessoal e local, para um desenvolvedor .NET
 
 | ID | Objetivo | Como o produto ajuda |
 |---|---|---|
-| OA1 | Conversação do dia a dia | Modo `free-conversation`: respostas curtas que sempre terminam em pergunta, mantendo o aluno falando |
+| OA1 | Conversação do dia a dia | Modo `free-conversation`: respostas curtas que sempre fazem exatamente uma pergunta, mantendo o aluno falando |
 | OA2 | Vocabulário de desenvolvimento de software | Assuntos de trabalho; sugestão de 1 expressão mais natural por turno |
 | OA3 | Entrevistas técnicas em inglês | Modo `job-interview`: entrevistador para vaga C#/.NET pleno/sênior (STAR + perguntas técnicas), uma pergunta por vez |
 | OA4 | Compreensão auditiva | Modo `listening-practice` e velocidade de fala configurável |

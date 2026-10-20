@@ -39,8 +39,9 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 
 ## DI e configuração
 
-- Cada projeto expõe uma extensão de registro: `services.AddEnglishTutorCore()`, `services.AddEnglishTutorInfrastructure(configuration)`.
-- Options: `services.AddOptions<BrainOptions>().Bind(config.GetSection("Brain")).ValidateDataAnnotations().ValidateOnStart();` + `IValidateOptions<T>` quando a validação for condicional.
+- Cada projeto expõe uma extensão de registro: `services.AddEnglishTutorCore()`, `services.AddEnglishTutorInfrastructure(promptsDirectory)`. Cada uma registra os validadores das próprias Options; o bind das seções fica no composition root (ADR-004).
+- Options: `services.AddOptions<BrainOptions>().Bind(config.GetSection(BrainOptions.SectionName)).ValidateOnStart();` no composition root + um `IValidateOptions<T>` por classe de Options, com mensagens que dizem o que está errado e o que se espera.
+- Com mais de uma classe de Options validada na partida, falhas simultâneas de seções diferentes chegam como `AggregateException`; a mensagem de configuração inválida cobre todas elas, com teste de duas seções inválidas ao mesmo tempo (AP-039).
 - Nada lê `IConfiguration` diretamente fora do composition root.
 
 ## Logs (Serilog via `ILogger<T>`)
@@ -64,6 +65,7 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 
 - Envolva `System.Diagnostics.Process` numa porta (`IProcessRunner`) — testável com fake.
 - `ArgumentList` (nunca concatenar string de argumentos); conteúdo grande via stdin; ler stdout/stderr de forma assíncrona; matar a árvore do processo no timeout (`Kill(entireProcessTree: true)`).
+- O processo filho herda o ambiente de quem abre o app. O `IProcessRunner` deixa explícito quais variáveis de ambiente o filho recebe, e a DoD que usa processo real diz em que ambiente roda (o comando limpa o que for preciso). Limpar o ambiente como regra do runner é decisão de ADR (AP-034).
 
 ## Git
 

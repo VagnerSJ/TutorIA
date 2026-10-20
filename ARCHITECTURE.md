@@ -51,20 +51,24 @@ src/
                        ConversationMessages, ConversationOptions, ConversationOptionsValidator, ConversationLog,
                        ITutorPromptSource, TurnMessageBuilder, TutorMode, LocalCommandParser, LocalCommand, LocalCommands
     Brain/             ITutorBrain, BrainRequest, BrainMessage, BrainRole, TutorReply, Correction, TutorReplyParseResult,
-                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, FeedbackFormatter,
+                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,
                        BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
   EnglishTutor.Infrastructure/
-    Brain/             ClaudeCodeTutorBrain, ClaudeCodeStreamingBrain, OllamaTutorBrain,
+    Brain/             ClaudeCodeTutorBrain, ClaudeCodeOptions, ClaudeCodeOptionsValidator, ClaudeCodeOutput,
+                       ClaudeCodePromptRenderer, ClaudeCodeLog, BrainOutputModes, TutorReplySchema,
+                       FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain,
                        TutorReplyParser, BrainFactory, FallbackTutorBrain
+    Processes/         IProcessRunner, ProcessRequest, ProcessResult, ProcessRunner
+    DependencyInjection/ InfrastructureServiceCollectionExtensions
     Stt/               WhisperNetSpeechToText, WhisperModelDownloader
     Tts/               PiperTextToSpeech, KokoroHttpTextToSpeech
     Audio/             NAudioRecorder, NAudioPlayer
     Persistence/       SqliteConversationStore
   EnglishTutor.Console/
-    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/, Logging/
+    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/ (ChatSession, ConversationInputHandler), Logging/; prompts/ copiado para a saída
 prompts/
   tutor.md             system prompt único (regras de conteúdo)
   format.json.md       instrução de formato quando o provedor usa saída estruturada
@@ -136,7 +140,7 @@ A cada turno o `ConversationService`:
 6. Envia **apenas** `Reply` ao TTS (RN-TTS01); o feedback vai só para a tela.
 7. Persiste o turno e atualiza erros recorrentes / palavras de baixa confiança.
 
-Provedores com estado (Claude Code via `--resume`) podem usar `SessionHint` como otimização, mas devem funcionar corretamente recebendo apenas o `BrainRequest` completo.
+Provedores com estado (Claude Code via `--resume`) guardam o identificador da sessão no próprio adaptador e só o reaproveitam quando o `BrainRequest` tem o mesmo system prompt, repete exatamente as mensagens que a sessão já conhece e acrescenta uma única mensagem do aluno; em qualquer outro caso enviam a janela completa numa sessão nova (ADR-007). `BrainRequest.SessionHint` fica reservado, e o `ConversationService` o envia `null`.
 
 ## 6. Cérebro plugável
 
@@ -182,7 +186,7 @@ Validação das Options na inicialização (`ValidateOnStart`).
 - Forma canônica: objeto JSON `{ reply, corrections[{original, corrected, explanation}], pronunciation, vocabulary, praise }`.
 - `ClaudeCode` usa `--json-schema` e lê `structured_output`; `Ollama` usa `format` com o mesmo JSON Schema.
 - `TutorReplyParser` é **único**: aceita o JSON canônico e, como alternativa, o formato com tags `<reply>…</reply><feedback>…</feedback>` (texto cru, modelos menores, `OutputMode: Tags`).
-- As regras de conteúdo verificáveis (reply não vazio e terminando em `?`, no máximo 2 correções, correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
+- As regras de conteúdo verificáveis (reply não vazio e com exatamente uma pergunta, isto é, uma única frase terminada em `?`, em qualquer posição, com as frases separadas por `ReplySentences`; no máximo 2 correções; correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
 
 ### 6.3 Provedor Claude Code (processo)
 
@@ -191,9 +195,9 @@ Invocação (por turno, Fase 2):
 ```
 claude -p
   --output-format json
-  --json-schema <schema>                  (OutputMode=JsonSchema)
-  --system-prompt-file prompts/tutor.md
-  --append-system-prompt-file prompts/format.json.md
+  --json-schema <schema>                  (OutputMode=JsonSchema; TutorReplySchema)
+  --system-prompt-file <arquivo temporário com BrainRequest.SystemPrompt = prompts/tutor.md>
+  --append-system-prompt-file prompts/format.json.md   (prompts/format.tags.md com OutputMode=Tags)
   --tools ""                              (nenhuma ferramenta embutida)
   --disallowedTools "mcp__*"
   --strict-mcp-config
@@ -204,7 +208,8 @@ claude -p
 
 - `WorkingDirectory` é uma pasta vazia dedicada, para não carregar `CLAUDE.md`, hooks ou MCP de outros projetos.
 - **Nunca** `--bare` (exige `ANTHROPIC_API_KEY`, não usa a assinatura).
-- Prompt enviado via stdin (evita limites e escaping de linha de comando no Windows).
+- Prompt enviado via stdin (evita limites e escaping de linha de comando no Windows): sem `--resume`, as mensagens do `BrainRequest` num texto único (`ClaudeCodePromptRenderer`); com `--resume`, só a mensagem nova (ADR-007). O arquivo temporário do system prompt fica fora da pasta de trabalho e é apagado ao fim da chamada.
+- Saída: `structured_output` (JsonSchema) ou `result` (Tags) vai para o `TutorReplyParser`; o `session_id` fica no adaptador (ADR-007). Até a US-005, código de saída diferente de zero, `is_error` ou saída que não é JSON viram `BrainException` com `Unknown`; executável inexistente propaga a exceção do sistema e o console mostra erro inesperado (a US-005 a classifica como `CliNotFound`).
 - Erros mapeados para `BrainException` com `BrainErrorKind`: `CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`, `InvalidOutput`, `Unknown`.
 - `UsageLimitReached` (e, se configurado, `CliNotFound`/`NotAuthenticated`) aciona o `FallbackTutorBrain`.
 
