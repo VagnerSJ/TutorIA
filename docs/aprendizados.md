@@ -344,7 +344,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** duas afirmações sem conferência da fonte. A primeira foi corrigida contra `ConversationWindow.Add`. A segunda a Rodada 3 apontou, e o Planejador manteve a decisão da P17, que não depende do argumento (resposta na §12 de 2026-10-17).
 - **Por que importa:** o argumento errado entra em ADR e plano e leva a conclusões falsas para quem decide depois.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md`: "número vindo da revisão é conferido no código antes de ir para ADR ou spec"; "argumento que cita cenário ou regra de outra US cita o nome do cenário e confere o `Dado` no `SPRINT_N.md` antes de escrever"; (b) `.claude/skills/checklist-revisao/SKILL.md`: afirmação quantitativa sobre comportamento existente cita o símbolo que a sustenta (ex.: `ConversationWindow.Add`); §0 confere também as justificativas que citam outras US.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 36")
 
 ### AP-037 — Mutação temporária revertida com `git checkout` apagou o Green não commitado
 

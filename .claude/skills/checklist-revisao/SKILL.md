@@ -18,6 +18,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Transformações citadas nas tabelas de mensagens da §2 (corte, normalização, limite) têm teste nos dois lados do limite (AP-016); asserção sobre mensagem que embute texto de biblioteca confere um trecho que só o projeto produz (AP-015).
 - [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
 - Critério `LiveBrain` sobre saída de modelo diz a camada medida (adaptador ou serviço com retentativa), a tolerância e quantas rodadas seguidas precisa sobreviver; com tolerância zero, o plano registra o risco de oscilação e quem decide quando ficar vermelho (AP-032).
+- Justificativas do plano que citam cenário ou regra de outra US estão certas contra o `SPRINT_N.md` (papéis, `Dado`, provedor principal ou reserva), não só os textos a registrar na spec de destino (AP-036).
 - Verificação de "nenhuma linha" na DoD (busca de texto antigo) tem o outro lado demonstrado: o mesmo comando acha as ocorrências antes da mudança; a busca cobre o nome antigo do cenário e as variações sintáticas da asserção (AP-035).
 - Alteração proposta na `ARCHITECTURE.md` lista também as linhas do `CLAUDE.md` e das skills que repetem a mesma regra.
 - Riscos técnicos e ambiguidades que travariam o Executor estão tratados ou viraram pergunta em aberto.
@@ -26,6 +27,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 ## Como escrever bloqueantes e sugestões
 - Descreva o **efeito esperado** e onde está o problema, não a técnica de implementação ou de teste. Ex.: "a mensagem de configuração inválida não pode se perder se o cancelamento chegar durante a escrita", e não "teste com token já cancelado". Cabe ao Executor escolher a técnica e confirmar que o Red falha pelo motivo certo (AP-010).
 - Identifique o trecho pelo símbolo (classe/método) além do número de linha, que envelhece (AP-023).
+- Afirmação quantitativa sobre comportamento existente (limite, contagem, "a partir de qual turno") cita o símbolo que a sustenta (ex.: `ConversationWindow.Add`) e foi conferida no código antes de ir para o relatório (AP-036).
 
 ## 1. Spec e regras
 - [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código).
