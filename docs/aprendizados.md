@@ -353,7 +353,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** segundo o relato do usuário, ao desfazer uma mutação temporária com `git checkout -- <arquivo>`, o Executor apagou também o Green que ainda não estava commitado naquele arquivo e teve de refazê-lo. Os detalhes do incidente não estão em `plan.md`; a entrada registra só o que o usuário relatou.
 - **Por que importa:** a técnica do AP-017 (Red por mutação temporária) pressupõe poder voltar ao estado anterior; desfazer pelo repositório destrói trabalho que ainda não existe nele.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, junto do AP-017/AP-029: "antes de aplicar a mutação temporária, commite o Green (ou o par test/feat) ou desfaça a mutação com a edição inversa; nunca use `git checkout -- <arquivo>` ou `git restore` num arquivo com alterações não commitadas".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 37")
 
 ### AP-038 — Comando `perl` para editar strings C# corrompe escapes e aspas
 
