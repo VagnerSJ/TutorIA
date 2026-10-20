@@ -380,7 +380,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** (B2, recorrência do AP-022) o adiamento "a US-005 troca isso" ficou numa P*, e a conferência da §8 não o pegou; resolvido com um cenário novo na spec da US-005 antes da T1. (S4) uma limitação foi aceita com "o Core não valida isso", mas o mesmo componente (o separador de frases) passou a ser usado num critério da DoD com tolerância zero; resolvido com a lista de consumidores e o efeito em cada um (P22).
 - **Por que importa:** adiamento sem dono some; limite aceito para um consumidor pode ser inaceitável para outro.
 - **Correção (proposta):** `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md` §0: procurar adiamentos também nas P* e nos comentários de teste ("a US-YYY troca/atualiza"), não só na §8; todo "limite aceito" lista os consumidores do componente (validador, testes `LiveBrain`, DoD) e o efeito em cada um.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 40")
 
 ### AP-041 — Tabela de decisão: cada linha precisa de um caso que só ela satisfaz
 

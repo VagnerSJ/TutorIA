@@ -13,7 +13,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Cada resposta P* com efeito observável (texto exibido, código de saída, normalização, evento de log) tem teste mapeado na §4 e tarefa na §5.
 - [O] A DoD da §10 cobre a DoD da US na sprint, com comandos verificáveis e resultado esperado (inclui cobertura do Core ≥ 80%).
 - [O] Conformidade com R1–R4, `RN-*` citadas e regras rápidas do `CLAUDE.md`; decisões técnicas relevantes têm ADR Proposto.
-- [O] Escopo: nada além nem aquém do que a US pede; fora de escopo explícito. Item da §8 adiado para outra US tem texto exato a registrar na spec da US de destino, que você confere (AP-022).
+- [O] Escopo: nada além nem aquém do que a US pede; fora de escopo explícito. Item da §8 adiado para outra US tem texto exato a registrar na spec da US de destino, que você confere (AP-022). Procure adiamentos também nas P* e nos comentários de teste ("a US-YYY troca/atualiza"), e confira que todo "limite aceito" lista os consumidores do componente e o efeito em cada um (AP-040).
 - [O] Consistência interna: §3 (arquivos) × §4 (testes) × §5 (tarefas) × §6 (pacotes), com contagens que batem e nomes de teste da §5 idênticos aos da §4 (AP-025).
 - Transformações citadas nas tabelas de mensagens da §2 (corte, normalização, limite) têm teste nos dois lados do limite (AP-016); asserção sobre mensagem que embute texto de biblioteca confere um trecho que só o projeto produz (AP-015).
 - [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
