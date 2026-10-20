@@ -80,7 +80,7 @@ public sealed class TutorReplyValidatorTests
         result.Rejection!.Message.Should().Contain("has 2 questions");
     }
 
-    // US-002 — Cenário: reply sem pergunta (apoio, P6)
+    // US-002 — Cenário: reply sem pergunta (aceite com espaços finais, apoio, P6)
     [Fact]
     public void Validate_WhenReplyEndsWithQuestionFollowedBySpaces_IsValidAndTrimmed()
     {
