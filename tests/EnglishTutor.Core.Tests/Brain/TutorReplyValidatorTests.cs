@@ -37,20 +37,50 @@ public sealed class TutorReplyValidatorTests
         result.Warnings.Should().BeEmpty();
     }
 
-    // US-002 — Cenário: reply sem pergunta final — RN-FEED01, ADR-002 item 5 (P6)
+    // US-002 — Cenário: reply sem pergunta — RN-FEED01, ADR-002 item 5 (P6)
     [Theory]
     [InlineData("I like that.")]
-    [InlineData("Is it good? I like that.")]
-    public void Validate_WhenReplyDoesNotEndWithQuestion_RejectsWithQuestionReason(string reply)
+    [InlineData("Great job! Tell me more.")]
+    [InlineData("Hmm... what a day.")]
+    public void Validate_WhenReplyHasNoQuestion_RejectsWithExactlyOneQuestionReason(string reply)
     {
         var result = TutorReplyValidator.Validate(Candidate(reply, []));
 
         result.IsValid.Should().BeFalse();
-        result.Rejection!.Reason.Should().Be("reply must end with a question");
-        result.Rejection!.Message.Should().Contain($"\"{reply}\"");
+        result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
+        result.Rejection!.Message.Should().Contain($"\"{reply}\"").And.Contain("has no question");
     }
 
-    // US-002 — Cenário: reply sem pergunta final (apoio, P6)
+    // US-004 — Cenário: pergunta seguida de incentivo é aceita (regra no Core, bordas) — RN-FEED01 (P20, P21, P22)
+    [Theory]
+    [InlineData("Was it busy in the morning? Tell me about your commute.")]
+    [InlineData("Did you really say \"why not?\" to your boss? Tell me more.")]
+    [InlineData("I met Mr. Smith there. Do you know him? He is nice.")]
+    [InlineData("Hmm... do you mean the bus? Tell me more.")]
+    public void Validate_WhenReplyAsksOneQuestionInAnyPosition_ReturnsValidReply(string reply)
+    {
+        var result = TutorReplyValidator.Validate(Candidate(reply, []));
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be(reply);
+    }
+
+    // US-004 — Cenário: reply com duas perguntas é inválido (regra no Core, bordas) — RN-FEED01 (P21, P22)
+    [Theory]
+    [InlineData("Was it busy? How long was the trip?")]
+    [InlineData("Really?! What happened next?")]
+    [InlineData("Your boss said \"Really?\" Then what did you say?")]
+    [InlineData("Was it busy?\nHow long was the trip?")]
+    public void Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason(string reply)
+    {
+        var result = TutorReplyValidator.Validate(Candidate(reply, []));
+
+        result.IsValid.Should().BeFalse();
+        result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
+        result.Rejection!.Message.Should().Contain("has 2 questions");
+    }
+
+    // US-002 — Cenário: reply sem pergunta (apoio, P6)
     [Fact]
     public void Validate_WhenReplyEndsWithQuestionFollowedBySpaces_IsValidAndTrimmed()
     {
