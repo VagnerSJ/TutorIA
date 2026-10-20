@@ -8,7 +8,11 @@ public sealed class TutorReplyRejectionsTests
     public static TheoryData<string, string, string> Cases => new()
     {
         { nameof(TutorReplyRejections.MissingReply), TutorReplyRejections.MissingReplyReason, "the answer has no reply text" },
-        { nameof(TutorReplyRejections.ReplyMustEndWithQuestion), TutorReplyRejections.ReplyMustEndWithQuestionReason, "\"I like that.\"" },
+        {
+            nameof(TutorReplyRejections.ReplyMustAskExactlyOneQuestion),
+            TutorReplyRejections.ReplyMustAskExactlyOneQuestionReason,
+            "the reply \"I like that.\" has no question"
+        },
         { nameof(TutorReplyRejections.InvalidJson), TutorReplyRejections.InvalidJsonReason, "'H' is an invalid start of a value" },
         { nameof(TutorReplyRejections.InvalidCorrections), TutorReplyRejections.InvalidCorrectionsReason, "\"corrections\" is a string" },
     };
@@ -26,29 +30,43 @@ public sealed class TutorReplyRejectionsTests
         rejection.Message.Should().Contain("Expected ");
     }
 
-    // US-002 — §2.1, mensagem "reply must end with a question": reply citado até 80 caracteres + "..." (revisão S3)
+    // US-002 — §2.1 (US-004, P23), mensagem de uma pergunta: reply citado até 80 caracteres + "..." (revisão S3)
     [Fact]
-    public void ReplyMustEndWithQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis()
+    public void ReplyMustAskExactlyOneQuestion_WhenReplyExceeds80Characters_QuotesFirst80WithEllipsis()
     {
         var first80 = new string('a', 79) + "b";
         var reply = first80 + "c";
 
-        var rejection = TutorReplyRejections.ReplyMustEndWithQuestion(reply);
+        var rejection = TutorReplyRejections.ReplyMustAskExactlyOneQuestion(reply, 0);
 
-        rejection.Message.Should().Contain($"the reply \"{first80}...\" does not end with");
+        rejection.Message.Should().Contain($"the reply \"{first80}...\" has");
         rejection.Message.Should().NotContain(reply);
     }
 
     // US-002 — §2.1, limite do corte: 80 caracteres são citados inteiros (revisão S3)
     [Fact]
-    public void ReplyMustEndWithQuestion_WhenReplyHas80Characters_QuotesItWhole()
+    public void ReplyMustAskExactlyOneQuestion_WhenReplyHas80Characters_QuotesItWhole()
     {
         var reply = new string('a', 79) + "b";
 
-        var rejection = TutorReplyRejections.ReplyMustEndWithQuestion(reply);
+        var rejection = TutorReplyRejections.ReplyMustAskExactlyOneQuestion(reply, 0);
 
-        rejection.Message.Should().Contain($"the reply \"{reply}\" does not end with");
+        rejection.Message.Should().Contain($"the reply \"{reply}\" has");
         rejection.Message.Should().NotContain("...");
+    }
+
+    // US-004 — Cenário: reply com duas perguntas é inválido (apoio, P23, AP-016: contagem) — RN-FEED01
+    [Theory]
+    [InlineData("I like that.", 0, "the reply \"I like that.\" has no question", "has 0")]
+    [InlineData("Was it busy? How long was the trip?", 2, "has 2 questions", "no question")]
+    [InlineData("Why? When? Where?", 3, "has 3 questions", "no question")]
+    public void ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound(
+        string reply, int questionCount, string expected, string unexpected)
+    {
+        var rejection = TutorReplyRejections.ReplyMustAskExactlyOneQuestion(reply, questionCount);
+
+        rejection.Message.Should().Contain(expected).And.NotContain(unexpected);
+        rejection.Message.Should().Contain("Expected 1 to 3 short sentences with exactly one question");
     }
 
     // US-002 — §12: detalhe da JsonException terminado em "." não gera ".." antes de Expected (revisão S3)
@@ -64,7 +82,7 @@ public sealed class TutorReplyRejectionsTests
     private static TutorReplyRejection Create(string factory) => factory switch
     {
         nameof(TutorReplyRejections.MissingReply) => TutorReplyRejections.MissingReply(),
-        nameof(TutorReplyRejections.ReplyMustEndWithQuestion) => TutorReplyRejections.ReplyMustEndWithQuestion("I like that."),
+        nameof(TutorReplyRejections.ReplyMustAskExactlyOneQuestion) => TutorReplyRejections.ReplyMustAskExactlyOneQuestion("I like that.", 0),
         nameof(TutorReplyRejections.InvalidJson) => TutorReplyRejections.InvalidJson("'H' is an invalid start of a value."),
         nameof(TutorReplyRejections.InvalidCorrections) => TutorReplyRejections.InvalidCorrections("string"),
         _ => throw new ArgumentOutOfRangeException(nameof(factory), factory, "Unknown rejection factory."),

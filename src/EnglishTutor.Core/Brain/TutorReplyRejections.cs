@@ -8,6 +8,8 @@ public static class TutorReplyRejections
 
     public const string ReplyMustEndWithQuestionReason = "reply must end with a question";
 
+    public const string ReplyMustAskExactlyOneQuestionReason = "reply must ask the student exactly one question";
+
     public const string InvalidJsonReason = "invalid JSON";
 
     public const string InvalidCorrectionsReason = "invalid corrections";
@@ -28,6 +30,9 @@ public static class TutorReplyRejections
             $"{ReplyMustEndWithQuestionReason}: the reply \"{quoted}\" does not end with \"?\". " +
             "Expected 1 to 3 short sentences that end with one question to the student.");
     }
+
+    public static TutorReplyRejection ReplyMustAskExactlyOneQuestion(string reply, int questionCount) =>
+        throw new NotImplementedException();
 
     public static TutorReplyRejection InvalidJson(string detail)
     {
