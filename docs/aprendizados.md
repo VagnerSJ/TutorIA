@@ -326,7 +326,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o `ProcessRunner` deixa o processo `claude` herdar todo o ambiente de quem abre o console (`CLAUDECODE`, `CLAUDE_CODE_*`, `ANTHROPIC_BASE_URL`). Numa gravação feita a partir do app desktop, o nome do titular da conta chegou ao contexto do professor (a fixture foi descartada e gravada de novo). A evidência do D5/D7 também dependia do ambiente de quem rodava. O comando do D5 passou a limpar as variáveis. O usuário aceitou de forma explícita o risco de privacidade (plano §7 e §8), sem US de destino e sem ADR, com a condição de revisitar caso o app seja distribuído ou aberto em ambiente de terceiros.
 - **Por que importa:** o mesmo código dá resultados e vazamentos diferentes conforme quem o abre; DoD com processo real sem ambiente descrito não é reproduzível.
 - **Correção (proposta):** `.claude/skills/padroes-codigo/SKILL.md`, seção "Processos externos": "o `IProcessRunner` deixa explícito quais variáveis de ambiente o filho recebe; a DoD que usa processo real diz em que ambiente roda (o comando limpa o que for preciso)". Adotar a limpeza como regra do runner é decisão de ADR do usuário, não desta proposta.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 34")
 
 ### AP-035 — Verificação de "nenhuma linha" sem o outro lado, e busca só do texto exato
 

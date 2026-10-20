@@ -64,6 +64,7 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 
 - Envolva `System.Diagnostics.Process` numa porta (`IProcessRunner`) — testável com fake.
 - `ArgumentList` (nunca concatenar string de argumentos); conteúdo grande via stdin; ler stdout/stderr de forma assíncrona; matar a árvore do processo no timeout (`Kill(entireProcessTree: true)`).
+- O processo filho herda o ambiente de quem abre o app. O `IProcessRunner` deixa explícito quais variáveis de ambiente o filho recebe, e a DoD que usa processo real diz em que ambiente roda (o comando limpa o que for preciso). Limpar o ambiente como regra do runner é decisão de ADR (AP-034).
 
 ## Git
 
