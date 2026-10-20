@@ -18,6 +18,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Transformações citadas nas tabelas de mensagens da §2 (corte, normalização, limite) têm teste nos dois lados do limite (AP-016); asserção sobre mensagem que embute texto de biblioteca confere um trecho que só o projeto produz (AP-015).
 - [O] Ordem das tarefas preserva o Red de cada teste (nenhuma tarefa anterior já faz o teste seguinte nascer verde).
 - Critério `LiveBrain` sobre saída de modelo diz a camada medida (adaptador ou serviço com retentativa), a tolerância e quantas rodadas seguidas precisa sobreviver; com tolerância zero, o plano registra o risco de oscilação e quem decide quando ficar vermelho (AP-032).
+- US com `ValidateOnStart` em mais de uma classe de Options tem teste com duas seções inválidas ao mesmo tempo; valor aceito sem diferenciar maiúsculas pelo validador tem teste no consumidor com caixa diferente (AP-039).
 - Justificativas do plano que citam cenário ou regra de outra US estão certas contra o `SPRINT_N.md` (papéis, `Dado`, provedor principal ou reserva), não só os textos a registrar na spec de destino (AP-036).
 - Verificação de "nenhuma linha" na DoD (busca de texto antigo) tem o outro lado demonstrado: o mesmo comando acha as ocorrências antes da mudança; a busca cobre o nome antigo do cenário e as variações sintáticas da asserção (AP-035).
 - Alteração proposta na `ARCHITECTURE.md` lista também as linhas do `CLAUDE.md` e das skills que repetem a mesma regra.

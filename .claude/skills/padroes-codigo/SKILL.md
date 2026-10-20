@@ -41,6 +41,7 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 
 - Cada projeto expõe uma extensão de registro: `services.AddEnglishTutorCore()`, `services.AddEnglishTutorInfrastructure(promptsDirectory)`. Cada uma registra os validadores das próprias Options; o bind das seções fica no composition root (ADR-004).
 - Options: `services.AddOptions<BrainOptions>().Bind(config.GetSection(BrainOptions.SectionName)).ValidateOnStart();` no composition root + um `IValidateOptions<T>` por classe de Options, com mensagens que dizem o que está errado e o que se espera.
+- Com mais de uma classe de Options validada na partida, falhas simultâneas de seções diferentes chegam como `AggregateException`; a mensagem de configuração inválida cobre todas elas, com teste de duas seções inválidas ao mesmo tempo (AP-039).
 - Nada lê `IConfiguration` diretamente fora do composition root.
 
 ## Logs (Serilog via `ILogger<T>`)

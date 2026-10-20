@@ -371,7 +371,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** (B1) acrescentar `ClaudeCodeOptions` e `ConversationOptions` com `ValidateOnStart` faz duas seções inválidas ao mesmo tempo virarem uma `AggregateException`, que caía no erro inesperado (código 1) e regredia a US-001; nenhum teste existente invalidava duas seções. Corrigido com a P19 e a T17. (B4) o validador aceitava `OutputMode` em outra caixa e o consumidor usaria o valor cru, rodando no modo errado em silêncio; corrigido com o valor canônico no adaptador e teste com `"jsonschema"` e `"TAGS"`. Recorrência da S1 do `plan-review` da US-001.
 - **Por que importa:** cada falha só aparece quando a combinação ou a caixa errada acontece, em produção.
 - **Correção (proposta):** (a) `.claude/skills/padroes-codigo/SKILL.md`, "DI e configuração": "com mais de uma classe de Options validada na partida, a mensagem de configuração inválida cobre falhas simultâneas de seções diferentes (com teste)", e a lista do Planejador: "US que adiciona `ValidateOnStart` mapeia um teste com duas seções inválidas"; (b) checklist de revisão de plano: "valor aceito sem diferenciar maiúsculas pelo validador tem teste no consumidor com caixa diferente".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 39")
 
 ### AP-040 — Adiamento escrito em P* e "limite aceito" sem listar os consumidores
 
