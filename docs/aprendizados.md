@@ -317,7 +317,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a decisão do usuário sobre o E3 pedia um commit `feat(brain)` ou `fix(brain)` para o reforço de prompt, mas a mudança entrou como `docs(ai)` (2cb0f7a). O Executor registrou o desvio no E4. Nas duas mudanças de prompt seguintes (`11514ab` e `f237c82`) o tipo fixado foi seguido, então o desvio não se repetiu. Parente do AP-014/AP-027 (forma decidida e não seguida), agora no tipo do commit.
 - **Por que importa:** prompts mudam o comportamento do professor; o histórico com `docs(ai)` esconde mudança de comportamento e atrapalha changelog e bisect.
 - **Correção (proposta):** `.claude/agents/executor.md`: "quando a §12 fixa tipo ou escopo de commit, use exatamente esse; para divergir, registre o motivo na §12 antes do commit". Arquivos em `prompts/` que mudam o comportamento do professor são `feat(brain)` ou `fix(brain)`, não `docs(ai)`.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 33")
 
 ### AP-034 — Ambiente herdado pelo processo filho afeta privacidade e reprodutibilidade
 
