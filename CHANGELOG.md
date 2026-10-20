@@ -21,5 +21,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: `/mode` reconhecido pelo parser de comandos e `TutorMode.TryParse`; o console ainda o trata como desconhecido até a US-004 (US-003).
 - Added: console mostra o aviso local `Nothing was sent: type a sentence in English and press Enter.` em linha em branco (RN-CONV05) (US-003).
 - Added: ADR-006 (retentativa de formato e histórico no `ConversationService`) (US-003).
+- Added: `ClaudeCodeTutorBrain`, primeiro cérebro real: um processo `claude -p` isolado por turno (sem `--bare`, sem ferramentas, pasta de trabalho dedicada), histórico controlado pela aplicação e `--resume` como otimização (US-004).
+- Added: console conversa por texto com o professor: mostra reply e feedback, `/mode` troca o modo e `/help` o lista (US-004).
+- Added: configuração `Brain:ClaudeCode:*` (`ExecutablePath`, `Model`, `WorkingDirectory`, `UseResume`, `OutputMode`) e bind de `Conversation:MaxTurnsInWindow` com validação na inicialização; várias seções inválidas ao mesmo tempo continuam encerrando com código 2 (US-004).
+- Added: ADR-007 (processo por turno, histórico e `--resume`) e medição de latência JsonSchema × Tags no ADR-002 (US-004).
+- Changed: RN-FEED01: o `reply` deve ter exatamente uma pergunta em qualquer posição, e não mais terminar com ela; a recusa diz quantas perguntas encontrou (US-004).
+- Changed: o console passa a emitir UTF-8 sem BOM, para a seta `→` do feedback sair legível no Windows (US-004).
 - Fixed: `/quit` enviado por pipe no Windows PowerShell 5.1 era lido com BOM UTF-8 e tratado como texto livre (US-001).
 - Hábitos de trabalho com IA: skill `revisar-contexto`, `docs/aprendizados.md`, `specs/archive/`, Definition of Done verificável por US, seções Evidências e Comentários do usuário no plano, ADR proposto antes do código, hooks `post-edit-dotnet` e `executor-stop-gate`.

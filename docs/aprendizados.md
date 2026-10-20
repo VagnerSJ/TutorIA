@@ -300,3 +300,102 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** quem lê o detalhamento (o Documentador, o próximo Planejador) copia o número antigo.
 - **Correção (proposta):** `.claude/agents/executor.md`, etapa de evidências: "mudou uma contagem → atualize o cabeçalho, o detalhamento por classe da §4 e D2/D5/D8, e confira se a soma bate"; e "tarefa marcada `[x]` leva o hash na própria linha".
 - **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
+
+### AP-032 — Critério `LiveBrain` de "100%" sobre saída de LLM gera DoD intermitente
+
+- **Data / US:** 2026-10-20 / US-004 (`review.md` Rodada 1 B1 e Rodada 2 S5; `plan.md` §11, §12 E3 a E6)
+- **Quem errou:** planejador (spec e DoD) e revisor do plano (aprovou o critério)
+- **O que aconteceu:** o D5 da US-004 exigia "5/5 no formato" medido no adaptador, sem a retentativa do ADR-006 que o produto tem. Com o modelo `haiku`, 5 a 20% das chamadas saíam fora do formato, e o D5 ficou vermelho de forma intermitente (2 verdes em 5 rodadas depois do primeiro reforço de prompt). O que resolveu foi mudar a regra (RN-FEED01, "exatamente uma pergunta") e reforçar o prompt, não o critério: 5 rodadas de 8 chamadas verdes, o que é compatível com uma taxa baixa, mas não a prova (risco residual registrado em `docs/us/US-004.md`).
+- **Por que importa:** critério de 100% sobre saída de modelo mede sorte; a DoD vira intermitente e o fluxo trava no fim, depois de todo o código pronto.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md` §0 (revisão de plano): todo critério `LiveBrain` diz em que camada mede (adaptador ou serviço com retentativa), qual tolerância aceita e quantas rodadas seguidas precisa sobreviver (ex.: 3 a 5) antes da aprovação do plano; (b) se a tolerância for zero, o plano registra o risco de oscilação e quem decide o que fazer quando ficar vermelho (usuário, com registro prévio na spec).
+- **Status:** Proposta
+
+### AP-033 — Tipo de commit diferente do que o usuário decidiu
+
+- **Data / US:** 2026-10-19 / US-004 (`review.md` Rodada 1 S1 e Rodada 2; `plan.md` §12 E3/E4)
+- **Quem errou:** executor
+- **O que aconteceu:** a decisão do usuário sobre o E3 pedia um commit `feat(brain)` ou `fix(brain)` para o reforço de prompt, mas a mudança entrou como `docs(ai)` (2cb0f7a). O Executor registrou o desvio no E4. Nas duas mudanças de prompt seguintes (`11514ab` e `f237c82`) o tipo fixado foi seguido, então o desvio não se repetiu. Parente do AP-014/AP-027 (forma decidida e não seguida), agora no tipo do commit.
+- **Por que importa:** prompts mudam o comportamento do professor; o histórico com `docs(ai)` esconde mudança de comportamento e atrapalha changelog e bisect.
+- **Correção (proposta):** `.claude/agents/executor.md`: "quando a §12 fixa tipo ou escopo de commit, use exatamente esse; para divergir, registre o motivo na §12 antes do commit". Arquivos em `prompts/` que mudam o comportamento do professor são `feat(brain)` ou `fix(brain)`, não `docs(ai)`.
+- **Status:** Proposta
+
+### AP-034 — Ambiente herdado pelo processo filho afeta privacidade e reprodutibilidade
+
+- **Data / US:** 2026-10-19 / US-004 (`review.md` Rodada 1 S2/S3 e Rodada 2; `plan.md` §7, §8, §12 E3)
+- **Quem errou:** planejador e executor (o ambiente do processo não foi tratado como decisão)
+- **O que aconteceu:** o `ProcessRunner` deixa o processo `claude` herdar todo o ambiente de quem abre o console (`CLAUDECODE`, `CLAUDE_CODE_*`, `ANTHROPIC_BASE_URL`). Numa gravação feita a partir do app desktop, o nome do titular da conta chegou ao contexto do professor (a fixture foi descartada e gravada de novo). A evidência do D5/D7 também dependia do ambiente de quem rodava. O comando do D5 passou a limpar as variáveis. O usuário aceitou de forma explícita o risco de privacidade (plano §7 e §8), sem US de destino e sem ADR, com a condição de revisitar caso o app seja distribuído ou aberto em ambiente de terceiros.
+- **Por que importa:** o mesmo código dá resultados e vazamentos diferentes conforme quem o abre; DoD com processo real sem ambiente descrito não é reproduzível.
+- **Correção (proposta):** `.claude/skills/padroes-codigo/SKILL.md`, seção "Processos externos": "o `IProcessRunner` deixa explícito quais variáveis de ambiente o filho recebe; a DoD que usa processo real diz em que ambiente roda (o comando limpa o que for preciso)". Adotar a limpeza como regra do runner é decisão de ADR do usuário, não desta proposta.
+- **Status:** Proposta
+
+### AP-035 — Verificação de "nenhuma linha" sem o outro lado, e busca só do texto exato
+
+- **Data / US:** 2026-10-19 / US-004 (`plan-review.md` Rodada 4 S2/S3 e Rodada 5)
+- **Quem errou:** planejador
+- **O que aconteceu:** ao mudar a RN-FEED01, o D16 (varredura do texto antigo) esperava "nenhuma linha", e só esse lado estava previsto: se o comando deixasse de varrer algum caminho ou tivesse aspas erradas, daria verde falso. A lista de ocorrências também cobria só o texto exato (`must end with a question`, `EndWith("?")`) e deixava de fora o nome antigo do cenário em comentário de teste e a forma `EndsWith('?')`. Corrigido com o controle D16c (o mesmo comando acha as linhas antigas antes da mudança, registrado em `c482f1e`) e com a busca das variações. Variação do AP-005 e do AP-016.
+- **Por que importa:** verde sem o outro lado do limite não prova nada; texto antigo sobrevivente gera falso bloqueante.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md`: quando a US renomeia cenário ou regra, o Grep de "texto antigo" inclui o nome antigo do cenário, as variações sintáticas da asserção e uma evidência de que o comando de busca da DoD acha as ocorrências antes da mudança; (b) `.claude/skills/checklist-revisao/SKILL.md` §0: "verificação de 'nenhuma linha' na DoD tem o outro lado demonstrado".
+- **Status:** Proposta
+
+### AP-036 — Afirmação sobre outra US ou número da revisão usado sem conferir a fonte
+
+- **Data / US:** 2026-10-17 / US-004 (`plan-review.md` Rodada 2 S1 e Rodada 3 S1)
+- **Quem errou:** revisor do plano (um número, "a partir do turno N + 1", foi copiado para o ADR-007 sem conferir o código) e planejador (a justificativa da P17 citou o cenário de fallback da US-007 com os papéis invertidos: na spec, `ClaudeCode` é o provedor principal e `Ollama` o fallback)
+- **O que aconteceu:** duas afirmações sem conferência da fonte. A primeira foi corrigida contra `ConversationWindow.Add`. A segunda a Rodada 3 apontou, e o Planejador manteve a decisão da P17, que não depende do argumento (resposta na §12 de 2026-10-17).
+- **Por que importa:** o argumento errado entra em ADR e plano e leva a conclusões falsas para quem decide depois.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md`: "número vindo da revisão é conferido no código antes de ir para ADR ou spec"; "argumento que cita cenário ou regra de outra US cita o nome do cenário e confere o `Dado` no `SPRINT_N.md` antes de escrever"; (b) `.claude/skills/checklist-revisao/SKILL.md`: afirmação quantitativa sobre comportamento existente cita o símbolo que a sustenta (ex.: `ConversationWindow.Add`); §0 confere também as justificativas que citam outras US.
+- **Status:** Proposta
+
+### AP-037 — Mutação temporária revertida com `git checkout` apagou o Green não commitado
+
+- **Data / US:** 2026-10-19 / US-004 (relato do usuário; o Executor aplicou mutações temporárias nas tarefas T2, T10, T16 e outras para dar Red a testes de caracterização)
+- **Quem errou:** executor
+- **O que aconteceu:** segundo o relato do usuário, ao desfazer uma mutação temporária com `git checkout -- <arquivo>`, o Executor apagou também o Green que ainda não estava commitado naquele arquivo e teve de refazê-lo. Os detalhes do incidente não estão em `plan.md`; a entrada registra só o que o usuário relatou.
+- **Por que importa:** a técnica do AP-017 (Red por mutação temporária) pressupõe poder voltar ao estado anterior; desfazer pelo repositório destrói trabalho que ainda não existe nele.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, junto do AP-017/AP-029: "antes de aplicar a mutação temporária, commite o Green (ou o par test/feat) ou desfaça a mutação com a edição inversa; nunca use `git checkout -- <arquivo>` ou `git restore` num arquivo com alterações não commitadas".
+- **Status:** Proposta
+
+### AP-038 — Comando `perl` para editar strings C# corrompe escapes e aspas
+
+- **Data / US:** 2026-10-19 / US-004 (relato do usuário)
+- **Quem errou:** executor
+- **O que aconteceu:** segundo o relato do usuário, o Executor usou `perl` em linha de comando para alterar literais de string de código C#. Barras invertidas, `\uXXXX` e aspas passam por camadas de interpretação do shell e do perl e saem alterados. Os detalhes do incidente não estão em `plan.md`. Parente do AP-007 (escapes corrompidos por ferramentas de edição).
+- **Por que importa:** a corrupção é silenciosa em literais e só aparece em teste ou no D15; o hook de formatação não a pega.
+- **Correção (proposta):** `.claude/agents/executor.md` e `.claude/skills/tdd-dotnet/SKILL.md`: "literais de string com `\`, `\u`, aspas ou `%` são editados com a ferramenta de edição de arquivo, não com `perl`/`sed`/`awk` em linha de comando; se for inevitável, confira o `git diff` do trecho e rode o D15 antes de seguir".
+- **Status:** Proposta
+
+### AP-039 — `ValidateOnStart` com várias Options muda a exceção de partida; normalização sem teste no consumidor
+
+- **Data / US:** 2026-10-17 / US-004 (`plan-review.md` Rodada 1 B1 e B4)
+- **Quem errou:** planejador
+- **O que aconteceu:** (B1) acrescentar `ClaudeCodeOptions` e `ConversationOptions` com `ValidateOnStart` faz duas seções inválidas ao mesmo tempo virarem uma `AggregateException`, que caía no erro inesperado (código 1) e regredia a US-001; nenhum teste existente invalidava duas seções. Corrigido com a P19 e a T17. (B4) o validador aceitava `OutputMode` em outra caixa e o consumidor usaria o valor cru, rodando no modo errado em silêncio; corrigido com o valor canônico no adaptador e teste com `"jsonschema"` e `"TAGS"`. Recorrência da S1 do `plan-review` da US-001.
+- **Por que importa:** cada falha só aparece quando a combinação ou a caixa errada acontece, em produção.
+- **Correção (proposta):** (a) `.claude/skills/padroes-codigo/SKILL.md`, "DI e configuração": "com mais de uma classe de Options validada na partida, a mensagem de configuração inválida cobre falhas simultâneas de seções diferentes (com teste)", e a lista do Planejador: "US que adiciona `ValidateOnStart` mapeia um teste com duas seções inválidas"; (b) checklist de revisão de plano: "valor aceito sem diferenciar maiúsculas pelo validador tem teste no consumidor com caixa diferente".
+- **Status:** Proposta
+
+### AP-040 — Adiamento escrito em P* e "limite aceito" sem listar os consumidores
+
+- **Data / US:** 2026-10-17 / US-004 (`plan-review.md` Rodada 1 B2 e Rodada 4 S4)
+- **Quem errou:** planejador
+- **O que aconteceu:** (B2, recorrência do AP-022) o adiamento "a US-005 troca isso" ficou numa P*, e a conferência da §8 não o pegou; resolvido com um cenário novo na spec da US-005 antes da T1. (S4) uma limitação foi aceita com "o Core não valida isso", mas o mesmo componente (o separador de frases) passou a ser usado num critério da DoD com tolerância zero; resolvido com a lista de consumidores e o efeito em cada um (P22).
+- **Por que importa:** adiamento sem dono some; limite aceito para um consumidor pode ser inaceitável para outro.
+- **Correção (proposta):** `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md` §0: procurar adiamentos também nas P* e nos comentários de teste ("a US-YYY troca/atualiza"), não só na §8; todo "limite aceito" lista os consumidores do componente (validador, testes `LiveBrain`, DoD) e o efeito em cada um.
+- **Status:** Proposta
+
+### AP-041 — Tabela de decisão: cada linha precisa de um caso que só ela satisfaz
+
+- **Data / US:** 2026-10-17 / US-004 (`plan-review.md` Rodada 1 B3/S5 e Rodada 2 S2/S3)
+- **Quem errou:** planejador
+- **O que aconteceu:** na tabela de `ClaudeCodeOutput.Read` (§2.5) as linhas se sobrepõem (código ≠ 0 e `is_error`), e um caso de teste podia cair numa linha anterior e deixar a seguinte sem cobertura. Depois, a linha 2 tinha condição composta ("não é JSON" ou "não é `type: result`") e o auxiliar de teste decidia em silêncio qual linha casava. Corrigido com casos como `other-type` e `json-array`, que usam um `structured_output` válido, e auxiliares que declaram `"type": "result"`. Variação do AP-016.
+- **Por que importa:** o teste passa pela linha errada e a regra certa fica sem prova.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "em tabela de decisão, cada linha tem um caso que só ela satisfaz; condição composta tem um caso por parte; auxiliares de teste que montam a entrada declaram os campos que decidem a linha".
+- **Status:** Proposta
+
+### AP-042 — Rótulo de comentário alterado por substituição mecânica deixa de descrever o teste
+
+- **Data / US:** 2026-10-20 / US-004 (`review.md` Rodada 2 S6; corrigido em `e220427`)
+- **Quem errou:** executor
+- **O que aconteceu:** ao trocar o nome antigo do cenário pelo novo (S2 da Rodada 4), o comentário de `Validate_WhenReplyEndsWithQuestionFollowedBySpaces_IsValidAndTrimmed` ficou `Cenário: reply sem pergunta (apoio, P6)`, que não descreve o que o teste cobre. Sem efeito observável, só rótulo.
+- **Por que importa:** comentário que mente confunde quem lê o mapa cenário → teste.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "ao trocar o nome de um cenário, releia cada comentário alterado contra o corpo do teste, não só o texto antigo".
+- **Status:** Proposta
