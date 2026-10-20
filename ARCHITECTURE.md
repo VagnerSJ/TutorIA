@@ -51,7 +51,7 @@ src/
                        ConversationMessages, ConversationOptions, ConversationOptionsValidator, ConversationLog,
                        ITutorPromptSource, TurnMessageBuilder, TutorMode, LocalCommandParser, LocalCommand, LocalCommands
     Brain/             ITutorBrain, BrainRequest, BrainMessage, BrainRole, TutorReply, Correction, TutorReplyParseResult,
-                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, FeedbackFormatter,
+                       TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,
                        BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
@@ -186,7 +186,7 @@ Validação das Options na inicialização (`ValidateOnStart`).
 - Forma canônica: objeto JSON `{ reply, corrections[{original, corrected, explanation}], pronunciation, vocabulary, praise }`.
 - `ClaudeCode` usa `--json-schema` e lê `structured_output`; `Ollama` usa `format` com o mesmo JSON Schema.
 - `TutorReplyParser` é **único**: aceita o JSON canônico e, como alternativa, o formato com tags `<reply>…</reply><feedback>…</feedback>` (texto cru, modelos menores, `OutputMode: Tags`).
-- As regras de conteúdo verificáveis (reply não vazio e terminando em `?`, no máximo 2 correções, correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
+- As regras de conteúdo verificáveis (reply não vazio e com exatamente uma pergunta, isto é, uma única frase terminada em `?`, em qualquer posição, com as frases separadas por `ReplySentences`; no máximo 2 correções; correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
 
 ### 6.3 Provedor Claude Code (processo)
 

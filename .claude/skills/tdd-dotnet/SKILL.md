@@ -83,7 +83,7 @@ public abstract class TutorBrainContractTests
     protected abstract ITutorBrain CreateBrain(/* respostas simuladas */);
 
     [Fact]
-    public async Task SendAsync_WithValidOutput_ReturnsReplyEndingWithQuestion() { ... }
+    public async Task SendAsync_WithValidOutput_ReturnsReplyWithOneQuestion() { ... }
 }
 
 public sealed class OllamaTutorBrainContractTests : TutorBrainContractTests { ... }

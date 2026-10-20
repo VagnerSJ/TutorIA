@@ -17,7 +17,7 @@ Fatos verificados na documentação do Claude Code v2.1.299:
 1. A forma canônica do contrato é um objeto JSON:
    ```json
    {
-     "reply": "string (1–3 frases, termina com '?')",
+     "reply": "string (1–3 frases, com exatamente uma pergunta, em qualquer posição)",
      "corrections": [{ "original": "string", "corrected": "string", "explanation": "string" }],
      "pronunciation": "string | null",
      "vocabulary": "string | null",
@@ -27,7 +27,7 @@ Fatos verificados na documentação do Claude Code v2.1.299:
 2. `ClaudeCode` e `Ollama` usam saída estruturada com esse schema (`OutputMode = JsonSchema`, padrão).
 3. O `TutorReplyParser` é único e aceita **também** o formato com tags (`OutputMode = Tags`), usado como alternativa de compatibilidade e para comparação no `eval`.
 4. As regras de conteúdo ficam em `prompts/tutor.md`; a instrução de formato fica em `prompts/format.json.md` ou `prompts/format.tags.md`, anexada pelo adaptador (RN-BRAIN02).
-5. Regras que o schema não garante (reply termina com pergunta, no máximo 2 correções) continuam validadas pelo parser, com a retentativa da RN-BRAIN04.
+5. Regras que o schema não garante (reply com exatamente uma pergunta, RN-FEED01; no máximo 2 correções) continuam validadas pelo parser, com a retentativa da RN-BRAIN04.
 
 ## Alternativas consideradas
 
