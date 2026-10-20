@@ -335,7 +335,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** ao mudar a RN-FEED01, o D16 (varredura do texto antigo) esperava "nenhuma linha", e só esse lado estava previsto: se o comando deixasse de varrer algum caminho ou tivesse aspas erradas, daria verde falso. A lista de ocorrências também cobria só o texto exato (`must end with a question`, `EndWith("?")`) e deixava de fora o nome antigo do cenário em comentário de teste e a forma `EndsWith('?')`. Corrigido com o controle D16c (o mesmo comando acha as linhas antigas antes da mudança, registrado em `c482f1e`) e com a busca das variações. Variação do AP-005 e do AP-016.
 - **Por que importa:** verde sem o outro lado do limite não prova nada; texto antigo sobrevivente gera falso bloqueante.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md`: quando a US renomeia cenário ou regra, o Grep de "texto antigo" inclui o nome antigo do cenário, as variações sintáticas da asserção e uma evidência de que o comando de busca da DoD acha as ocorrências antes da mudança; (b) `.claude/skills/checklist-revisao/SKILL.md` §0: "verificação de 'nenhuma linha' na DoD tem o outro lado demonstrado".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 35")
 
 ### AP-036 — Afirmação sobre outra US ou número da revisão usado sem conferir a fonte
 
