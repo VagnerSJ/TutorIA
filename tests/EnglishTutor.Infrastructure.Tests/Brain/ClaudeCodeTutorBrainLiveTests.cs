@@ -28,11 +28,14 @@ public sealed class ClaudeCodeTutorBrainLiveTests : IDisposable
             }
             catch (BrainException exception) when (exception.IsInvalidOutput)
             {
-                outOfFormat.Add(known.Sentence);
+                outOfFormat.Add(
+                    $"sentence: \"{known.Sentence}\"; rejected reply: {exception.RawText}; reason: {exception.Rejection.Message}");
             }
         }
 
-        outOfFormat.Should().BeEmpty(because: "every answer must follow the format (5/5)");
+        outOfFormat.Should().BeEmpty(
+            because: "every answer must follow the format (5/5). Rejected: {0}",
+            becauseArgs: string.Join(" | ", outOfFormat));
         found.Should().BeGreaterThanOrEqualTo(4);
     }
 
