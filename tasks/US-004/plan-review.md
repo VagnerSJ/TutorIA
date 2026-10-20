@@ -226,3 +226,57 @@ Nenhum.
 
 - **S2/S3 (variação do AP-005):** quando um cenário ou motivo é renomeado na spec, o plano tende a listar só as ocorrências do texto exato que mudou (`must end with a question`, `EndWith("?")`). Ficam de fora as variações: nome antigo do cenário em comentários de teste e a forma `EndsWith('?')`. Proposta: no `.claude/agents/planejador.md`, quando a US renomeia cenário ou regra, o Grep de "texto antigo" inclui (a) o nome antigo do cenário, (b) as variações sintáticas da asserção e (c) uma evidência de que o comando de busca da DoD acha as ocorrências antes da mudança. No `checklist-revisao` §0, acrescentar: "verificação de 'nenhuma linha' na DoD tem o outro lado demonstrado (o comando acha as ocorrências antes da mudança)".
 - **S4:** uma limitação aceita foi justificada com "o Core não valida isso", mas o mesmo componente passou a ser usado num critério da DoD com tolerância zero. Proposta: no `planejador.md`, todo "limite aceito" lista os consumidores do componente (validador, testes `LiveBrain`, DoD) e diz o efeito em cada um.
+
+## Rodada 5
+
+Data: 2026-10-20
+Escopo revisado: `tasks/US-004/plan.md` no HEAD 097f237 (`docs(ai): revise plan for US-004`), comparado com a93c42b (`git diff HEAD~1 HEAD`: 64 inserções e 31 remoções, o arquivo vai de 1255 para 1288 linhas). Só revisei o que mudou. O arquivo foi reescrito inteiro, mas o diff mostra só os trechos abaixo, então nada foi perdido.
+Resultado: APROVADO
+
+### Itens da rodada anterior (Rodada 4)
+
+| Item | Status |
+|---|---|
+| S1 (status e T23 × D7) | Resolvida em 097f237. O `Status:` cita T18–T23. A T23 roda D1–D6 e D8–D18 e diz que o D7 não se repete, com o motivo (feito em 2fd8419, latência não é critério da RN-FEED01). O D7 da §10 diz a mesma coisa. A nota de abertura da §11 também. |
+| S2 (comentários "reply sem pergunta final") | Resolvida em 097f237. Está na §2.10.4 (linha nova com texto antigo e novo), na §3, na §4 ("Testes existentes alterados": 11 itens), na T20 (mudam nos commits `test`) e no D16 (padrões `pergunta final` e `NoFinalQuestion`). Os 4 comentários existem no código, com o texto citado: `TutorReplyValidatorTests.cs` linhas 40 e 53, `TutorReplyParserTests.cs` linhas 98 e 209. O nome atual do cenário na spec é "reply sem pergunta" (`SPRINT_1.md:130`). |
+| S3 (D16 só confere um lado) | Resolvida em 097f237, com a ressalva da S1 desta rodada. O D16 foi reescrito e há o D16c, executado na T18 antes do Red. |
+| S4 (P22 e o D5) | Resolvida em 097f237. A P22 lista os consumidores e o efeito de cada limite. A §7 tem a linha nova. A T23 classifica a causa de rodada vermelha em (a) a (d), e "limite do separador" também vai para a §12. |
+| S5 (exemplo do `tdd-dotnet`) | Resolvida em 097f237. A decisão é que o exemplo acompanha a regra nova. Texto antigo e novo estão na §2.10.6. A linha antiga confere com `.claude/skills/tdd-dotnet/SKILL.md:86`, com 4 espaços de indentação. A §3, a pré-condição da §5, o D16 e a DoD comum foram atualizados. |
+| S6 (nome do teste de `IsQuestion`) | Resolvida em 097f237. O nome é `IsQuestion_WithSentence_ReturnsWhetherFinalPunctuationContainsQuestionMark`, igual na §4 (linhas 655 e 778), na T18 (925) e na P21 (1046). O nome antigo só aparece na linha 1287, que registra a própria renomeação (ver S2 abaixo). |
+| S7 (privacidade do ambiente herdado) | Registrada como risco aceito, sem criar adiamento sem dono (AP-022). A §7 tem motivo, mitigações em vigor e condição para revisitar. A §8 diz "sem US de destino, sem ADR agora e sem promessa para outra US". A §12 registra o pedido do usuário e a resposta. A condição para revisitar é um gatilho com decisão do usuário, não uma promessa a outra US. |
+
+### Verificações
+
+| Item | Resultado |
+|---|---|
+| [O] D16 funciona no Windows PowerShell 5.1 | ✅ Rodei o bloco no `powershell.exe` 5.1, no estado atual da árvore, que ainda tem o texto antigo. Saída: `scanned=131 named=3` e 38 linhas. Os 3 nomeados entram por `Get-Item`. `.claude\skills` é varrido, mesmo sendo pasta com ponto. Aspas, crases e `Where-Object Name -in` não deram erro. |
+| [O] D16c, parte 1 (código, testes, prompts) | ✅ Todos os padrões esperados pelo plano aparecem. `must end with a question` e `ReplyMustEndWithQuestion` estão em `TutorReplyRejections.cs`, `TutorReplyValidator.cs` e nos testes. `LAST sentence` está nos 3 prompts. `EndWith("?")` está em `ClaudeCodeTutorBrainTests`, `ClaudeCodeTutorBrainLiveTests` e noutros testes. `EndsWith('?')` está em `TutorReplyValidator.cs:19` e `FixtureRecorderLiveTests.cs:36`. `pergunta final` e `NoFinalQuestion` estão em `TutorReplyParserTests.cs` e `TutorReplyValidatorTests.cs`. |
+| [O] D16c, parte 2 (`git grep` no `ea8744d`) | ✅ O comando funciona e `ea8744d` existe. Acha uma linha em cada um dos 6 arquivos esperados: `ARCHITECTURE.md:189`, `specs/PRODUCT.md:15`, ADR-002 (linhas 20 e 30), ADR-005 (14, 18 e 35), `docs/us/US-002.md:35` e `.claude/skills/tdd-dotnet/SKILL.md:86`. |
+| D16 cobre todas as ocorrências antigas dos documentos | ✅ Cada linha achada nos documentos tem texto antigo e novo na §2.10.6. Os textos novos não contêm nenhum padrão do D16. |
+| [O] Contagens | ✅ D2 = 249 = Core 103+31 = 134, Console 41, Infrastructure 72+2 = 74. A §4 e a §5 dão 57 métodos e 98 casos. D17 = 19 casos em 3 métodos (10+2+7). A linha 1267 da §12 bate com essas contagens. A renomeação não muda nada, e a §4 diz isso. |
+| [O] Nomes idênticos na §4 e na §5 (AP-025) | ✅ Conferi os 3 testes de `ReplySentencesTests` e os de "reply sem pergunta" do validador e do parser. Os nomes batem. O `Validate_WhenReplyEndsWithQuestionFollowedBySpaces_IsValidAndTrimmed` (linhas 462 e 945) não muda de nome. |
+| [O] Texto da §2.10.6 (trecho antigo do `tdd-dotnet`) | ✅ O texto antigo confere por byte com o arquivo. O novo é `SendAsync_WithValidOutput_ReturnsReplyWithOneQuestion`. O parágrafo "Repetições em `CLAUDE.md` e skills" foi corrigido e a busca inclui `EndingWith\|pergunta final`. O `CHANGELOG.md` fica de fora de propósito (registro histórico). |
+| [O] Ordem das tarefas e Red | ✅ A T18 agora começa com o controle do D16 e depois faz o Red. Esse passo só roda comandos e não gera código. Os Reds da T19 a T21 não mudam. |
+| [O] Escopo e AP-022 | ✅ A S7 não cria adiamento. O teste do `ChangeMode` (S4 do `review.md`) continua em item próprio, para decisão do usuário. |
+| Nada perdido na reescrita | ✅ O diff entre 097f237 e a93c42b só tem os trechos listados acima. Cabeçalhos §1 a §12 e as tarefas T1 a T23 estão presentes. |
+| Código e testes do repositório | N/A. Não rodei build nem testes: este é o modo revisão de plano, e o código na branch não mudou desde a Rodada 4. |
+
+### Bloqueantes
+
+Nenhum.
+
+### Sugestões
+
+- **S1** — §7, linha de 2026-10-20 (privacidade do ambiente herdado), frase "o comando do D5/D6/D7 limpa as variáveis (§10)". Só o D5 tem o comando de limpeza. O D6 diz "no ambiente acima" e depende de ser a mesma sessão do D5. O D7 não limpa, mas também não é repetido na T23. **Esperado:** a frase diz que o D5 limpa e que o D6 roda na mesma sessão. Assim o Executor não roda o D6 numa sessão nova com o ambiente herdado do app desktop. Se esse ambiente for a causa do problema, o D6 mostraria o nome do titular e o D13 reprovaria, mas a evidência já estaria contaminada.
+- **S2** — §12, resposta da rodada 4 (linha 1287), item S6. A frase "para uma busca pelo nome antigo não achar mais nada" não é literal: o nome antigo `...ItEndsWithQuestionMark` ainda aparece nessa própria linha, ao registrar a renomeação. Não afeta o D16, que não varre `tasks/`. **Esperado:** ajustar a frase para "fora desta linha" ou aceitar a ocorrência como histórico.
+
+### Pontos positivos
+
+- O D16 imprime `scanned` e `named` antes dos resultados. Um caminho não varrido aparece na evidência em vez de virar um verde falso. Os 3 arquivos nomeados entram por `Get-Item`, e isso resolve o problema de misturar arquivo e pasta no `-Path`.
+- O D16c prova os dois lados da verificação: o mesmo bloco acha as ocorrências no código, e o `git grep` em `ea8744d` acha as dos documentos, que a parte 1 já não vê. A lista esperada é concreta, por padrão e por arquivo. Ela bate com o que obtive, e o plano manda parar se algo faltar.
+- A restrição de forma na §2.10.1 (sem `EndsWith('?')` no código novo) é explicada pelo motivo: o D16 confere por texto, e a regra é "pontuação final contém `?`".
+- A P22 passa a listar os consumidores do `ReplySentences` e o efeito de cada limite. A T23 diferencia falha do modelo, da regra e do separador, e leva a decisão ao usuário.
+
+### Aprendizados para o processo
+
+- Nada novo. O AP-005 (texto antigo sobrevivente) e o AP-022 já cobrem o ocorrido. As propostas da Rodada 4 (o outro lado da verificação de "nenhuma linha" e os consumidores de todo "limite aceito") foram aplicadas e funcionaram. Ainda vale registrá-las em `.claude/agents/planejador.md` e no `checklist-revisao` §0, se o usuário concordar.
