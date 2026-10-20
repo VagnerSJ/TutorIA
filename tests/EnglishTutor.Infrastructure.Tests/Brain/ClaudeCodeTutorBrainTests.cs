@@ -407,7 +407,7 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
         await sut.SendAsync(
             Request(User("t1"), Assistant(reply.RawText), User("t2")), TestContext.Current.CancellationToken);
 
-        reply.Reply.Should().EndWith("?");
+        ReplySentences.Split(reply.Reply).Count(ReplySentences.IsQuestion).Should().Be(1);
         reply.Corrections.Should().Contain(c =>
             c.Original.Contains("since five years", StringComparison.OrdinalIgnoreCase)
             && c.Corrected.Contains("for five years", StringComparison.OrdinalIgnoreCase));
@@ -427,7 +427,7 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
 
         var reply = await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
 
-        reply.Reply.Should().EndWith("?");
+        ReplySentences.Split(reply.Reply).Count(ReplySentences.IsQuestion).Should().Be(1);
         reply.RawText.Should().Be(recordedResult);
     }
 

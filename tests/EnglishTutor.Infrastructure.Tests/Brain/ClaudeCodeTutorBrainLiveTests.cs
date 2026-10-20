@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Tests.Support;
 
@@ -7,7 +6,7 @@ namespace EnglishTutor.Infrastructure.Tests.Brain;
 
 // Real Claude Code CLI (installed and authenticated); excluded from the fast suite.
 [Trait("Category", "LiveBrain")]
-public sealed partial class ClaudeCodeTutorBrainLiveTests : IDisposable
+public sealed class ClaudeCodeTutorBrainLiveTests : IDisposable
 {
     private readonly LiveClaudeCode _live = new();
 
@@ -39,14 +38,15 @@ public sealed partial class ClaudeCodeTutorBrainLiveTests : IDisposable
 
     // US-004 — Cenário: frase com erro gramatical — RN-FEED01, RN-FEED02
     [Fact]
-    public async Task SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesEndingWithQuestion()
+    public async Task SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion()
     {
         var request = _live.Request(LiveClaudeCode.StudentMessage("I have worked with C# since five years"));
 
         var reply = await _live.Brain.SendAsync(request, TestContext.Current.CancellationToken);
 
-        reply.Reply.Should().EndWith("?");
-        SentenceEnd().Count(reply.Reply).Should().BeLessThanOrEqualTo(3);
+        var sentences = ReplySentences.Split(reply.Reply);
+        sentences.Should().HaveCountLessThanOrEqualTo(3);
+        sentences.Count(ReplySentences.IsQuestion).Should().Be(1);
         reply.Corrections.Should().Contain(c =>
             c.Original.Contains("since five years", StringComparison.OrdinalIgnoreCase)
             && c.Corrected.Contains("for five years", StringComparison.OrdinalIgnoreCase));
@@ -71,11 +71,8 @@ public sealed partial class ClaudeCodeTutorBrainLiveTests : IDisposable
         var arguments = _live.Runner.Requests[1].Arguments.ToList();
         arguments.Should().Contain("--resume");
         arguments[arguments.IndexOf("--resume") + 1].Should().Be(sessionId);
-        reply2.Reply.Should().EndWith("?");
+        ReplySentences.Split(reply2.Reply).Count(ReplySentences.IsQuestion).Should().Be(1);
     }
 
     public void Dispose() => _live.Dispose();
-
-    [GeneratedRegex(@"[.!?](\s|$)")]
-    private static partial Regex SentenceEnd();
 }

@@ -1,3 +1,4 @@
+using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.Tests.Support;
 
@@ -33,6 +34,6 @@ public sealed class FixtureRecorderLiveTests
             replies.Add(reply.Reply);
         }
 
-        replies.Should().HaveCount(2).And.OnlyContain(reply => reply.EndsWith('?'));
+        replies.Should().HaveCount(2).And.OnlyContain(reply => ReplySentences.Split(reply).Count(ReplySentences.IsQuestion) == 1);
     }
 }
