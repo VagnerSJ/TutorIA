@@ -1152,6 +1152,14 @@ Exemplos que continuam recusados: `"... What kind of projects do you work on the
 
 Depois da mudança de prompts: D1 → 0 Aviso(s), 0 Erro(s); D2 → 216 passed (103 + 41 + 72), 0 failed; D4 → código de saída 0 (2026-10-19, 2cb0f7a). **O D5 continua ❌ intermitente**: a taxa caiu de cerca de 20% para 5–10% por chamada, mas "5/5 no formato" ainda falha em 3 de 5 rodadas. A T18 fica aberta (§12 E4).
 
+### Revisão de 2026-10-19 (RN-FEED01): evidências da T18 à T23
+
+**T18 — controle do D16 (D16c), antes de qualquer mudança desta revisão** (2026-10-20, HEAD `d39ffab`; documentos do orquestrador já aplicados):
+
+- Parte 1 (bloco D16 no repositório): `scanned=131 named=3`. Padrões encontrados: `must end with a question` (`TutorReplyRejections.cs:9`, `TutorReplyRejectionsTests.cs:29`, `TutorReplyValidatorTests.cs:49`, `TutorReplyParserTests.cs:107,216`); `ReplyMustEndWithQuestion` (`TutorReplyRejections.cs`, `TutorReplyValidator.cs:21`, `TutorReplyRejectionsTests.cs`); `LAST sentence` (`prompts/tutor.md:19`, `format.json.md:5`, `format.tags.md:6`); `EndWith("?")` (`ClaudeCodeTutorBrainLiveTests.cs:48,74`, `ClaudeCodeTutorBrainTests.cs:410,430`); `EndsWith('?')` (`TutorReplyValidator.cs:19`, `FixtureRecorderLiveTests.cs:36`); `pergunta final` (`TutorReplyValidatorTests.cs:40,53`, `TutorReplyParserTests.cs:98,209`); `NoFinalQuestion` (`TutorReplyParserTests.cs:100,211`). Todos os padrões esperados apareceram.
+- Parte 2 (`git grep` no `ea8744d`): linhas em `ARCHITECTURE.md:189`, `specs/PRODUCT.md:15`, `docs/adr/ADR-002-contrato-saida-estruturada.md:20,30`, `docs/adr/ADR-005-regras-de-conteudo-no-core-parser-na-infrastructure.md:18,35`, `docs/us/US-002.md:35` e `.claude/skills/tdd-dotnet/SKILL.md:86`. Os 6 arquivos esperados apareceram.
+- Conclusão: o D16 enxerga o texto antigo no código, nos testes e nos prompts, e a parte 2 o enxerga nos documentos e na skill; o D16 vale como evidência depois da T22.
+
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
