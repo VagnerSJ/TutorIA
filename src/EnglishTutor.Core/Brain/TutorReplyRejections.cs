@@ -6,8 +6,6 @@ public static class TutorReplyRejections
 {
     public const string MissingReplyReason = "missing reply";
 
-    public const string ReplyMustEndWithQuestionReason = "reply must end with a question";
-
     public const string ReplyMustAskExactlyOneQuestionReason = "reply must ask the student exactly one question";
 
     public const string InvalidJsonReason = "invalid JSON";
@@ -20,16 +18,6 @@ public static class TutorReplyRejections
         MissingReplyReason,
         $"{MissingReplyReason}: the answer has no reply text. Expected a JSON object with a non-empty \"reply\" string, " +
         "or the spoken text inside <reply>...</reply> followed by <feedback>...</feedback>.");
-
-    public static TutorReplyRejection ReplyMustEndWithQuestion(string reply)
-    {
-        ArgumentNullException.ThrowIfNull(reply);
-        var quoted = Quote(reply);
-        return new(
-            ReplyMustEndWithQuestionReason,
-            $"{ReplyMustEndWithQuestionReason}: the reply \"{quoted}\" does not end with \"?\". " +
-            "Expected 1 to 3 short sentences that end with one question to the student.");
-    }
 
     public static TutorReplyRejection ReplyMustAskExactlyOneQuestion(string reply, int questionCount)
     {
