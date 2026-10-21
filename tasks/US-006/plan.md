@@ -640,3 +640,8 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 - Plano aprovado com todos os padrões propostos das perguntas P1 a P12 (nenhuma resposta alterada).
 - Sugestões S2, S3 e S4 da revisão do plano: **não incorporadas**, por decisão do usuário.
 - ADR-009 passou a "Aceito". `specs/sprints/SPRINT_1.md` (US-006 e US-007) e `ARCHITECTURE.md` (§3, §6.1, §6.4) foram atualizados conforme a §2.9, em commits próprios, antes da T1.
+
+### 2026-10-21 — escolhas do Executor (T2, versões dos pacotes)
+
+- `OllamaSharp` **5.5.0** (versão estável mais recente no nuget.org; o nuspec declara `Microsoft.Extensions.AI.Abstractions` >= 10.8.0 e o `OllamaApiClient` implementa `IChatClient`, condição de parada do ADR-009 afastada).
+- `Microsoft.Extensions.AI.Abstractions` **10.11.0** (versão estável mais recente, compatível com a exigência de >= 10.8.0 do `OllamaSharp`). Os dois ficam em `Directory.Packages.props`, grupo `Infrastructure`, e só na `EnglishTutor.Infrastructure.csproj` (R1).
