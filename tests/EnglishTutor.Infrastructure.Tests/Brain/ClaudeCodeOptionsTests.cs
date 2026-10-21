@@ -13,6 +13,7 @@ public sealed class ClaudeCodeOptionsTests
         options.ExecutablePath.Should().Be("claude");
         options.Model.Should().Be("haiku");
         options.WorkingDirectory.Should().Be("%LOCALAPPDATA%/EnglishTutor/brain");
+        options.TimeoutSeconds.Should().Be(60);
         options.UseResume.Should().BeTrue();
         options.OutputMode.Should().Be("JsonSchema");
     }

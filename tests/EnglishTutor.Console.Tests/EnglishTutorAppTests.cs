@@ -263,6 +263,24 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().BeEmpty();
     }
 
+    // US-005 — Cenário: tempo esgotado (apoio: chave inválida encerra antes do prompt) — RN-BRAIN09
+    [Fact]
+    public async Task RunAsync_WhenTimeoutSecondsIsZero_ExitsWithInvalidConfigurationBeforePrompt()
+    {
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode", extraValues: new Dictionary<string, string?> { ["Brain:ClaudeCode:TimeoutSeconds"] = "0" }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Brain:ClaudeCode:TimeoutSeconds must be between 1 and 3600 (found 0)");
+        _output.ToString().Should().BeEmpty();
+    }
+
     // US-004 — Cenário: janela de turnos configurável (apoio, P19, B1: várias seções inválidas)
     [Theory]
     [InlineData("Inexistente", "Brain:ClaudeCode:OutputMode", "JsonSchema",
