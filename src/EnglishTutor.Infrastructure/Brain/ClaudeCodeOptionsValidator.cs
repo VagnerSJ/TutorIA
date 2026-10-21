@@ -38,6 +38,14 @@ public sealed class ClaudeCodeOptionsValidator : IValidateOptions<ClaudeCodeOpti
                 $"Accepted values: {string.Join(", ", BrainOutputModes.All)}.");
         }
 
+        if (options.TimeoutSeconds is < ClaudeCodeOptions.MinTimeoutSeconds or > ClaudeCodeOptions.MaxTimeoutSeconds)
+        {
+            failures.Add(
+                $"{_prefix}:TimeoutSeconds must be between {ClaudeCodeOptions.MinTimeoutSeconds} and " +
+                $"{ClaudeCodeOptions.MaxTimeoutSeconds} (found {options.TimeoutSeconds}). " +
+                $"Expected the maximum number of seconds to wait for each Claude Code call (default: {ClaudeCodeOptions.DefaultTimeoutSeconds}).");
+        }
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }

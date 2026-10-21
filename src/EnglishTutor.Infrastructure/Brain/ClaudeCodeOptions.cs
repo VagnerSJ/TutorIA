@@ -20,7 +20,7 @@ public sealed class ClaudeCodeOptions
 
     public string WorkingDirectory { get; set; } = DefaultWorkingDirectory;
 
-    public int TimeoutSeconds { get; set; }
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 
     public bool UseResume { get; set; } = true;
 
