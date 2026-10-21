@@ -3,6 +3,7 @@
 - **Status:** Aceito (2026-10-17)
 - **Data:** 2026-10-17 (revisado no mesmo dia, depois da rodada 1 da revisão do plano: itens 3 e 5 e "Consequências"; e depois da rodada 2: contagem de turnos em "Consequências")
 - **US relacionadas:** US-004 (e, como consumidoras, US-005, US-007, US-008)
+- **Complementado por:** ADR-008 (item 5: classificação das falhas e executável inexistente, US-005)
 
 ## Contexto
 

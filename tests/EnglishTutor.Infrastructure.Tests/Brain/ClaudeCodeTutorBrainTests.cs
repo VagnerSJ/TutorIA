@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
@@ -8,6 +9,7 @@ using EnglishTutor.Infrastructure.Tests.Support;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 
 namespace EnglishTutor.Infrastructure.Tests.Brain;
 
@@ -26,7 +28,7 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
 
     private readonly RecordingLogger<ClaudeCodeTutorBrain> _logger = new();
 
-    private readonly ManualTimeProvider _timeProvider = new();
+    private readonly FakeTimeProvider _timeProvider = new();
 
     public ClaudeCodeTutorBrainTests()
     {
@@ -109,17 +111,253 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
             .Which.StandardInput.Should().Be(request.Messages[0].Content);
     }
 
-    // US-004 — Cenário: processo isolado e sem ferramentas (apoio: cancelamento) — P6
+    // US-005 — Cenário: tempo esgotado — RN-BRAIN09
     [Fact]
-    public async Task SendAsync_Always_PassesCallerTokenToProcessRunner()
+    public async Task SendAsync_WhenProcessDoesNotAnswerWithinTimeout_CancelsProcessAndThrowsTimeout()
     {
-        using var cancellation = new CancellationTokenSource();
-        _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1")));
+        var started = new TaskCompletionSource();
+        string? promptPath = null;
+        _processRunner.OnRun = run =>
+        {
+            promptPath = ValueAfter(run, "--system-prompt-file");
+            started.SetResult();
+        };
+        _processRunner.HangsUntilCancelled();
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        var call = sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        var notYet = _processRunner.Tokens[0].IsCancellationRequested;
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var thrown = await FluentActions
+            .Awaiting(() => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<BrainException>();
+
+        notYet.Should().BeFalse();
+        thrown.Which.Kind.Should().Be(BrainErrorKind.Timeout);
+        thrown.Which.Message.Should().Contain("did not answer in time (limit: 1 s)")
+            .And.Contain("Brain:ClaudeCode:TimeoutSeconds");
+        _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio, P5: um relógio por chamada) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_OnEachCall_StartsTimeoutAgain()
+    {
+        var secondStarted = new TaskCompletionSource();
+        _processRunner.OnRun = _ =>
+        {
+            if (_processRunner.Requests.Count == 1)
+            {
+                _timeProvider.Advance(TimeSpan.FromMilliseconds(900));
+            }
+            else
+            {
+                secondStarted.SetResult();
+            }
+        };
+        _processRunner
+            .ReturnsOutput(ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1")))
+            .HangsUntilCancelled();
+        var sut = CreateSut(options =>
+        {
+            options.TimeoutSeconds = 1;
+            options.UseResume = false;
+        });
+        await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var second = sut.SendAsync(SingleMessageRequest("t2"), TestContext.Current.CancellationToken);
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        var notYet = _processRunner.Tokens[1].IsCancellationRequested;
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var thrown = await FluentActions
+            .Awaiting(() => second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<BrainException>();
+
+        notYet.Should().BeFalse(because: "each call has its own clock");
+        thrown.Which.Kind.Should().Be(BrainErrorKind.Timeout);
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio: Ctrl+C não é Timeout; substitui o repasse do token) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout()
+    {
+        using var callerCancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource();
+        _processRunner.OnRun = _ => started.SetResult();
+        _processRunner.HangsUntilCancelled();
         var sut = CreateSut();
 
-        await sut.SendAsync(SingleMessageRequest("t1"), cancellation.Token);
+        var call = sut.SendAsync(SingleMessageRequest("t1"), callerCancellation.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await callerCancellation.CancelAsync();
+        var act = () => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        _processRunner.Tokens.Should().Equal(cancellation.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio: tempo estourado e Ctrl+C ao mesmo tempo; S2) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation()
+    {
+        using var callerCancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource();
+        string? promptPath = null;
+        _processRunner.OnRun = run =>
+        {
+            promptPath = ValueAfter(run, "--system-prompt-file");
+            started.SetResult();
+        };
+        _processRunner.HangsUntilCancelled(onCancelled: () => callerCancellation.Cancel());
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        var call = sut.SendAsync(SingleMessageRequest("t1"), callerCancellation.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1000));
+        var act = () => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        callerCancellation.IsCancellationRequested.Should().BeTrue();
+        _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
+    }
+
+    // US-005 — Cenário: CLI não encontrada — RN-BRAIN07
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task SendAsync_WhenExecutableIsNotFound_ThrowsCliNotFoundWithInstallInstructionAndKey(int nativeErrorCode)
+    {
+        string? promptPath = null;
+        _processRunner.OnRun = run => promptPath = ValueAfter(run, "--system-prompt-file");
+        var inner = new Win32Exception(nativeErrorCode);
+        _processRunner.Throws(inner);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.CliNotFound);
+        thrown.Message.Should().Contain("Claude Code CLI not found (\"claude-under-test\")")
+            .And.Contain("irm https://claude.ai/install.ps1 | iex")
+            .And.Contain("Brain:ClaudeCode:ExecutablePath");
+        thrown.InnerException.Should().BeSameAs(inner);
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
+    }
+
+    // US-005 — Cenário: CLI não encontrada (apoio, P9: outro lado) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenExecutableCannotBeStartedForOtherReason_ThrowsUnknownWithErrorCode()
+    {
+        _processRunner.Throws(new Win32Exception(5));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.Unknown);
+        thrown.Message.Should().Contain("could not be started (\"claude-under-test\", error 5)")
+            .And.NotContain("not found");
+    }
+
+    // US-005 — Cenário: não autenticado — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WithRecordedNotAuthenticatedOutput_ThrowsNotAuthenticatedAskingForAuthLogin()
+    {
+        _processRunner.Returns(ClaudeErrorFixtures.Read("not-authenticated"));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.NotAuthenticated);
+        thrown.Message.Should().StartWith("Claude Code is not logged in (")
+            .And.Contain("Run \"claude auth login\"")
+            .And.Contain("If the ANTHROPIC_API_KEY environment variable is set, check or remove it.")
+            .And.NotContain("Claude Code failed (exit code");
+    }
+
+    // US-005 — Cenário: limite de uso atingido (fixture sintética, P4) — RN-BRAIN07
+    [Theory]
+    [InlineData("usage-limit-synthetic-1")]
+    [InlineData("usage-limit-synthetic-2")]
+    public async Task SendAsync_WithUsageLimitOutput_ThrowsUsageLimitReached(string fixtureName)
+    {
+        _processRunner.Returns(ClaudeErrorFixtures.Read(fixtureName));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.UsageLimitReached);
+        thrown.Message.Should().Contain("Claude Code usage limit reached (")
+            .And.Contain("(synthetic)")
+            .And.Contain("Wait until your Claude plan limit resets");
+    }
+
+    // US-005 — D5: Unknown com saída gravada (caracterização) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WithRecordedUnknownFailureOutput_ThrowsUnknownWithDetail()
+    {
+        var recorded = ClaudeErrorFixtures.Read("unknown-model");
+        _processRunner.Returns(recorded);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.Unknown);
+        thrown.Message.Should().StartWith(
+            recorded.ExitCode != 0 ? "Claude Code failed (exit code" : "Claude Code reported an error:")
+            .And.Contain("nao-existe-us005");
+    }
+
+    public static TheoryData<int, string, string, BrainErrorKind, string> FailureTextCases() => new()
+    {
+        // 1: result of an error object, first pattern of row a (row 1 of the output table).
+        { 1, ClaudeOutputs.Error("Not logged in t1"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (Not logged in t1)" },
+        // 2: only stderr, pattern on the second line; the detail is the first line.
+        { 1, string.Empty, "warning t2\nRun /login to continue t2", BrainErrorKind.NotAuthenticated, "is not logged in (warning t2)" },
+        // 3: result of an error object with exit code 0 (row 3 of the output table).
+        { 0, ClaudeOutputs.Error("Invalid API key t3"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (Invalid API key t3)" },
+        // 4: different case.
+        { 1, string.Empty, "AUTHENTICATION_ERROR t4", BrainErrorKind.NotAuthenticated, "is not logged in (AUTHENTICATION_ERROR t4)" },
+        // 5: oauth token.
+        { 1, ClaudeOutputs.Error("OAuth token has expired t5"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (OAuth token has expired t5)" },
+        // 6: usage limit in an error result with exit code 0.
+        { 0, ClaudeOutputs.Error("Claude AI usage limit reached t6"), string.Empty, BrainErrorKind.UsageLimitReached, "usage limit reached (Claude AI usage limit reached t6)" },
+        // 7: "hit your limit" in stderr.
+        { 1, string.Empty, "You've hit your limit t7", BrainErrorKind.UsageLimitReached, "usage limit reached (You've hit your limit t7)" },
+        // 8: both rows match; row a comes before row b.
+        { 1, ClaudeOutputs.Error("Usage limit reached. Please run /login t8"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (Usage limit reached. Please run /login t8)" },
+        // 9: exit code 0 and not the JSON result: not classified (P10).
+        { 0, "Not logged in t9", string.Empty, BrainErrorKind.Unknown, "is not a JSON result" },
+        // 10: rate_limit is not a usage limit (P10).
+        { 1, string.Empty, "rate_limit_error t10", BrainErrorKind.Unknown, "Claude Code failed (exit code 1): rate_limit_error t10" },
+        // 11: the error result matches nothing and stderr matches: the kind comes from stderr (S1).
+        { 1, ClaudeOutputs.Error("Server error t11"), "Not logged in t11", BrainErrorKind.NotAuthenticated, "is not logged in (Server error t11)" },
+        // 12: stderr matches nothing and the error result matches: the kind comes from the result (R2-S1).
+        { 1, ClaudeOutputs.Error("You've hit your limit t12"), "Warning: a newer version is available t12", BrainErrorKind.UsageLimitReached, "usage limit reached (You've hit your limit t12)" },
+    };
+
+    // US-005 — Cenário: não autenticado / limite de uso (apoio: tabela da classificação; P3, P10, P13, S1, R2-S1)
+    [Theory]
+    [MemberData(nameof(FailureTextCases))]
+    public async Task SendAsync_WhenFailureTextNamesAKind_ClassifiesByRowAndSource(
+        int exitCode, string standardOutput, string standardError, BrainErrorKind expectedKind, string expectedFragment)
+    {
+        _processRunner.Returns(new ProcessResult(exitCode, standardOutput, standardError));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(expectedKind);
+        thrown.Message.Should().Contain(expectedFragment);
     }
 
     // US-004 — Cenário: processo isolado e sem ferramentas — RN-BRAIN06

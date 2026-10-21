@@ -27,5 +27,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: ADR-007 (processo por turno, histórico e `--resume`) e medição de latência JsonSchema × Tags no ADR-002 (US-004).
 - Changed: RN-FEED01: o `reply` deve ter exatamente uma pergunta em qualquer posição, e não mais terminar com ela; a recusa diz quantas perguntas encontrou (US-004).
 - Changed: o console passa a emitir UTF-8 sem BOM, para a seta `→` do feedback sair legível no Windows (US-004).
+- Added: falhas do Claude Code classificadas em `CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout` e `Unknown`, com mensagem que diz o que houve e o que fazer (US-005).
+- Added: `Brain:ClaudeCode:TimeoutSeconds` (padrão 60, faixa 1 a 3600) limita cada chamada ao `claude -p` e encerra o processo e seus filhos ao estourar (US-005).
+- Added: ADR-008 (classificação de falhas e tempo máximo por chamada do Claude Code) e fixtures de erro gravadas e sintéticas (US-005).
+- Changed: falha do cérebro no console não encerra mais a sessão: a mensagem vai para a saída de erro, é registrada como aviso (evento 1005) e o prompt volta (US-005).
 - Fixed: `/quit` enviado por pipe no Windows PowerShell 5.1 era lido com BOM UTF-8 e tratado como texto livre (US-001).
 - Hábitos de trabalho com IA: skill `revisar-contexto`, `docs/aprendizados.md`, `specs/archive/`, Definition of Done verificável por US, seções Evidências e Comentários do usuário no plano, ADR proposto antes do código, hooks `post-edit-dotnet` e `executor-stop-gate`.

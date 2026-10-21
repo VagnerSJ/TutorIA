@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Processes;
@@ -58,12 +59,23 @@ public sealed class ClaudeCodeTutorBrain(
         var systemPromptPath = Path.Combine(Path.GetTempPath(), $"englishtutor-system-prompt-{Guid.NewGuid():N}.md");
         ProcessResult result;
         var startedAt = _timeProvider.GetTimestamp();
+        // ADR-008: one clock per call to the process, linked to the caller's token.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(options.TimeoutSeconds), _timeProvider);
+        using var call = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         try
         {
-            await File.WriteAllTextAsync(systemPromptPath, request.SystemPrompt, _utf8WithoutBom, ct);
+            await File.WriteAllTextAsync(systemPromptPath, request.SystemPrompt, _utf8WithoutBom, call.Token);
             var arguments = BuildArguments(options, mode, systemPromptPath, resumeId);
             result = await _processRunner.RunAsync(
-                new ProcessRequest(options.ExecutablePath, arguments, workingDirectory, standardInput), ct);
+                new ProcessRequest(options.ExecutablePath, arguments, workingDirectory, standardInput), call.Token);
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw ClaudeCodeFailures.Timeout(options.TimeoutSeconds, exception);
+        }
+        catch (Win32Exception exception)
+        {
+            throw ClaudeCodeFailures.StartFailed(options.ExecutablePath, exception);
         }
         finally
         {

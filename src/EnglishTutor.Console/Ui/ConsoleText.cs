@@ -17,6 +17,13 @@ public static class ConsoleText
     // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
     public static string StartupFailed(string reason) => $"The application could not start: {reason}";
 
+    // ADR-008: the message of the BrainException says what happened and what to do; the next step is the same for all.
+    public static IReadOnlyList<string> BrainFailed(string message) =>
+    [
+        $"The tutor could not answer: {message}",
+        "You can send a sentence again or type /quit to exit.",
+    ];
+
     public const string FeedbackHeader = "Feedback:";
 
     // US-004 P8: "Tutor: <reply>", then the feedback lines when there are any (none for a raw fallback).

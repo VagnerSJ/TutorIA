@@ -66,17 +66,18 @@ public sealed class FakeTutorBrain : ITutorBrain
 
 ## Ciclo
 
-1. **Red**: primeiro crie os esqueletos mínimos que o teste vai usar (arquivos, tipos e membros que lançam `NotImplementedException`, `using`s); só então escreva o teste do cenário. Assim o hook pós-edição compila a cada passo, e o Red falha **na asserção ou na exceção prevista**, nunca por erro de compilação (AP-013). Commit `test(...)` com teste e esqueletos.
+1. **Red**: primeiro crie os esqueletos mínimos que o teste vai usar (arquivos, tipos e membros que lançam `NotImplementedException`, `using`s); só então escreva o teste do cenário. Assim o hook pós-edição compila a cada passo, e o Red falha **na asserção ou na exceção prevista**, nunca por erro de compilação (AP-013). Crie ou edite primeiro o arquivo que declara o tipo ou membro novo (o esqueleto) e depois o que o usa; se o hook acusar símbolo inexistente logo após a primeira edição de um par, edite o outro arquivo antes de investigar, porque o erro some sozinho (AP-044). Commit `test(...)` com teste e esqueletos.
 2. **Green**: o mínimo para passar. Commit `feat(...)`.
 3. **Refactor**: com tudo verde. Commit `refactor(...)`.
 
-**Teste de caracterização** (comportamento que já existe, então não há Red natural): aplique uma mutação temporária que quebre o comportamento, mostre a falha pelo motivo certo, reverta sem commitar e descreva a mutação e a falha na tarefa do `plan.md`. A mutação pode ser qualquer forma equivalente que compile (ex.: remover o inicializador em vez de `= 0`, que a CA1805 barra) (AP-017, AP-029). Antes de aplicar a mutação, commite o Green (ou o par test/feat) ou desfaça a mutação pela edição inversa; nunca use `git checkout -- <arquivo>` ou `git restore` num arquivo com alterações não commitadas, porque isso apaga também o Green (AP-037).
+**Teste de caracterização** (comportamento que já existe, então não há Red natural): aplique uma mutação temporária que quebre o comportamento, mostre a falha pelo motivo certo, reverta sem commitar e descreva a mutação e a falha na tarefa do `plan.md`. A mutação pode ser qualquer forma equivalente que compile (ex.: remover o inicializador em vez de `= 0`, que a CA1805 barra) (AP-017, AP-029). Antes de aplicar a mutação, commite o Green (ou o par test/feat) ou desfaça a mutação pela edição inversa; nunca use `git checkout -- <arquivo>` ou `git restore` num arquivo com alterações não commitadas, porque isso apaga também o Green (AP-037). Se o teste nasce verde porque o esqueleto já devolve o valor esperado, a mutação é aplicada depois do Green commitado, e a tarefa diz em que momento; a mutação sobre teste de fixture gravada é escolhida (ou confirmada) depois da gravação, para o ramo que a fixture realmente percorre (AP-045).
 
 ## Assíncrono e cancelamento
 
 - Todo teste assíncrono é `async Task`; nunca `.Result`/`.Wait()`.
 - Passe `TestContext.Current.CancellationToken` (xUnit v3) ou `CancellationToken.None` (v2).
 - Cubra pelo menos um cenário de cancelamento/timeout por porta que fala com processo ou rede.
+- Todo teste com fake que só termina por cancelamento usa espera limitada (ex.: `WaitAsync(TimeSpan.FromSeconds(10))`), inclusive os de caracterização, para o Red ou a mutação falhar em vez de travar a suíte (AP-046).
 
 ## Testes de contrato
 

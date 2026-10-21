@@ -9,7 +9,7 @@
 | US-002 | Contrato do professor e parser único da resposta | 1 | US-001 | Concluída |
 | US-003 | ConversationService dono do histórico | 1 | US-002 | Concluída |
 | US-004 | Conversar por texto com o professor via Claude Code | 2 | US-003 | Concluída |
-| US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | A fazer |
+| US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | Concluída |
 | US-006 | Professor local via Ollama | 2b | US-003 | A fazer |
 | US-007 | Troca de cérebro por configuração e fallback | 2b | US-005, US-006 | A fazer |
 | US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | A fazer |
@@ -351,7 +351,7 @@ Cenário: falha do cérebro no console não encerra a sessão
 
 | # | Comando | Esperado |
 |---|---|---|
-| D5 | `dotnet test --filter "FullyQualifiedName~ClaudeCode"` | um teste por `BrainErrorKind`, com fixtures de stdout/stderr gravadas |
+| D5 | `dotnet test --filter "Category!=LiveBrain&FullyQualifiedName~ClaudeCode"` | verde, com ao menos um teste por `BrainErrorKind` que o adaptador produz (`CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`, `Unknown`; `InvalidOutput` vem da US-004). `NotAuthenticated` e `Unknown` usam stdout/stderr gravados de execuções reais; `UsageLimitReached` usa fixtures sintéticas, marcadas como tal no `README.md` da pasta de fixtures, porque o limite de uso não é reproduzível sob demanda; `CliNotFound` e `Timeout` vêm de exceção e de tempo, sem stdout |
 | D6 | `$env:Brain__ClaudeCode__ExecutablePath="nao-existe"; "hi" \| dotnet run --project src/EnglishTutor.Console` | mensagem "Claude Code CLI not found" com instrução; sessão continua |
 | D7 | `dotnet test --filter "FullyQualifiedName~EnglishTutorAppTests"` | verde; o teste `RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError` (US-004, P11) foi substituído pelo teste do cenário "falha do cérebro no console não encerra a sessão" |
 

@@ -103,7 +103,8 @@ public static class EnglishTutorApp
         var provider = CanonicalProvider(services);
         // P7: only ClaudeCode is connected; Ollama keeps the "not connected" handler until US-006.
         IChatInputHandler handler = provider == BrainProviders.ClaudeCode
-            ? new ConversationInputHandler(services.GetRequiredService<ConversationService>(), options.Output)
+            ? new ConversationInputHandler(
+                services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger)
             : new TutorNotConnectedInputHandler(options.Output);
         logger.ApplicationStarted(provider, handler.Mode.Name);
 

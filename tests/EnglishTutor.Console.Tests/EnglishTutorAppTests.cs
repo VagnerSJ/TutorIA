@@ -2,6 +2,7 @@ using System.Text.Json;
 using EnglishTutor.Console.Tests.Support;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Infrastructure.Processes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -263,6 +264,24 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().BeEmpty();
     }
 
+    // US-005 — Cenário: tempo esgotado (apoio: chave inválida encerra antes do prompt) — RN-BRAIN09
+    [Fact]
+    public async Task RunAsync_WhenTimeoutSecondsIsZero_ExitsWithInvalidConfigurationBeforePrompt()
+    {
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode", extraValues: new Dictionary<string, string?> { ["Brain:ClaudeCode:TimeoutSeconds"] = "0" }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Brain:ClaudeCode:TimeoutSeconds must be between 1 and 3600 (found 0)");
+        _output.ToString().Should().BeEmpty();
+    }
+
     // US-004 — Cenário: janela de turnos configurável (apoio, P19, B1: várias seções inválidas)
     [Theory]
     [InlineData("Inexistente", "Brain:ClaudeCode:OutputMode", "JsonSchema",
@@ -293,18 +312,88 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().BeEmpty();
     }
 
-    // US-004 — apoio, P11: falha do cérebro até a US-005.
-    // Substituído na US-005, cenário "falha do cérebro no console não encerra a sessão".
-    [Fact]
-    public async Task RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError()
+    // US-005 — Cenário: falha do cérebro no console não encerra a sessão — RN-BRAIN07
+    [Theory]
+    [InlineData(BrainErrorKind.CliNotFound, "failure CliNotFound t1")]
+    [InlineData(BrainErrorKind.NotAuthenticated, "failure NotAuthenticated t1")]
+    [InlineData(BrainErrorKind.UsageLimitReached, "failure UsageLimitReached t1")]
+    [InlineData(BrainErrorKind.Timeout, "failure Timeout t1")]
+    [InlineData(BrainErrorKind.Unknown, "Claude Code failed (exit code 1): boom t1")]
+    public async Task RunAsync_WhenBrainFails_ShowsErrorAndContinuesSession(BrainErrorKind kind, string message)
     {
-        _brain.Throws(new BrainException(BrainErrorKind.Unknown, "Claude Code failed (exit code 1): test"));
-        var options = CreateOptions("ClaudeCode", "sentence t1", "/quit");
+        _brain
+            .Throws(new BrainException(kind, message))
+            .Returns(ConsoleTutorReplies.Valid("t2"));
+        var options = CreateOptions("ClaudeCode", "first sentence t1", "second sentence t2", "/quit");
 
         var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
 
-        exitCode.Should().Be(ExitCodes.UnexpectedError);
-        _error.ToString().Should().Contain("An unexpected error occurred. See the log file for details.");
+        exitCode.Should().Be(0);
+        _error.ToString().Should().Contain($"The tutor could not answer: {message}")
+            .And.Contain("You can send a sentence again or type /quit to exit.")
+            .And.NotContain("An unexpected error occurred. See the log file for details.");
+        _brain.Requests.Should().HaveCount(2);
+        var secondRequest = _brain.Requests[1];
+        secondRequest.Messages.Should().ContainSingle(because: "the turn that failed did not enter the window")
+            .Which.Content.Should().Contain("second sentence t2");
+        _output.ToString().Split(Environment.NewLine).Should().Contain(line => line.EndsWith("Tutor: Reply t2?", StringComparison.Ordinal));
+    }
+
+    // US-005 — Cenário: CLI não encontrada (de ponta a ponta) — RN-BRAIN07
+    [Fact]
+    public async Task RunAsync_WhenClaudeExecutableIsNotFound_ShowsCliNotFoundInstructionAndContinues()
+    {
+        var runner = new MissingExecutableProcessRunner();
+        var workingDirectory = Path.Combine(_logDirectory, "brain");
+        var options = new AppRunOptions(
+            [],
+            new StringReader(Lines("sentence t1", "sentence t2", "/quit")),
+            _output,
+            _error,
+            TestConfiguration.Create(
+                "ClaudeCode",
+                extraValues: new Dictionary<string, string?>
+                {
+                    ["Brain:ClaudeCode:ExecutablePath"] = "claude-missing-t1",
+                    ["Brain:ClaudeCode:WorkingDirectory"] = workingDirectory,
+                }),
+            ConfigureServices: services =>
+            {
+                services.AddSingleton<IProcessRunner>(runner);
+                services.AddSingleton<ITutorPromptSource>(new FixedTutorPromptSource());
+            });
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _error.ToString().Should().Contain("The tutor could not answer: Claude Code CLI not found (\"claude-missing-t1\")")
+            .And.Contain("irm https://claude.ai/install.ps1 | iex")
+            .And.Contain("Brain:ClaudeCode:ExecutablePath")
+            .And.NotContain("An unexpected error occurred");
+        runner.Calls.Should().Be(2);
+    }
+
+    // US-005 — Cenário: falha do cérebro no console não encerra a sessão (apoio: log, P11) — ARCHITECTURE §9
+    [Fact]
+    public async Task RunAsync_WhenBrainFails_LogsBrainFailedWarningWithKind()
+    {
+        _brain.Throws(new BrainException(BrainErrorKind.UsageLimitReached, "limit t1"));
+        var options = CreateOptions("ClaudeCode", "sentence t1", "/quit") with
+        {
+            Configuration = TestConfiguration.Create("ClaudeCode", _logDirectory),
+        };
+
+        await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        var events = ReadLogEvents();
+        var failed = events.Should().ContainSingle(e => EventName(e) == "BrainFailed").Subject;
+        failed.GetProperty("EventId").GetProperty("Id").GetInt32().Should().Be(1005);
+        failed.GetProperty("@l").GetString().Should().Be("Warning");
+        failed.GetProperty("ErrorKind").GetString().Should().Be("UsageLimitReached");
+        failed.GetProperty("@x").GetString().Should().Contain("limit t1");
+        events.Should().NotContain(e => EventName(e) == "UnexpectedError");
+        events.Should().ContainSingle(e => EventName(e) == "ApplicationStopped")
+            .Which.GetProperty("ExitCode").GetInt32().Should().Be(0);
     }
 
     public void Dispose()

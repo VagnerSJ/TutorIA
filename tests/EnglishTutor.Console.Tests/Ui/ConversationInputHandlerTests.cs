@@ -11,6 +11,7 @@ public sealed class ConversationInputHandlerTests : IDisposable
 {
     private readonly ScriptedTutorBrain _brain = new();
     private readonly StringWriter _output = new();
+    private readonly StringWriter _error = new();
     private readonly ConversationService _service;
     private readonly ConversationInputHandler _sut;
 
@@ -21,7 +22,7 @@ public sealed class ConversationInputHandlerTests : IDisposable
             new FixedTutorPromptSource(),
             Options.Create(new ConversationOptions()),
             NullLogger<ConversationService>.Instance);
-        _sut = new ConversationInputHandler(_service, _output);
+        _sut = new ConversationInputHandler(_service, _output, _error, NullLogger.Instance);
     }
 
     // US-004 — Cenário: console conversa pelo ConversationService (apoio, P8) — RN-FEED02
@@ -58,6 +59,34 @@ public sealed class ConversationInputHandlerTests : IDisposable
         _brain.Requests.Should().BeEmpty();
     }
 
+    // US-005 — Cenário: falha do cérebro no console não encerra a sessão (apoio: canal) — RN-BRAIN07
+    [Fact]
+    public async Task HandleAsync_WhenBrainFails_WritesMessageAndNextStepToErrorOnly()
+    {
+        _brain.Throws(new BrainException(BrainErrorKind.NotAuthenticated, "not logged in t1"));
+
+        await _sut.HandleAsync("sentence t1", TestContext.Current.CancellationToken);
+
+        _error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Should().Equal(
+            "The tutor could not answer: not logged in t1",
+            "You can send a sentence again or type /quit to exit.");
+        _output.ToString().Should().BeEmpty();
+    }
+
+    // US-005 — Cenário: falha do cérebro no console não encerra a sessão (apoio: só BrainException; caracterização)
+    [Theory]
+    [InlineData(typeof(OperationCanceledException))]
+    [InlineData(typeof(InvalidOperationException))]
+    public async Task HandleAsync_WhenFailureIsNotBrainException_PropagatesIt(Type exceptionType)
+    {
+        _brain.Throws((Exception)Activator.CreateInstance(exceptionType)!);
+
+        var act = () => _sut.HandleAsync("sentence t1", TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<Exception>().Where(e => e.GetType() == exceptionType);
+        _error.ToString().Should().BeEmpty();
+    }
+
     // US-004 — Cenário: troca de modo pelo console (apoio) — RN-CONV01
     [Fact]
     public void ChangeMode_WithMode_ChangesConversationServiceMode()
@@ -68,7 +97,11 @@ public sealed class ConversationInputHandlerTests : IDisposable
         _service.Mode.Should().Be(TutorMode.ListeningPractice);
     }
 
-    public void Dispose() => _output.Dispose();
+    public void Dispose()
+    {
+        _output.Dispose();
+        _error.Dispose();
+    }
 
     private string[] OutputLines() =>
         _output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);

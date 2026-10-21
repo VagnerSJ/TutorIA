@@ -399,3 +399,66 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** comentário que mente confunde quem lê o mapa cenário → teste.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`: "ao trocar o nome de um cenário, releia cada comentário alterado contra o corpo do teste, não só o texto antigo".
 - **Status:** Aplicada (2026-10-20, ver commit "docs(ai): apply learning 42")
+
+### AP-043 — Versão de pacote deixada em aberto no plano só é registrada depois do commit
+
+- **Data / US:** 2026-10-21 / US-005 (`review.md` Rodada 1 S1; relato do Executor, `plan.md` §12)
+- **Quem errou:** planejador (deixou "última estável 10.x") e executor (registrou a versão `10.11.0` na §12 depois do commit `c545c9f`)
+- **O que aconteceu:** o plano disse "última estável 10.x" para `Microsoft.Extensions.TimeProvider.Testing`. O Executor fixou `10.11.0` em `Directory.Packages.props` no commit do teste e só escreveu a escolha na §12 no commit de evidências. Desvio pequeno (pacote só de testes, Core intocado), mas é o padrão do AP-014/AP-027 aplicado a versão de pacote.
+- **Por que importa:** escolha que o plano deixou em aberto chega ao documento depois do código (hábito 4); a versão muda o que o build restaura.
+- **Correção (proposta):** (a) `.claude/agents/planejador.md`: a §6 (pacotes) fixa a versão, ou diz "o Executor registra a versão na §12 no mesmo commit"; (b) `.claude/agents/executor.md`: mudança de `Directory.Packages.props` com versão não prevista no plano entra na §12 antes ou no mesmo commit. Vale como regra só se o padrão se repetir (primeira ocorrência).
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 43")
+
+### AP-044 — Hook de edição acusa build vermelho transitório quando um tipo novo é usado antes do arquivo que o declara
+
+- **Data / US:** 2026-10-21 / US-005 (relato do Executor)
+- **Quem errou:** executor (ordem de edição) e infraestrutura de hooks (feedback sem distinguir o transitório)
+- **O que aconteceu:** ao editar primeiro o arquivo que usa um tipo novo (ex.: `ClaudeCodeFailures` ou um método novo do `FakeProcessRunner`) e só depois o que o declara, o hook `post-edit-dotnet` devolveu erro de compilação enquanto o par ainda estava incompleto. O erro some quando o segundo arquivo é salvo. Parente do AP-013 (erros de compilação intermediários no Red).
+- **Por que importa:** ruído no feedback rápido; o agente pode tentar "corrigir" um erro que desaparece sozinho ou confundi-lo com o Red.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md` (ciclo Red, junto do AP-013): "crie ou edite primeiro o arquivo que declara o tipo ou membro novo (esqueleto), depois o que o usa; se um erro de símbolo inexistente aparecer logo após a primeira edição de um par, edite o outro arquivo antes de investigar". Alternativa a critério do usuário: o hook não bloqueia em erros de tipo ainda não declarado (CS0103, CS0246, CS1061).
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 44")
+
+### AP-045 — Mutação do Red sem o que quebrar (esqueleto) ou escolhida antes da fixture existir
+
+- **Data / US:** 2026-10-20 / US-005 (`plan-review.md` Rodada 1 S3 e Rodada 2 S2)
+- **Quem errou:** planejador
+- **O que aconteceu:** (S3) as mutações descritas para T1 e T4b só têm efeito quando a regra real já existe; no Red, o validador sem a faixa e o `Classify` que devolve sempre `Unknown` não têm o que quebrar. O plano passou a ter um parágrafo "Mutações depois do Green" na §5, com procedimento (commit do `feat`, mutação, falha, edição inversa, `git status --short`). (R2-S2) uma mutação escolhida antes de gravar a fixture `unknown-model` poderia não atingir a linha da tabela por onde a fixture realmente passa; resolvido com mutação que vale para as linhas 1 e 3 e com o registro da linha na T4a. Ambos funcionaram na execução (Evidências da §11). Complementa o AP-017, AP-029 e AP-037.
+- **Por que importa:** o teste de caracterização pode nascer verde sem provar que discrimina.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, junto do AP-017: "se o teste nasce verde porque o esqueleto já devolve o valor esperado, a mutação é aplicada depois do Green commitado, e a tarefa diz em que momento; a mutação sobre teste de fixture gravada é escolhida (ou confirmada) depois da gravação, para o ramo que a fixture realmente percorre".
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 45")
+
+### AP-046 — Espera limitada só nos testes novos, e propriedade atribuída a um grupo sem conferir cada membro
+
+- **Data / US:** 2026-10-20 / US-005 (`plan-review.md` Rodada 2 S3 e Rodada 3 S2)
+- **Quem errou:** planejador
+- **O que aconteceu:** a proteção contra travar a suíte (`WaitAsync(TimeSpan.FromSeconds(10))`) foi aplicada aos testes de tempo novos, mas não ao teste de caracterização `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout`, cujo Red por mutação também trava (R2-S3). Depois, a §7 passou a dizer "os quatro testes que usam `HangsUntilCancelled`", mas a descrição de um deles na §4 não declarava a espera limitada (R3-S2). Ambos corrigidos antes da execução.
+- **Por que importa:** fake que só termina por cancelamento trava a suíte inteira quando o Red ou a mutação falha; a §7 ou a §5 pode afirmar mais do que o mapa da §4 mostra.
+- **Correção (proposta):** (a) `.claude/skills/tdd-dotnet/SKILL.md`: "todo teste com fake que só termina por cancelamento usa espera limitada, inclusive os de caracterização"; (b) `.claude/skills/checklist-revisao/SKILL.md` §0: "quando a §7 ou a §5 atribui uma propriedade a um grupo de testes ('os N testes que...'), a descrição de cada um na §4 a declara".
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 46")
+
+### AP-047 — Afirmação condicional da §2 sem teste; "as duas fontes" provadas só numa direção
+
+- **Data / US:** 2026-10-20 / US-005 (`plan-review.md` Rodada 1 S1 e S2; Rodada 2 S1)
+- **Quem errou:** planejador
+- **O que aconteceu:** (R1-S2) a §2.2 dizia que o cancelamento do chamador propaga "mesmo que o tempo também tenha estourado", sem teste na §4; virou o teste `SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation`, com callback determinístico no fake. (R1-S1) todos os casos com padrão no stderr tinham `errorResult` nulo, então "examina as duas fontes" não estava provado; entrou o caso 11. (R2-S1) o caso 11 cobriu só uma direção; entrou o caso 12 (`result` casa, stderr presente não casa). Variação do AP-004/AP-018/AP-041.
+- **Por que importa:** a implementação "olha o stderr só quando não há result de erro" (ou o inverso) passaria em todos os casos e contradiria a spec.
+- **Correção (proposta):** `.claude/skills/checklist-revisao/SKILL.md` §0 e `.claude/agents/planejador.md`: "cada afirmação condicional da §2 ('mesmo que', 'exceto quando', 'só se') tem um teste na §4 ou sai do plano"; "quando o plano diz que duas fontes são sempre examinadas, há um caso em que só a fonte A casa com a B presente e sem casar, e outro com os papéis trocados". Pode ser fundida ao AP-041 se o usuário preferir.
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 47")
+
+### AP-048 — Fixture gravada com argumentos diferentes dos do adaptador
+
+- **Data / US:** 2026-10-20 / US-005 (`plan-review.md` Rodada 1 S4)
+- **Quem errou:** planejador
+- **O que aconteceu:** o comando de gravação das fixtures de erro não usava os argumentos de isolamento do adaptador (`--strict-mcp-config`, `--disallowedTools "mcp__*"`, `--system-prompt-file`). Com a configuração real do usuário, o stderr gravado poderia trazer avisos de MCP que o adaptador nunca veria. Corrigido: o comando usa os mesmos argumentos (conferidos em `BuildArguments`) e o `README.md` das fixtures registra as diferenças que sobram (modo Tags, prompt-modelo sem renderizar, sem `--resume`).
+- **Por que importa:** fixture que não representa a chamada real dá teste verde com comportamento diferente em produção.
+- **Correção (proposta):** `.claude/agents/planejador.md`: "comando de gravação de fixture usa os mesmos argumentos de isolamento do adaptador, ou o `README.md` da pasta de fixtures registra a diferença".
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 48")
+
+### AP-049 — Justificativa de cobertura na §12 mais forte do que o mapa da §4
+
+- **Data / US:** 2026-10-20 / US-005 (`plan-review.md` Rodada 3 S1)
+- **Quem errou:** planejador
+- **O que aconteceu:** a resposta a R2-S1 na §12 afirmou "cada padrão da linha b aparece nas duas fontes". O padrão `usage limit` só aparece no `result` de erro. O AP-041 não exige o cruzamento, então nada faltava no mapa, mas a frase podia levar uma revisão futura a dar como coberto o que não está. Corrigida na R3-S1. Variação do AP-036 aplicada ao próprio plano.
+- **Por que importa:** afirmação de cobertura sem conferência vira falsa garantia.
+- **Correção (proposta):** `.claude/agents/planejador.md`: "afirmação de cobertura na §12 ('cada X tem Y') é conferida contra a tabela da §4 antes do commit; se não fechar, é restringida ao que os casos provam".
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 49")

@@ -36,6 +36,36 @@ public sealed class ClaudeCodeOptionsValidatorTests
             .Which.Should().Be("Brain:ClaudeCode:OutputMode 'Json' is invalid. Accepted values: JsonSchema, Tags.");
     }
 
+    // US-005 — Cenário: tempo esgotado (apoio: faixa, P6) — RN-BRAIN09
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(3601)]
+    public void Validate_WhenTimeoutSecondsIsOutOfRange_FailsWithRangeAndFoundValue(int timeoutSeconds)
+    {
+        var options = new ClaudeCodeOptions { TimeoutSeconds = timeoutSeconds };
+
+        var result = _sut.Validate(name: null, options);
+
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().ContainSingle().Which.Should().Be(
+            $"Brain:ClaudeCode:TimeoutSeconds must be between 1 and 3600 (found {timeoutSeconds}). " +
+            "Expected the maximum number of seconds to wait for each Claude Code call (default: 60).");
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio: faixa, outro lado) — RN-BRAIN09
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3600)]
+    public void Validate_WithTimeoutSecondsAtLimits_Succeeds(int timeoutSeconds)
+    {
+        var options = new ClaudeCodeOptions { TimeoutSeconds = timeoutSeconds };
+
+        var result = _sut.Validate(name: null, options);
+
+        result.Succeeded.Should().BeTrue();
+    }
+
     // US-004 — apoio: OutputMode aceito sem diferenciar maiúsculas (P13)
     [Theory]
     [InlineData("JsonSchema")]
