@@ -1,3 +1,4 @@
+using EnglishTutor.Core.Brain;
 using Microsoft.Extensions.Logging;
 
 namespace EnglishTutor.Console.Logging;
@@ -28,4 +29,8 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1004, Level = LogLevel.Warning,
         Message = "Application stopped abnormally after {ElapsedMs} ms; a cancellation not requested by the app propagated")]
     public static partial void ApplicationAborted(this ILogger logger, long elapsedMs);
+
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Warning,
+        Message = "Brain call failed with {ErrorKind}; the session continues")]
+    public static partial void BrainFailed(this ILogger logger, BrainErrorKind errorKind, Exception exception);
 }

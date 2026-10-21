@@ -1,4 +1,5 @@
 using EnglishTutor.Core.Conversation;
+using Microsoft.Extensions.Logging;
 
 namespace EnglishTutor.Console.Ui;
 
@@ -8,13 +9,19 @@ public sealed class ConversationInputHandler : IChatInputHandler
 {
     private readonly ConversationService _conversation;
     private readonly TextWriter _output;
+    private readonly TextWriter _error;
+    private readonly ILogger _logger;
 
-    public ConversationInputHandler(ConversationService conversation, TextWriter output)
+    public ConversationInputHandler(ConversationService conversation, TextWriter output, TextWriter error, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(logger);
         _conversation = conversation;
         _output = output;
+        _error = error;
+        _logger = logger;
     }
 
     public TutorMode Mode => _conversation.Mode;

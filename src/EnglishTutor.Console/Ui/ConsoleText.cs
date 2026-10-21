@@ -17,6 +17,8 @@ public static class ConsoleText
     // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
     public static string StartupFailed(string reason) => $"The application could not start: {reason}";
 
+    public static IReadOnlyList<string> BrainFailed(string message) => throw new NotImplementedException();
+
     public const string FeedbackHeader = "Feedback:";
 
     // US-004 P8: "Tutor: <reply>", then the feedback lines when there are any (none for a raw fallback).
