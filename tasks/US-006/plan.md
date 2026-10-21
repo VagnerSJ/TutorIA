@@ -1,9 +1,9 @@
 # Plano — US-006 Professor local via Ollama
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-21
 Branch: feature/US-006_ollama-brain
 Spec: specs/sprints/SPRINT_1.md#us-006
-Regras: RN-BRAIN01–05 (da US), RN-BRAIN07 e RN-BRAIN09 (acrescentadas à US, ver §2.9 e P3), RN-BRAIN04 e RN-BRAIN08 (sem mudança), RN-CONV03; ARCHITECTURE §2 (R1–R4), §3, §6.1, §6.2, §6.4, §7, §9, §10; ADR-002, ADR-005, ADR-006, ADR-008, ADR-009 (Proposto, novo)
+Regras: RN-BRAIN01–05 (da US), RN-BRAIN07 e RN-BRAIN09 (acrescentadas à US, ver §2.9 e P3), RN-BRAIN04 e RN-BRAIN08 (sem mudança), RN-CONV03; ARCHITECTURE §2 (R1–R4), §3, §6.1, §6.2, §6.4, §7, §9, §10; ADR-002, ADR-005, ADR-006, ADR-008, ADR-009 (Aceito, novo)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Ligar o professor local: com `Brain:Provider = Ollama`, o console conversa pelo 
 
 ## 2. Abordagem
 
-A decisão central está no **ADR-009 (Proposto)**: `docs/adr/ADR-009-provedor-ollama-ichatclient-pedido-falhas-e-tempo-maximo.md`. Em resumo:
+A decisão central está no **ADR-009 (Aceito)**: `docs/adr/ADR-009-provedor-ollama-ichatclient-pedido-falhas-e-tempo-maximo.md`. Em resumo:
 
 - `OllamaTutorBrain` (Infrastructure) implementa `ITutorBrain` sobre `IChatClient` (`Microsoft.Extensions.AI`), com o `OllamaApiClient` do pacote `OllamaSharp` criado por `OllamaChatClients.Create(OllamaOptions, HttpMessageHandler?)`. A mesma fábrica serve ao DI e aos testes, que trocam só o `HttpMessageHandler` e por isso conferem o fio HTTP real (`/api/chat`, `messages`, `format`).
 - O adaptador não guarda estado (RN-BRAIN01): recebe a janela completa e a repassa. Resposta inválida vira `BrainException.InvalidOutput` (ADR-006). `SessionHint` é ignorado.
@@ -278,7 +278,7 @@ Comentários de código com adiamento ou texto que muda com esta US (AP-040; Gre
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-009-provedor-ollama-ichatclient-pedido-falhas-e-tempo-maximo.md` | Decisão (Proposto), criada junto com este plano |
+| Criar | `docs/adr/ADR-009-provedor-ollama-ichatclient-pedido-falhas-e-tempo-maximo.md` | Decisão (Aceito), criada junto com este plano |
 | Alterar | `ARCHITECTURE.md` | §3, §6.1, §6.4 (§2.9) pelo orquestrador antes da T1; §7 na T8 |
 | Alterar | `specs/sprints/SPRINT_1.md` | US-006 (Regras, cenário "tempo esgotado", D7) e US-007 (D7) (§2.9), pelo orquestrador antes da T1 |
 | Alterar | `Directory.Packages.props` | `OllamaSharp` e `Microsoft.Extensions.AI.Abstractions` (grupo novo `Infrastructure`) (§6) |
@@ -627,3 +627,9 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
   → Conferido: o cabeçalho já diz `feature/US-006_ollama-brain`, igual à branch atual (`git status`); sem mudança.
 
 - S2, S3 e S4 do `plan-review.md` (sugestões, fora do pedido deste comentário): **não incorporadas nesta rodada** para não alterar contagens além do B1; ficam para decisão do usuário.
+
+### 2026-10-21 — aprovação do usuário
+
+- Plano aprovado com todos os padrões propostos das perguntas P1 a P12 (nenhuma resposta alterada).
+- Sugestões S2, S3 e S4 da revisão do plano: **não incorporadas**, por decisão do usuário.
+- ADR-009 passou a "Aceito". `specs/sprints/SPRINT_1.md` (US-006 e US-007) e `ARCHITECTURE.md` (§3, §6.1, §6.4) foram atualizados conforme a §2.9, em commits próprios, antes da T1.
