@@ -77,6 +77,7 @@ public sealed class FakeTutorBrain : ITutorBrain
 - Todo teste assíncrono é `async Task`; nunca `.Result`/`.Wait()`.
 - Passe `TestContext.Current.CancellationToken` (xUnit v3) ou `CancellationToken.None` (v2).
 - Cubra pelo menos um cenário de cancelamento/timeout por porta que fala com processo ou rede.
+- Todo teste com fake que só termina por cancelamento usa espera limitada (ex.: `WaitAsync(TimeSpan.FromSeconds(10))`), inclusive os de caracterização, para o Red ou a mutação falhar em vez de travar a suíte (AP-046).
 
 ## Testes de contrato
 

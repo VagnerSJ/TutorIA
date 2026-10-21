@@ -434,7 +434,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a proteção contra travar a suíte (`WaitAsync(TimeSpan.FromSeconds(10))`) foi aplicada aos testes de tempo novos, mas não ao teste de caracterização `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout`, cujo Red por mutação também trava (R2-S3). Depois, a §7 passou a dizer "os quatro testes que usam `HangsUntilCancelled`", mas a descrição de um deles na §4 não declarava a espera limitada (R3-S2). Ambos corrigidos antes da execução.
 - **Por que importa:** fake que só termina por cancelamento trava a suíte inteira quando o Red ou a mutação falha; a §7 ou a §5 pode afirmar mais do que o mapa da §4 mostra.
 - **Correção (proposta):** (a) `.claude/skills/tdd-dotnet/SKILL.md`: "todo teste com fake que só termina por cancelamento usa espera limitada, inclusive os de caracterização"; (b) `.claude/skills/checklist-revisao/SKILL.md` §0: "quando a §7 ou a §5 atribui uma propriedade a um grupo de testes ('os N testes que...'), a descrição de cada um na §4 a declara".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 46")
 
 ### AP-047 — Afirmação condicional da §2 sem teste; "as duas fontes" provadas só numa direção
 
