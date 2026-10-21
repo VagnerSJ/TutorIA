@@ -1,10 +1,12 @@
+using EnglishTutor.Console.Logging;
+using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using Microsoft.Extensions.Logging;
 
 namespace EnglishTutor.Console.Ui;
 
 // Sends free text to the ConversationService and shows the reply and the feedback (US-004 P8).
-// Brain failures propagate (P11, until US-005).
+// A BrainException is shown on the error output and the session continues (ADR-008); anything else propagates.
 public sealed class ConversationInputHandler : IChatInputHandler
 {
     private readonly ConversationService _conversation;
@@ -32,7 +34,22 @@ public sealed class ConversationInputHandler : IChatInputHandler
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        var result = await _conversation.SendAsync(text, ct);
+        ConversationTurnResult result;
+        try
+        {
+            result = await _conversation.SendAsync(text, ct);
+        }
+        catch (BrainException exception)
+        {
+            foreach (var line in ConsoleText.BrainFailed(exception.Message))
+            {
+                await _error.WriteLineAsync(line.AsMemory(), ct);
+            }
+
+            _logger.BrainFailed(exception.Kind, exception);
+            return;
+        }
+
         if (!result.IsReplied)
         {
             await WriteLinesAsync([result.Warning], ct);
