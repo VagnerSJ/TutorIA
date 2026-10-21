@@ -416,7 +416,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** ao editar primeiro o arquivo que usa um tipo novo (ex.: `ClaudeCodeFailures` ou um método novo do `FakeProcessRunner`) e só depois o que o declara, o hook `post-edit-dotnet` devolveu erro de compilação enquanto o par ainda estava incompleto. O erro some quando o segundo arquivo é salvo. Parente do AP-013 (erros de compilação intermediários no Red).
 - **Por que importa:** ruído no feedback rápido; o agente pode tentar "corrigir" um erro que desaparece sozinho ou confundi-lo com o Red.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md` (ciclo Red, junto do AP-013): "crie ou edite primeiro o arquivo que declara o tipo ou membro novo (esqueleto), depois o que o usa; se um erro de símbolo inexistente aparecer logo após a primeira edição de um par, edite o outro arquivo antes de investigar". Alternativa a critério do usuário: o hook não bloqueia em erros de tipo ainda não declarado (CS0103, CS0246, CS1061).
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 44")
 
 ### AP-045 — Mutação do Red sem o que quebrar (esqueleto) ou escolhida antes da fixture existir
 
