@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using EnglishTutor.Core.Brain;
 
 namespace EnglishTutor.Infrastructure.Brain;
@@ -11,4 +12,7 @@ internal static class ClaudeCodeFailures
             $"Claude Code did not answer in time (limit: {timeoutSeconds} s) and was stopped. " +
             $"Send your sentence again, or raise {ClaudeCodeOptions.SectionName}:TimeoutSeconds.",
             inner);
+
+    public static BrainException StartFailed(string executablePath, Win32Exception inner) =>
+        throw new NotImplementedException();
 }

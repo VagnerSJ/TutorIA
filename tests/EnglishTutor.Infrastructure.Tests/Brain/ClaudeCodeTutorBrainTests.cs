@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
@@ -223,6 +224,44 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
         callerCancellation.IsCancellationRequested.Should().BeTrue();
         _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
         File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
+    }
+
+    // US-005 — Cenário: CLI não encontrada — RN-BRAIN07
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task SendAsync_WhenExecutableIsNotFound_ThrowsCliNotFoundWithInstallInstructionAndKey(int nativeErrorCode)
+    {
+        string? promptPath = null;
+        _processRunner.OnRun = run => promptPath = ValueAfter(run, "--system-prompt-file");
+        var inner = new Win32Exception(nativeErrorCode);
+        _processRunner.Throws(inner);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.CliNotFound);
+        thrown.Message.Should().Contain("Claude Code CLI not found (\"claude-under-test\")")
+            .And.Contain("irm https://claude.ai/install.ps1 | iex")
+            .And.Contain("Brain:ClaudeCode:ExecutablePath");
+        thrown.InnerException.Should().BeSameAs(inner);
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
+    }
+
+    // US-005 — Cenário: CLI não encontrada (apoio, P9: outro lado) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenExecutableCannotBeStartedForOtherReason_ThrowsUnknownWithErrorCode()
+    {
+        _processRunner.Throws(new Win32Exception(5));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.Unknown);
+        thrown.Message.Should().Contain("could not be started (\"claude-under-test\", error 5)")
+            .And.NotContain("not found");
     }
 
     // US-004 — Cenário: processo isolado e sem ferramentas — RN-BRAIN06
