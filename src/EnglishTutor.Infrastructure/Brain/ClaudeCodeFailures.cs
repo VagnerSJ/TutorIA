@@ -18,6 +18,12 @@ internal static class ClaudeCodeFailures
             $"Send your sentence again, or raise {ClaudeCodeOptions.SectionName}:TimeoutSeconds.",
             inner);
 
+    public static BrainErrorKind Classify(string? errorResult, string standardError) => BrainErrorKind.Unknown;
+
+    public static BrainException NotAuthenticated(string detail) => throw new NotImplementedException();
+
+    public static BrainException UsageLimitReached(string detail) => throw new NotImplementedException();
+
     public static BrainException StartFailed(string executablePath, Win32Exception inner)
     {
         ArgumentNullException.ThrowIfNull(inner);

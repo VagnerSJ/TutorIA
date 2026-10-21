@@ -264,6 +264,102 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
             .And.NotContain("not found");
     }
 
+    // US-005 — Cenário: não autenticado — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WithRecordedNotAuthenticatedOutput_ThrowsNotAuthenticatedAskingForAuthLogin()
+    {
+        _processRunner.Returns(ClaudeErrorFixtures.Read("not-authenticated"));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.NotAuthenticated);
+        thrown.Message.Should().StartWith("Claude Code is not logged in (")
+            .And.Contain("Run \"claude auth login\"")
+            .And.Contain("If the ANTHROPIC_API_KEY environment variable is set, check or remove it.")
+            .And.NotContain("Claude Code failed (exit code");
+    }
+
+    // US-005 — Cenário: limite de uso atingido (fixture sintética, P4) — RN-BRAIN07
+    [Theory]
+    [InlineData("usage-limit-synthetic-1")]
+    [InlineData("usage-limit-synthetic-2")]
+    public async Task SendAsync_WithUsageLimitOutput_ThrowsUsageLimitReached(string fixtureName)
+    {
+        _processRunner.Returns(ClaudeErrorFixtures.Read(fixtureName));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.UsageLimitReached);
+        thrown.Message.Should().Contain("Claude Code usage limit reached (")
+            .And.Contain("(synthetic)")
+            .And.Contain("Wait until your Claude plan limit resets");
+    }
+
+    // US-005 — D5: Unknown com saída gravada (caracterização) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WithRecordedUnknownFailureOutput_ThrowsUnknownWithDetail()
+    {
+        var recorded = ClaudeErrorFixtures.Read("unknown-model");
+        _processRunner.Returns(recorded);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(BrainErrorKind.Unknown);
+        thrown.Message.Should().StartWith(
+            recorded.ExitCode != 0 ? "Claude Code failed (exit code" : "Claude Code reported an error:")
+            .And.Contain("nao-existe-us005");
+    }
+
+    public static TheoryData<int, string, string, BrainErrorKind, string> FailureTextCases() => new()
+    {
+        // 1: result of an error object, first pattern of row a (row 1 of the output table).
+        { 1, ClaudeOutputs.Error("Not logged in t1"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (Not logged in t1)" },
+        // 2: only stderr, pattern on the second line; the detail is the first line.
+        { 1, string.Empty, "warning t2\nRun /login to continue t2", BrainErrorKind.NotAuthenticated, "is not logged in (warning t2)" },
+        // 3: result of an error object with exit code 0 (row 3 of the output table).
+        { 0, ClaudeOutputs.Error("Invalid API key t3"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (Invalid API key t3)" },
+        // 4: different case.
+        { 1, string.Empty, "AUTHENTICATION_ERROR t4", BrainErrorKind.NotAuthenticated, "is not logged in (AUTHENTICATION_ERROR t4)" },
+        // 5: oauth token.
+        { 1, ClaudeOutputs.Error("OAuth token has expired t5"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (OAuth token has expired t5)" },
+        // 6: usage limit in an error result with exit code 0.
+        { 0, ClaudeOutputs.Error("Claude AI usage limit reached t6"), string.Empty, BrainErrorKind.UsageLimitReached, "usage limit reached (Claude AI usage limit reached t6)" },
+        // 7: "hit your limit" in stderr.
+        { 1, string.Empty, "You've hit your limit t7", BrainErrorKind.UsageLimitReached, "usage limit reached (You've hit your limit t7)" },
+        // 8: both rows match; row a comes before row b.
+        { 1, ClaudeOutputs.Error("Usage limit reached. Please run /login t8"), string.Empty, BrainErrorKind.NotAuthenticated, "is not logged in (Usage limit reached. Please run /login t8)" },
+        // 9: exit code 0 and not the JSON result: not classified (P10).
+        { 0, "Not logged in t9", string.Empty, BrainErrorKind.Unknown, "is not a JSON result" },
+        // 10: rate_limit is not a usage limit (P10).
+        { 1, string.Empty, "rate_limit_error t10", BrainErrorKind.Unknown, "Claude Code failed (exit code 1): rate_limit_error t10" },
+        // 11: the error result matches nothing and stderr matches: the kind comes from stderr (S1).
+        { 1, ClaudeOutputs.Error("Server error t11"), "Not logged in t11", BrainErrorKind.NotAuthenticated, "is not logged in (Server error t11)" },
+        // 12: stderr matches nothing and the error result matches: the kind comes from the result (R2-S1).
+        { 1, ClaudeOutputs.Error("You've hit your limit t12"), "Warning: a newer version is available t12", BrainErrorKind.UsageLimitReached, "usage limit reached (You've hit your limit t12)" },
+    };
+
+    // US-005 — Cenário: não autenticado / limite de uso (apoio: tabela da classificação; P3, P10, P13, S1, R2-S1)
+    [Theory]
+    [MemberData(nameof(FailureTextCases))]
+    public async Task SendAsync_WhenFailureTextNamesAKind_ClassifiesByRowAndSource(
+        int exitCode, string standardOutput, string standardError, BrainErrorKind expectedKind, string expectedFragment)
+    {
+        _processRunner.Returns(new ProcessResult(exitCode, standardOutput, standardError));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var thrown = (await act.Should().ThrowAsync<BrainException>()).Which;
+        thrown.Kind.Should().Be(expectedKind);
+        thrown.Message.Should().Contain(expectedFragment);
+    }
+
     // US-004 — Cenário: processo isolado e sem ferramentas — RN-BRAIN06
     [Fact]
     public async Task SendAsync_WhenWorkingDirectoryDoesNotExist_CreatesItAndKeepsItEmpty()
