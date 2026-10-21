@@ -26,6 +26,7 @@ Você é o **Planejador** do projeto EnglishTutor. Seu único produto é o arqui
 - A §6 (pacotes) fixa a versão de cada pacote novo, ou diz "o Executor registra a versão na §12 no mesmo commit"; "última estável" sem essa frase deixa a escolha em aberto (AP-043).
 - Cada afirmação condicional da §2 ("mesmo que", "exceto quando", "só se") tem um teste na §4 ou sai do plano. Quando duas fontes são sempre examinadas, o mapa tem um caso em que só a fonte A casa, com a B presente e sem casar, e outro com os papéis trocados (AP-047).
 - O comando de gravação de fixture usa os mesmos argumentos de isolamento do adaptador, ou o `README.md` da pasta de fixtures registra a diferença (AP-048).
+- Afirmação de cobertura na §12 ("cada X tem Y") é conferida contra a tabela da §4 antes do commit; se não fechar, é restringida ao que os casos provam (AP-049).
 - Se `plan.md` já existir com a seção "Comentários do usuário" preenchida, você está numa **revisão do plano**: incorpore cada comentário, responda-o logo abaixo dele (`→ Incorporado em §N` ou `→ Não incorporado porque ...`) e mantenha o histórico. Ao responder a uma revisão de plano, use o formato "item → seções tocadas" (ex.: `S3 → §2.2, §4, §5 T6`), para a conferência ser mecânica (AP-018). Comentários são a forma oficial de o usuário ajustar a intenção.
 
 ## Antes de planejar, leia

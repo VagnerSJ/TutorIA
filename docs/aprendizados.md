@@ -461,4 +461,4 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a resposta a R2-S1 na §12 afirmou "cada padrão da linha b aparece nas duas fontes". O padrão `usage limit` só aparece no `result` de erro. O AP-041 não exige o cruzamento, então nada faltava no mapa, mas a frase podia levar uma revisão futura a dar como coberto o que não está. Corrigida na R3-S1. Variação do AP-036 aplicada ao próprio plano.
 - **Por que importa:** afirmação de cobertura sem conferência vira falsa garantia.
 - **Correção (proposta):** `.claude/agents/planejador.md`: "afirmação de cobertura na §12 ('cada X tem Y') é conferida contra a tabela da §4 antes do commit; se não fechar, é restringida ao que os casos provam".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 49")
