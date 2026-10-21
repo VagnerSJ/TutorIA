@@ -425,7 +425,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** (S3) as mutações descritas para T1 e T4b só têm efeito quando a regra real já existe; no Red, o validador sem a faixa e o `Classify` que devolve sempre `Unknown` não têm o que quebrar. O plano passou a ter um parágrafo "Mutações depois do Green" na §5, com procedimento (commit do `feat`, mutação, falha, edição inversa, `git status --short`). (R2-S2) uma mutação escolhida antes de gravar a fixture `unknown-model` poderia não atingir a linha da tabela por onde a fixture realmente passa; resolvido com mutação que vale para as linhas 1 e 3 e com o registro da linha na T4a. Ambos funcionaram na execução (Evidências da §11). Complementa o AP-017, AP-029 e AP-037.
 - **Por que importa:** o teste de caracterização pode nascer verde sem provar que discrimina.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md`, junto do AP-017: "se o teste nasce verde porque o esqueleto já devolve o valor esperado, a mutação é aplicada depois do Green commitado, e a tarefa diz em que momento; a mutação sobre teste de fixture gravada é escolhida (ou confirmada) depois da gravação, para o ramo que a fixture realmente percorre".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 45")
 
 ### AP-046 — Espera limitada só nos testes novos, e propriedade atribuída a um grupo sem conferir cada membro
 
