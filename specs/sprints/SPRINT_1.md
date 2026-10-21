@@ -363,7 +363,7 @@ Como aluno,
 quero conversar com um modelo rodando na minha GPU,
 para praticar sem consumir minha assinatura e sem internet.
 
-**Regras:** RN-BRAIN01–05; ARCHITECTURE §6.4.
+**Regras:** RN-BRAIN01–05, RN-BRAIN07, RN-BRAIN09; ARCHITECTURE §6.4.
 
 ```gherkin
 Cenário: chamada com histórico completo
@@ -386,6 +386,12 @@ Cenário: modelo não baixado
   Quando envio uma frase
   Então vejo o comando "ollama pull <modelo>"
 
+Cenário: tempo esgotado
+  Dado TimeoutSeconds igual a 1 e um Ollama que não responde
+  Quando envio uma frase
+  Então a requisição é cancelada
+  E vejo uma mensagem de tempo esgotado
+
 Cenário: console conversa com o Ollama
   Dado "Brain:Provider" igual a "Ollama"
   Quando envio uma frase pelo console
@@ -400,6 +406,7 @@ Cenário: console conversa com o Ollama
 |---|---|---|
 | D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` | verde: 5 frases de fumaça, 5/5 no formato |
 | D6 | `nvidia-smi` durante o teste D5 | VRAM do modelo registrada em ARCHITECTURE §7 |
+| D7 | No Windows PowerShell 5.1: `$env:Brain__Provider="Ollama"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__Provider` | uma linha `Tutor: <reply>`; nenhuma linha "The tutor is not connected yet."; `exit=0` |
 
 ---
 
@@ -437,6 +444,7 @@ Cenário: sem fallback configurado
 |---|---|---|
 | D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde |
 | D6 | `$env:Brain__Provider="Ollama"; "/quit" \| dotnet run --project src/EnglishTutor.Console` | cabeçalho mostra "Ollama" |
+| D7 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha: o seletor provisório de `ITutorBrain` por `Brain:Provider` (US-006, em `InfrastructureServiceCollectionExtensions`) foi substituído pela `BrainFactory` |
 
 ---
 
