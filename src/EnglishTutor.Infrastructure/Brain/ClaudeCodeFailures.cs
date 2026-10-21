@@ -6,5 +6,9 @@ namespace EnglishTutor.Infrastructure.Brain;
 internal static class ClaudeCodeFailures
 {
     public static BrainException Timeout(int timeoutSeconds, OperationCanceledException inner) =>
-        throw new NotImplementedException();
+        new(
+            BrainErrorKind.Timeout,
+            $"Claude Code did not answer in time (limit: {timeoutSeconds} s) and was stopped. " +
+            $"Send your sentence again, or raise {ClaudeCodeOptions.SectionName}:TimeoutSeconds.",
+            inner);
 }
