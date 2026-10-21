@@ -57,7 +57,7 @@ src/
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
   EnglishTutor.Infrastructure/
-    Brain/             ClaudeCodeTutorBrain, ClaudeCodeOptions, ClaudeCodeOptionsValidator, ClaudeCodeOutput,
+    Brain/             ClaudeCodeTutorBrain, ClaudeCodeOptions, ClaudeCodeOptionsValidator, ClaudeCodeOutput, ClaudeCodeFailures,
                        ClaudeCodePromptRenderer, ClaudeCodeLog, BrainOutputModes, TutorReplySchema,
                        FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain,
                        TutorReplyParser, BrainFactory, FallbackTutorBrain
@@ -209,7 +209,7 @@ claude -p
 - `WorkingDirectory` é uma pasta vazia dedicada, para não carregar `CLAUDE.md`, hooks ou MCP de outros projetos.
 - **Nunca** `--bare` (exige `ANTHROPIC_API_KEY`, não usa a assinatura).
 - Prompt enviado via stdin (evita limites e escaping de linha de comando no Windows): sem `--resume`, as mensagens do `BrainRequest` num texto único (`ClaudeCodePromptRenderer`); com `--resume`, só a mensagem nova (ADR-007). O arquivo temporário do system prompt fica fora da pasta de trabalho e é apagado ao fim da chamada.
-- Saída: `structured_output` (JsonSchema) ou `result` (Tags) vai para o `TutorReplyParser`; o `session_id` fica no adaptador (ADR-007). Até a US-005, código de saída diferente de zero, `is_error` ou saída que não é JSON viram `BrainException` com `Unknown`; executável inexistente propaga a exceção do sistema e o console mostra erro inesperado (a US-005 a classifica como `CliNotFound`).
+- Saída: `structured_output` (JsonSchema) ou `result` (Tags) vai para o `TutorReplyParser`; o `session_id` fica no adaptador (ADR-007). Falhas viram `BrainException` classificada pelo adaptador (ADR-008): executável não encontrado → `CliNotFound`; texto de autenticação ou de limite de uso no `result` de erro ou no stderr → `NotAuthenticated` ou `UsageLimitReached`; `TimeoutSeconds` estourado → `Timeout`, com o processo encerrado junto com a árvore; o resto → `Unknown` com o detalhe. A mensagem da exceção é o texto mostrado ao aluno (o que houve e o que fazer); o console a mostra na saída de erro e a sessão continua.
 - Erros mapeados para `BrainException` com `BrainErrorKind`: `CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`, `InvalidOutput`, `Unknown`.
 - `UsageLimitReached` (e, se configurado, `CliNotFound`/`NotAuthenticated`) aciona o `FallbackTutorBrain`.
 

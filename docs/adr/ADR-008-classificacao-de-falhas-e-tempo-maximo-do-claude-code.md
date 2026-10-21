@@ -1,6 +1,6 @@
 # ADR-008 — Provedor Claude Code: classificação das falhas, tempo máximo por chamada e mensagem ao aluno
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-20)
 - **Data:** 2026-10-20
 - **US relacionadas:** US-005 (e, como consumidoras, US-006, que segue o mesmo padrão de mensagem, e US-007, que decide o fallback pelo `BrainErrorKind`)
 - **Complementa:** ADR-007, item 5 (que deixava a classificação fina e o executável inexistente para a US-005)
