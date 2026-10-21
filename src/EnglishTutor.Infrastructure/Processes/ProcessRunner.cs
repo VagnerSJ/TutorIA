@@ -4,7 +4,7 @@ using System.Text;
 namespace EnglishTutor.Infrastructure.Processes;
 
 // The only place that uses System.Diagnostics.Process (US-004 §2.1). Exercised by the LiveBrain tests.
-// Exceptions are not translated: a missing executable propagates Win32Exception (CliNotFound is US-005).
+// Exceptions are not translated: a missing executable throws Win32Exception, which the adapter classifies (ADR-008).
 public sealed class ProcessRunner : IProcessRunner
 {
     private static readonly UTF8Encoding _utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);

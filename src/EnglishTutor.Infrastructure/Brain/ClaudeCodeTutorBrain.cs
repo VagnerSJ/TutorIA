@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Processes;
@@ -71,6 +72,10 @@ public sealed class ClaudeCodeTutorBrain(
         catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
         {
             throw ClaudeCodeFailures.Timeout(options.TimeoutSeconds, exception);
+        }
+        catch (Win32Exception exception)
+        {
+            throw ClaudeCodeFailures.StartFailed(options.ExecutablePath, exception);
         }
         finally
         {
