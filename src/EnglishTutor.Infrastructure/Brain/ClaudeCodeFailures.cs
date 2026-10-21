@@ -11,18 +11,18 @@ internal static class ClaudeCodeFailures
     private const int _fileNotFound = 2;
     private const int _pathNotFound = 3;
 
+    // Row a is checked before row b: the first row with a match decides (ADR-008).
+    private static readonly string[] _notAuthenticatedPatterns =
+        ["not logged in", "/login", "invalid api key", "authentication_error", "oauth token"];
+
+    private static readonly string[] _usageLimitPatterns = ["usage limit", "hit your limit"];
+
     public static BrainException Timeout(int timeoutSeconds, OperationCanceledException inner) =>
         new(
             BrainErrorKind.Timeout,
             $"Claude Code did not answer in time (limit: {timeoutSeconds} s) and was stopped. " +
             $"Send your sentence again, or raise {ClaudeCodeOptions.SectionName}:TimeoutSeconds.",
             inner);
-
-    // Row a is checked before row b: the first row with a match decides (ADR-008).
-    private static readonly string[] _notAuthenticatedPatterns =
-        ["not logged in", "/login", "invalid api key", "authentication_error", "oauth token"];
-
-    private static readonly string[] _usageLimitPatterns = ["usage limit", "hit your limit"];
 
     // Looks at both sources, always: the "result" of an error object and the whole stderr.
     public static BrainErrorKind Classify(string? errorResult, string standardError)
@@ -49,9 +49,6 @@ internal static class ClaudeCodeFailures
             BrainErrorKind.UsageLimitReached,
             $"Claude Code usage limit reached ({detail}). Wait until your Claude plan limit resets, then send your sentence again.");
 
-    private static bool Matches(string[] sources, string[] patterns) =>
-        sources.Any(source => patterns.Any(pattern => source.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
-
     public static BrainException StartFailed(string executablePath, Win32Exception inner)
     {
         ArgumentNullException.ThrowIfNull(inner);
@@ -72,4 +69,7 @@ internal static class ClaudeCodeFailures
             $"Expected {ClaudeCodeOptions.SectionName}:ExecutablePath to point to the Claude Code CLI (claude.exe).",
             inner);
     }
+
+    private static bool Matches(string[] sources, string[] patterns) =>
+        sources.Any(source => patterns.Any(pattern => source.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
 }
