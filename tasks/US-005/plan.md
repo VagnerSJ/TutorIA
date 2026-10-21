@@ -587,3 +587,10 @@ Plano aprovado com a condição de incorporar as sugestões S1 a S8 de `tasks/US
   → Incorporado nas duas formas. A mutação passa a ser "quando nenhum padrão casa, o `Classify` devolve `NotAuthenticated` em vez de `Unknown`", que vale para as linhas 1 e 3 ao mesmo tempo. A T4a registra nas Evidências o código gravado e a linha (1 ou 3); se cair na linha 2, o Executor para e registra na §12. A T4b cita essa linha ao lado do resultado da mutação. R2-S2 → §2.7 (bullet "Linha de leitura de `unknown-model`"), §4 (asserção de `SendAsync_WithRecordedUnknownFailureOutput_ThrowsUnknownWithDetail`), §5 T4a, §5 T4b (terceira mutação), §7 (risco novo).
 - **R2-S3:** `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout` falha em tempo limitado sob a mutação do Red, como os demais testes de tempo.
   → Incorporado. A espera pela tarefa usa `WaitAsync(TimeSpan.FromSeconds(10))`. Sob a mutação ("o cancelamento do chamador deixa de chegar ao runner"), o teste falha com `TimeoutException` em 10 s e não trava a suíte. A asserção do tipo `OperationCanceledException` distingue essa falha do resultado esperado. R2-S3 → §4 (linha do mapa: "espera limitada"; asserção do teste), §5 T2 (Red por mutação: falha pelo `WaitAsync`), §7 (risco "trava a suíte" cobre os quatro testes com `HangsUntilCancelled`, inclusive o de caracterização).
+
+### 2026-10-20 — Usuário (no chat), sobre a Rodada 3 da revisão do plano
+
+> "1" (aplicar S1 e S2 da Rodada 3 de `tasks/US-005/plan-review.md` e aprovar, sem nova rodada de revisão)
+
+- **R3-S1:** corrigir a frase da resposta a R2-S1 na §12 ("cada padrão da linha b aparece nas duas fontes"), restringindo-a ao que os casos da §4 provam.
+- **R3-S2:** a descrição de `SendAsync_OnEachCall_StartsTimeoutAgain` na §4 diz como a 2ª chamada fica pendente (`HangsUntilCancelled`) e que a espera é limitada (`WaitAsync(TimeSpan.FromSeconds(10))`).
