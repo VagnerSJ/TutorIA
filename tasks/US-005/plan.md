@@ -571,3 +571,11 @@ Plano aprovado com a condição de incorporar as sugestões S1 a S8 de `tasks/US
   → Incorporado. S7 → §2.6 (último bullet do `EnglishTutorApp`), §3 (linha do `EnglishTutorApp.cs`: "já no Red da T5"), §5 T5 Red.
 - **S8:** o Planejador decide se a mensagem de `NotAuthenticated` também menciona a `ANTHROPIC_API_KEY` do ambiente, e registra a decisão.
   → Decidido: menciona, sempre, com uma frase fixa (`If the ANTHROPIC_API_KEY environment variable is set, check or remove it.`), sem ler o ambiente. S8 → §2.5 (mensagem `NotAuthenticated` e nota), §2 "Alternativas descartadas", §4 (asserção de `SendAsync_WithRecordedNotAuthenticatedOutput_ThrowsNotAuthenticatedAskingForAuthLogin`), §8 (item do ambiente), §9 P17 (nova), §10 D12, ADR-008 (contexto, item 3, alternativa e consequência). A spec não muda: o cenário exige `claude auth login`, que continua na mensagem.
+
+### 2026-10-20 — Usuário (no chat), sobre a Rodada 2 da revisão do plano
+
+> "Sim" (incorporar as sugestões S1–S3 da Rodada 2 de `tasks/US-005/plan-review.md`)
+
+- **R2-S1:** incluir o caso simétrico ao caso 11: o stderr tem texto sem relação com nenhum padrão (ex.: um aviso da CLI) e o `result` de erro casa, com o tipo vindo do `result`.
+- **R2-S2:** a terceira mutação depois do Green da T4b vale para a linha em que a fixture `unknown-model` gravada de fato cai (ou para as linhas 1 e 3), e o Executor registra qual foi depois da T4a.
+- **R2-S3:** `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout` falha em tempo limitado sob a mutação do Red, como os demais testes de tempo.
