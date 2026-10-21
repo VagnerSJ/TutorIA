@@ -443,7 +443,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** (R1-S2) a §2.2 dizia que o cancelamento do chamador propaga "mesmo que o tempo também tenha estourado", sem teste na §4; virou o teste `SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation`, com callback determinístico no fake. (R1-S1) todos os casos com padrão no stderr tinham `errorResult` nulo, então "examina as duas fontes" não estava provado; entrou o caso 11. (R2-S1) o caso 11 cobriu só uma direção; entrou o caso 12 (`result` casa, stderr presente não casa). Variação do AP-004/AP-018/AP-041.
 - **Por que importa:** a implementação "olha o stderr só quando não há result de erro" (ou o inverso) passaria em todos os casos e contradiria a spec.
 - **Correção (proposta):** `.claude/skills/checklist-revisao/SKILL.md` §0 e `.claude/agents/planejador.md`: "cada afirmação condicional da §2 ('mesmo que', 'exceto quando', 'só se') tem um teste na §4 ou sai do plano"; "quando o plano diz que duas fontes são sempre examinadas, há um caso em que só a fonte A casa com a B presente e sem casar, e outro com os papéis trocados". Pode ser fundida ao AP-041 se o usuário preferir.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 47")
 
 ### AP-048 — Fixture gravada com argumentos diferentes dos do adaptador
 
