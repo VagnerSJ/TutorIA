@@ -282,12 +282,33 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().BeEmpty();
     }
 
+    // US-006 — Cenário: tempo esgotado (apoio: chave inválida encerra antes do prompt) — RN-BRAIN09
+    [Fact]
+    public async Task RunAsync_WhenOllamaTimeoutSecondsIsZero_ExitsWithInvalidConfigurationBeforePrompt()
+    {
+        var options = CreateOptions("Ollama", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "Ollama", extraValues: new Dictionary<string, string?> { ["Brain:Ollama:TimeoutSeconds"] = "0" }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Brain:Ollama:TimeoutSeconds must be between 1 and 3600 (found 0)");
+        _output.ToString().Should().BeEmpty();
+    }
+
     // US-004 — Cenário: janela de turnos configurável (apoio, P19, B1: várias seções inválidas)
+    // US-006 — apoio, P12: Brain:Ollama inválido com o Claude Code como provedor
     [Theory]
     [InlineData("Inexistente", "Brain:ClaudeCode:OutputMode", "JsonSchema",
         "Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.")]
     [InlineData("ClaudeCode", "Brain:ClaudeCode:OutputMode", "Json",
         "Brain:ClaudeCode:OutputMode 'Json' is invalid. Accepted values: JsonSchema, Tags.")]
+    [InlineData("ClaudeCode", "Brain:Ollama:TimeoutSeconds", "0",
+        "Brain:Ollama:TimeoutSeconds must be between 1 and 3600 (found 0)")]
     public async Task RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration(
         string provider, string otherKey, string otherValue, string expectedFailure)
     {

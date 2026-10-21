@@ -43,4 +43,20 @@ public sealed class InfrastructureServiceCollectionExtensionsTests
         read.Should().Throw<OptionsValidationException>()
             .Which.Failures.Should().ContainSingle(failure => failure.Contains("'Json'", StringComparison.Ordinal));
     }
+
+    // US-006 — Cenário: console conversa com o Ollama (apoio: validador registrado)
+    [Fact]
+    public void AddEnglishTutorInfrastructure_Always_RegistersOllamaOptionsValidator()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<OllamaOptions>().Configure(options => options.Model = " ");
+
+        services.AddEnglishTutorInfrastructure(_promptsDirectory);
+
+        using var provider = services.BuildServiceProvider();
+        var read = () => provider.GetRequiredService<IOptions<OllamaOptions>>().Value;
+        read.Should().Throw<OptionsValidationException>()
+            .Which.Failures.Should().ContainSingle(
+                failure => failure.Contains("Brain:Ollama:Model is required", StringComparison.Ordinal));
+    }
 }
