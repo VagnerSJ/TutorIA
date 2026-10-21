@@ -452,7 +452,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o comando de gravação das fixtures de erro não usava os argumentos de isolamento do adaptador (`--strict-mcp-config`, `--disallowedTools "mcp__*"`, `--system-prompt-file`). Com a configuração real do usuário, o stderr gravado poderia trazer avisos de MCP que o adaptador nunca veria. Corrigido: o comando usa os mesmos argumentos (conferidos em `BuildArguments`) e o `README.md` das fixtures registra as diferenças que sobram (modo Tags, prompt-modelo sem renderizar, sem `--resume`).
 - **Por que importa:** fixture que não representa a chamada real dá teste verde com comportamento diferente em produção.
 - **Correção (proposta):** `.claude/agents/planejador.md`: "comando de gravação de fixture usa os mesmos argumentos de isolamento do adaptador, ou o `README.md` da pasta de fixtures registra a diferença".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 48")
 
 ### AP-049 — Justificativa de cobertura na §12 mais forte do que o mapa da §4
 
