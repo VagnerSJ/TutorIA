@@ -8,6 +8,7 @@ using EnglishTutor.Infrastructure.Tests.Support;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 
 namespace EnglishTutor.Infrastructure.Tests.Brain;
 
@@ -26,7 +27,7 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
 
     private readonly RecordingLogger<ClaudeCodeTutorBrain> _logger = new();
 
-    private readonly ManualTimeProvider _timeProvider = new();
+    private readonly FakeTimeProvider _timeProvider = new();
 
     public ClaudeCodeTutorBrainTests()
     {
@@ -109,17 +110,119 @@ public sealed class ClaudeCodeTutorBrainTests : IDisposable
             .Which.StandardInput.Should().Be(request.Messages[0].Content);
     }
 
-    // US-004 — Cenário: processo isolado e sem ferramentas (apoio: cancelamento) — P6
+    // US-005 — Cenário: tempo esgotado — RN-BRAIN09
     [Fact]
-    public async Task SendAsync_Always_PassesCallerTokenToProcessRunner()
+    public async Task SendAsync_WhenProcessDoesNotAnswerWithinTimeout_CancelsProcessAndThrowsTimeout()
     {
-        using var cancellation = new CancellationTokenSource();
-        _processRunner.ReturnsOutput(ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1")));
+        var started = new TaskCompletionSource();
+        string? promptPath = null;
+        _processRunner.OnRun = run =>
+        {
+            promptPath = ValueAfter(run, "--system-prompt-file");
+            started.SetResult();
+        };
+        _processRunner.HangsUntilCancelled();
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        var call = sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        var notYet = _processRunner.Tokens[0].IsCancellationRequested;
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var thrown = await FluentActions
+            .Awaiting(() => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<BrainException>();
+
+        notYet.Should().BeFalse();
+        thrown.Which.Kind.Should().Be(BrainErrorKind.Timeout);
+        thrown.Which.Message.Should().Contain("did not answer in time (limit: 1 s)")
+            .And.Contain("Brain:ClaudeCode:TimeoutSeconds");
+        _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio, P5: um relógio por chamada) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_OnEachCall_StartsTimeoutAgain()
+    {
+        var secondStarted = new TaskCompletionSource();
+        _processRunner.OnRun = _ =>
+        {
+            if (_processRunner.Requests.Count == 1)
+            {
+                _timeProvider.Advance(TimeSpan.FromMilliseconds(900));
+            }
+            else
+            {
+                secondStarted.SetResult();
+            }
+        };
+        _processRunner
+            .ReturnsOutput(ClaudeOutputs.Structured("s-1", ClaudeOutputs.ValidReplyJson("t1")))
+            .HangsUntilCancelled();
+        var sut = CreateSut(options =>
+        {
+            options.TimeoutSeconds = 1;
+            options.UseResume = false;
+        });
+        await sut.SendAsync(SingleMessageRequest("t1"), TestContext.Current.CancellationToken);
+
+        var second = sut.SendAsync(SingleMessageRequest("t2"), TestContext.Current.CancellationToken);
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        var notYet = _processRunner.Tokens[1].IsCancellationRequested;
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var thrown = await FluentActions
+            .Awaiting(() => second.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<BrainException>();
+
+        notYet.Should().BeFalse(because: "each call has its own clock");
+        thrown.Which.Kind.Should().Be(BrainErrorKind.Timeout);
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio: Ctrl+C não é Timeout; substitui o repasse do token) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout()
+    {
+        using var callerCancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource();
+        _processRunner.OnRun = _ => started.SetResult();
+        _processRunner.HangsUntilCancelled();
         var sut = CreateSut();
 
-        await sut.SendAsync(SingleMessageRequest("t1"), cancellation.Token);
+        var call = sut.SendAsync(SingleMessageRequest("t1"), callerCancellation.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await callerCancellation.CancelAsync();
+        var act = () => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        _processRunner.Tokens.Should().Equal(cancellation.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
+    }
+
+    // US-005 — Cenário: tempo esgotado (apoio: tempo estourado e Ctrl+C ao mesmo tempo; S2) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation()
+    {
+        using var callerCancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource();
+        string? promptPath = null;
+        _processRunner.OnRun = run =>
+        {
+            promptPath = ValueAfter(run, "--system-prompt-file");
+            started.SetResult();
+        };
+        _processRunner.HangsUntilCancelled(onCancelled: () => callerCancellation.Cancel());
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        var call = sut.SendAsync(SingleMessageRequest("t1"), callerCancellation.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1000));
+        var act = () => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        callerCancellation.IsCancellationRequested.Should().BeTrue();
+        _processRunner.Tokens[0].IsCancellationRequested.Should().BeTrue();
+        File.Exists(promptPath).Should().BeFalse(because: "the temporary system prompt file is deleted after the call");
     }
 
     // US-004 — Cenário: processo isolado e sem ferramentas — RN-BRAIN06
