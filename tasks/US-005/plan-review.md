@@ -121,3 +121,77 @@ Nenhum.
 - **Prova de "as duas fontes" só numa direção** (S1). Ao incorporar a S1 da Rodada 1, o caso pedido cobriu exatamente a direção citada, e a simétrica ficou de fora. Regra sugerida no checklist §0, junto do AP-041: "quando o plano diz que duas fontes são sempre examinadas, há um caso em que só a fonte A casa com a B presente e sem casar, e outro com os papéis trocados".
 - **Mutação que depende de um dado ainda não gravado** (S2). Uma mutação escolhida antes de a fixture existir pode não atingir o caminho que ela exercita. Regra sugerida na `tdd-dotnet`: "mutação sobre teste de fixture gravada é escolhida (ou confirmada) depois da gravação, para o ramo que a fixture realmente percorre".
 - **Espera limitada só nos testes novos** (S3). A proteção contra travar a suíte foi aplicada aos testes de tempo, mas não ao teste de caracterização cujo Red por mutação também trava. Regra sugerida na `tdd-dotnet`: "todo teste com fake que só termina por cancelamento usa espera limitada, inclusive os de caracterização".
+
+## Rodada 3
+
+Data: 2026-10-20
+Escopo revisado: `tasks/US-005/plan.md` no commit `5de27ca` ("docs(ai): revise plan for US-005"), comparado com `87557e8`. O diff entre os dois toca só o `plan.md` (25 linhas a mais, 17 a menos). O ADR-008 não mudou. A branch tem 7 commits sobre `develop`, todos de documentação (`git diff develop...HEAD --stat`: ADR-008, `plan.md` e `plan-review.md`). Ainda não há código da US. Caracteres invisíveis no diff: 0. Conferi o plano contra a §2.4 (padrões das linhas a e b), a §2.5 (mensagens), as fixtures da §2.7 e o texto do ADR-008.
+Resultado: APROVADO
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| Todo cenário BDD no mapa da §4 (projeto, classe, método `Metodo_Cenario_Resultado`) | ✅ 5/5 cenários, sem mudança. O `[Theory]` de classificação vai de 11 para 12 casos |
+| P* com efeito observável têm teste na §4 e tarefa na §5 | ✅ Não há P nova. A P13 passa a citar os casos 2, 11 e 12 |
+| DoD da §10 cobre a DoD da US | ✅ D2 286 (134/51/101) e D8 53 casos / 29 métodos |
+| Conformidade R1–R4, RN-*, regras rápidas; ADR Proposto | ✅ ADR-008 continua Proposto e sem mudança. O item 1 (linha 31) já diz "sempre as duas fontes", e o caso 12 só prova a direção que faltava |
+| Escopo e adiamentos (AP-022, AP-040) | ✅ Nada novo |
+| Consistência §3 × §4 × §5 × §6 e contagens | ✅ (conta abaixo). Ver S2 |
+| Transformações com teste nos dois lados; asserções com texto só do projeto | ✅ O caso 12 confere `usage limit reached (`, que é texto do projeto. Ver S1 |
+| Ordem das tarefas preserva o Red | ✅ O caso 12 falha no Red (o esqueleto devolve `Unknown`). As mutações da T2 e da T4b ficam no momento certo |
+| Critério `LiveBrain` | ✅ Sem mudança (D10, D13, P16) |
+| `ValidateOnStart` em várias Options / caixa diferente | N/A |
+| Justificativas que citam outra US conferidas | ✅ Sem mudança |
+| Verificação de "nenhuma linha" com o outro lado (AP-035) | ✅ Sem mudança (D16/D16c) |
+| Alteração na `ARCHITECTURE.md` lista `CLAUDE.md` e skills | ✅ Sem mudança |
+| Riscos e ambiguidades tratados | ✅ Um risco novo na §7 (linha da fixture `unknown-model`). O risco "trava a suíte" passa a valer para os quatro testes com `HangsUntilCancelled` |
+| Viabilidade técnica | ✅ |
+
+Contagens que eu mesmo conferi:
+- `ClaudeCodeTutorBrainTests`: 52 + 1 (caso 12) = **53 casos**, 29 métodos (nenhum método novo).
+- Infrastructure.Tests: 100 + 1 = **101**.
+- Console.Tests: **51**. Core.Tests: **134**.
+- Total: 134 + 51 + 101 = **286**. `LiveBrain`: +2.
+
+Os números batem em todos os lugares: §4 "Contagem" (linha 374, com a parcela "+12"), §4 mapa (linha 319, "12 casos"), D2 (linha 494), D8 (linha 501) e §12 (resposta à Rodada 2). A resposta da Rodada 1 na §12 ainda traz 52/100/285, mas está marcada "(Contagens superadas pela resposta à Rodada 2, abaixo.)", o que basta.
+
+Como a branch não tem mudança de código desde `f033915`, não rodei de novo o build nem os testes. A linha de base continua a da Rodada 1.
+
+### Itens da rodada anterior
+- **R2-S1** (caso simétrico ao caso 11): **resolvido em `5de27ca`**. O caso 12 tem código 1, erro-json `You've hit your limit t12` e stderr `Warning: a newer version is available t12`, e espera `UsageLimitReached` com o trecho `usage limit reached (You've hit your limit t12)`.
+  - Comparei os textos com os padrões da §2.4. O stderr não contém nenhum padrão das linhas a e b. O `result` contém `hit your limit` e nenhum padrão da linha a.
+  - Uma implementação que só olha o `result` com o stderr vazio devolveria `Unknown`, com a mensagem `Claude Code failed (exit code 1): You've hit your limit t12`, que não contém o trecho. O caso falha, como deve.
+  - Estão coerentes a §2.4 (frase das duas direções e "com a outra fonte presente e sem casar"), o mapa da §4, a T4b ("os casos 11 e 12 falham") e a P13.
+  - Ver S1 sobre uma frase imprecisa na resposta da §12.
+- **R2-S2** (mutação para a linha real da fixture `unknown-model`): **resolvido em `5de27ca`**, nas duas formas.
+  - A mutação nova ("quando nenhum padrão casa, o `Classify` devolve `NotAuthenticated`") vale para as linhas 1 e 3. A linha 2 não chama o `Classify` (§2.4, linha 2 da tabela), então o caso 9 continua isolado.
+  - A T4a registra nas Evidências o código gravado e a linha. A linha 2 manda parar (§2.7).
+  - A T4b cita a linha ao lado do resultado. A §4 e a §7 estão coerentes.
+  - Depois do Green, `NotAuthenticated(string)` já está implementado, então a falha vem da asserção de `Kind`, como o plano diz.
+- **R2-S3** (espera limitada em `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout`): **resolvido em `5de27ca`**.
+  - O teste usa `WaitAsync(TimeSpan.FromSeconds(10))`, sem token. Sob a mutação do Red, sai `TimeoutException`, que não deriva de `OperationCanceledException`, e a asserção do tipo falha em 10 s, sem travar a suíte.
+  - Estão coerentes a §4 (linha do mapa e descrição), a T2 e a §7. Ver S2 sobre um dos quatro testes citados na §7.
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S1** — §12, resposta a R2-S1 (linha 582): a frase "cada padrão da linha b aparece nas duas fontes" não está certa.
+  - O padrão `usage limit` só aparece no `result` de erro: nos casos 6 e 8 e na fixture `usage-limit-synthetic-1`. Nenhum caso nem fixture o põe no stderr (`usage-limit-synthetic-2` usa `hit your limit`).
+  - O AP-041 não exige esse cruzamento, então nada falta no mapa. O que precisa mudar é a afirmação, para não induzir uma revisão futura a dar como coberto algo que não está.
+  - Esperado: corrigir a frase ou acrescentar o caso que a torna verdadeira.
+- **S2** — §4, descrição de `SendAsync_OnEachCall_StartsTimeoutAgain` (linha 361) × §7 (linha 449) × T2 Red.
+  - A §7 diz que os quatro testes que usam `HangsUntilCancelled` esperam com `WaitAsync(TimeSpan.FromSeconds(10))`, e a T2 diz que este teste falha "pelo `WaitAsync` de 10 s".
+  - A descrição do teste na §4 não diz nem uma coisa nem outra: só "2ª chamada fica pendente". As descrições dos outros três dizem as duas.
+  - Isso já vinha da Rodada 1, mas ficou visível agora que a §7 conta os quatro testes.
+  - Esperado: a descrição na §4 dizer como a 2ª chamada fica pendente e que a espera é limitada, para que o Red desse teste também falhe em tempo limitado.
+
+### Pontos positivos
+- A §12 da Rodada 2 segue o formato "item → seções tocadas" (AP-018), e cada seção citada foi de fato alterada no diff `87557e8..5de27ca`. A resposta antiga ficou marcada como superada, sem ser reescrita.
+- O R2-S2 foi resolvido pelas duas vias ao mesmo tempo: uma mutação que não depende da linha e o registro da linha real na T4a, com parada explícita se a fixture cair na linha 2. Há também um risco novo na §7.
+- O R2-S3 explica por que o tipo da exceção distingue a falha por tempo do resultado esperado, e o risco "trava a suíte" foi ampliado para todos os testes com `HangsUntilCancelled`, não só para o que foi citado.
+- A justificativa para não mexer no ADR-008 confere com o texto do item 1 (linha 31).
+
+### Aprendizados para o processo
+- **Justificativa de cobertura mais forte do que o mapa** (S1). Ao incorporar uma sugestão, a resposta da §12 generalizou ("cada padrão aparece nas duas fontes") além do que os casos sustentam. É uma variação do AP-036 aplicada ao próprio plano. Regra sugerida no `planejador.md`: "afirmação de cobertura na §12 ('cada X tem Y') é conferida contra a tabela da §4 antes do commit; se não fechar, ela é restringida ao que os casos provam".
+- **Proteção aplicada a um grupo sem conferir cada membro** (S2). A §7 passou a contar "os quatro testes", mas a descrição de um deles na §4 não foi revista junto. Regra sugerida no checklist §0: "quando a §7 ou a §5 atribui uma propriedade a um grupo de testes ('os N testes que...'), a descrição de cada um na §4 a declara".
