@@ -59,7 +59,8 @@ src/
   EnglishTutor.Infrastructure/
     Brain/             ClaudeCodeTutorBrain, ClaudeCodeOptions, ClaudeCodeOptionsValidator, ClaudeCodeOutput, ClaudeCodeFailures,
                        ClaudeCodePromptRenderer, ClaudeCodeLog, BrainOutputModes, TutorReplySchema,
-                       FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain,
+                       FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain, OllamaOptions,
+                       OllamaOptionsValidator, OllamaFailures, OllamaChatClients, OllamaLog,
                        TutorReplyParser, BrainFactory, FallbackTutorBrain
     Processes/         IProcessRunner, ProcessRequest, ProcessResult, ProcessRunner
     DependencyInjection/ InfrastructureServiceCollectionExtensions
@@ -174,6 +175,7 @@ classDiagram
     "Endpoint": "http://localhost:11434",
     "Model": "qwen2.5:14b-instruct-q4_K_M",
     "Temperature": 0.6,
+    "TimeoutSeconds": 60,
     "OutputMode": "JsonSchema"
   }
 }
@@ -215,7 +217,9 @@ claude -p
 
 ### 6.4 Provedor Ollama (HTTP)
 
-- Via `Microsoft.Extensions.AI` (`IChatClient`) com o pacote do Ollama; histórico montado pela aplicação a cada chamada (sem estado).
+- Via `Microsoft.Extensions.AI` (`IChatClient`) com o cliente `OllamaSharp` (`OllamaApiClient`, ADR-009); histórico montado pela aplicação a cada chamada (sem estado, RN-BRAIN01).
+- Mensagem `system` = `BrainRequest.SystemPrompt` + instrução de formato do modo (`prompts/format.json.md` ou `format.tags.md`, ADR-002). `OutputMode=JsonSchema` envia `format` com o `TutorReplySchema`; `Tags` não envia `format`. Modelo e temperatura vêm de `Brain:Ollama`.
+- Falhas viram `BrainException` classificada pelo adaptador (ADR-009): servidor sem resposta → `Unknown` com "Ollama is not running ..."; modelo ausente → `Unknown` com `ollama pull <modelo>`; `TimeoutSeconds` estourado → `Timeout`, com a requisição cancelada. O console mostra a mensagem como nas falhas do Claude Code.
 - O mesmo `IChatClient` servirá de base para o futuro provedor `AnthropicApi`.
 
 ## 7. Voz

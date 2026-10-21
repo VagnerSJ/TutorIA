@@ -1,6 +1,6 @@
 # ADR-009 — Provedor Ollama: IChatClient, montagem do pedido, classificação das falhas e tempo máximo por chamada
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 2026-10-21
 - **US relacionadas:** US-006 (e, como consumidoras, US-007, que escolhe e encadeia os cérebros, US-008, que roda a suíte de contrato sobre este adaptador, e US-009, que o mede no `eval`)
 - **Complementa:** ADR-002 (item 4: o adaptador anexa a instrução de formato), ADR-006 (o adaptador só traduz resposta inválida em `InvalidOutput`), ADR-008 (mesmo padrão de falha, tempo e mensagem ao aluno)
