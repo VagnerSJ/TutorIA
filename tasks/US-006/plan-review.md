@@ -50,3 +50,45 @@ Conferi no código e rodando `dotnet test --filter "Category!=LiveBrain"`:
 ## Aprendizados para o processo
 - Transformação de texto exibida ao aluno (primeira linha, texto de reserva, formatação de número) tende a entrar no plano só pelo caminho feliz. Os casos de uma linha e de mensagem presente passam sem provar a regra. Já aparece nos AP-015 e AP-016. Sugestão para a skill de planejamento: para cada `<placeholder>` derivado de texto de biblioteca ou de valor numérico, listar na §4 um caso por ramo da derivação (normal, múltiplas linhas, vazio) e, para números, a cultura.
 - Condicionais com conjunção ("A e B") precisam de caso em que só um dos termos casa (AP-047). O plano já cobre a precedência e cada fonte isolada, mas esqueceu o termo isolado da conjunção textual.
+
+---
+
+## Rodada 2
+
+# Revisão do plano — US-006 Professor local via Ollama (rodada 2)
+
+Data: 2026-10-21
+Escopo revisado: `tasks/US-006/plan.md` no commit aebee1a. Conferência do texto e da aritmética das contagens, sem build nem testes (só o `plan.md` mudou).
+Resultado: APROVADO (0 bloqueantes)
+
+## Itens da rodada anterior
+| Item | Status |
+|---|---|
+| **B1** (derivação do `<detalhe>`, P9) | Resolvido em aebee1a. §4 ganhou `SendAsync_WhenServerFailureDetailVaries_UsesFirstNonBlankLineOrFallback`, `[Theory]` de 5 casos comparando a mensagem inteira. Cada ramo tem caso próprio (várias linhas; linha inicial vazia ou em branco; espaços e `\r` nas pontas; mensagem vazia; só espaços e quebras). T4 lista o teste no Red e uma mutação por ramo depois do Green. §2.5, P9, D2 e D11 atualizados. |
+| S1 (nome da branch) | Sem efeito. A branch atual é `feature/US-006_ollama-brain`, igual ao cabeçalho do plano. O `plan-review.md` da rodada 1 citava outro nome (`ollama-tutor-brain`), que não confere com `git branch`. |
+| S2 (cultura invariante em `Temperature`) | Pendente, não pedida. |
+| S3 (só uma das palavras `model`/`not found`) | Pendente, não pedida. |
+| S4 (tipo próprio de exceção do OllamaSharp) | Pendente, não pedida. |
+
+## Contagens (conferidas na §4)
+- Validador: 12 métodos, 24 casos. `OllamaTutorBrainTests`: 19 métodos, 30 casos. `OllamaTutorBrainHttpTests`: 7/7. DI: +4 casos, +3 métodos. `OllamaOptionsTests`: 1.
+- Infrastructure.Tests: 1+24+30+7+4 = 66 → 101+66 = 167. Console.Tests: 55. Total 134+55+167 = 356 (D2 bate).
+- D11: 1+24+30+7 = 62, mais 4 de console e 3 de DI = 69. Bate.
+- Nomes do teste novo idênticos na §4, na T4 e na P9 (AP-025).
+
+## Verificações (checklist §0)
+Todos os itens ✅. Ressalvas: transformações (AP-016/015) só com a observação de cultura (S2 pendente); condicionais da §2 (AP-047) só com S3 pendente.
+
+## Bloqueantes
+Nenhum.
+
+## Sugestões
+- **S2, S3, S4** da rodada 1 continuam pendentes e não bloqueiam. A S3 ainda deixa um caso sem prova: com só `not found` (sem `model`) e sem status, trocar o "e" por "ou" na linha a passaria na suíte. Fechar exige 1 caso na `[Theory]` de classificação e atualizar as contagens (AP-031).
+
+## Pontos positivos
+- Correção do B1 cirúrgica e completa: caso por ramo, mensagem inteira comparada, mutação por ramo, contagens recalculadas e conferidas.
+- O Red de cada teste novo está declarado; o `<detalhe>` não nasce verde.
+
+## Aprendizados para o processo
+- Confirma o AP-016: `<placeholder>` derivado de texto de biblioteca precisa de um caso por ramo da derivação (e a cultura, para números).
+- O Revisor deve conferir nomes de branch com `git branch` antes de citá-los.
