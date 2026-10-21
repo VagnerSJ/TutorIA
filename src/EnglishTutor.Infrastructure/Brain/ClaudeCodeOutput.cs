@@ -7,7 +7,7 @@ namespace EnglishTutor.Infrastructure.Brain;
 internal sealed record ClaudeCodeResult(string? SessionId, string RawText);
 
 // Reads the JSON printed by "claude -p --output-format json" (US-004 §2.5). Rows are evaluated in order;
-// the fine classification of failures (CliNotFound, NotAuthenticated, ...) belongs to US-005.
+// rows 1 and 3 are classified by ClaudeCodeFailures (ADR-008).
 internal static class ClaudeCodeOutput
 {
     private const string _noDetails = "no error details were printed";
@@ -22,9 +22,12 @@ internal static class ClaudeCodeOutput
         // Row 1: non-zero exit code.
         if (result.ExitCode != 0)
         {
-            throw new BrainException(
-                BrainErrorKind.Unknown,
-                $"Claude Code failed (exit code {result.ExitCode}): {Detail(isResult ? root : null, result.StandardError)}");
+            var errorObject = isResult ? root : null;
+            var detail = Detail(errorObject, result.StandardError);
+            throw ClassifiedOrDefault(
+                ClaudeCodeFailures.Classify(ErrorResult(errorObject), result.StandardError),
+                detail,
+                $"Claude Code failed (exit code {result.ExitCode}): {detail}");
         }
 
         // Row 2: not the JSON result object of the CLI.
@@ -41,9 +44,11 @@ internal static class ClaudeCodeOutput
         // Row 3: the CLI reported an error; the parser is never called.
         if (IsError(resultObject))
         {
-            throw new BrainException(
-                BrainErrorKind.Unknown,
-                $"Claude Code reported an error: {Detail(resultObject, result.StandardError)}");
+            var detail = Detail(resultObject, result.StandardError);
+            throw ClassifiedOrDefault(
+                ClaudeCodeFailures.Classify(ErrorResult(resultObject), result.StandardError),
+                detail,
+                $"Claude Code reported an error: {detail}");
         }
 
         // Rows 4 and 5.
@@ -54,6 +59,17 @@ internal static class ClaudeCodeOutput
         var sessionId = ReadString(resultObject, "session_id");
         return new ClaudeCodeResult(string.IsNullOrEmpty(sessionId) ? null : sessionId, rawText);
     }
+
+    private static BrainException ClassifiedOrDefault(BrainErrorKind kind, string detail, string unknownMessage) => kind switch
+    {
+        BrainErrorKind.NotAuthenticated => ClaudeCodeFailures.NotAuthenticated(detail),
+        BrainErrorKind.UsageLimitReached => ClaudeCodeFailures.UsageLimitReached(detail),
+        _ => new BrainException(BrainErrorKind.Unknown, unknownMessage),
+    };
+
+    // The "result" of the JSON result object when it is an error; otherwise null.
+    private static string? ErrorResult(JsonElement? resultObject) =>
+        resultObject is { } output && IsError(output) ? ReadString(output, "result") : null;
 
     private static JsonDocument? TryParse(string standardOutput)
     {

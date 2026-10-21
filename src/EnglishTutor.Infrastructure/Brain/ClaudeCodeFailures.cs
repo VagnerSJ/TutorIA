@@ -18,11 +18,39 @@ internal static class ClaudeCodeFailures
             $"Send your sentence again, or raise {ClaudeCodeOptions.SectionName}:TimeoutSeconds.",
             inner);
 
-    public static BrainErrorKind Classify(string? errorResult, string standardError) => BrainErrorKind.Unknown;
+    // Row a is checked before row b: the first row with a match decides (ADR-008).
+    private static readonly string[] _notAuthenticatedPatterns =
+        ["not logged in", "/login", "invalid api key", "authentication_error", "oauth token"];
 
-    public static BrainException NotAuthenticated(string detail) => throw new NotImplementedException();
+    private static readonly string[] _usageLimitPatterns = ["usage limit", "hit your limit"];
 
-    public static BrainException UsageLimitReached(string detail) => throw new NotImplementedException();
+    // Looks at both sources, always: the "result" of an error object and the whole stderr.
+    public static BrainErrorKind Classify(string? errorResult, string standardError)
+    {
+        ArgumentNullException.ThrowIfNull(standardError);
+
+        string[] sources = [errorResult ?? string.Empty, standardError];
+        if (Matches(sources, _notAuthenticatedPatterns))
+        {
+            return BrainErrorKind.NotAuthenticated;
+        }
+
+        return Matches(sources, _usageLimitPatterns) ? BrainErrorKind.UsageLimitReached : BrainErrorKind.Unknown;
+    }
+
+    public static BrainException NotAuthenticated(string detail) =>
+        new(
+            BrainErrorKind.NotAuthenticated,
+            $"Claude Code is not logged in ({detail}). Run \"claude auth login\" in a terminal, then send your sentence again. " +
+            "If the ANTHROPIC_API_KEY environment variable is set, check or remove it.");
+
+    public static BrainException UsageLimitReached(string detail) =>
+        new(
+            BrainErrorKind.UsageLimitReached,
+            $"Claude Code usage limit reached ({detail}). Wait until your Claude plan limit resets, then send your sentence again.");
+
+    private static bool Matches(string[] sources, string[] patterns) =>
+        sources.Any(source => patterns.Any(pattern => source.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
 
     public static BrainException StartFailed(string executablePath, Win32Exception inner)
     {
