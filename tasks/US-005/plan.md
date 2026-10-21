@@ -1,9 +1,9 @@
 # Plano — US-005 Erros do Claude Code com mensagens claras
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-20
 Branch: feature/US-005_erros-claude-code
 Spec: specs/sprints/SPRINT_1.md#us-005
-Regras: RN-BRAIN07, RN-BRAIN09 (e, sem mudança, RN-BRAIN01, RN-BRAIN04, RN-BRAIN06, RN-BRAIN08, RN-CONV05); ARCHITECTURE §2 (R1–R4), §3, §6.1, §6.3, §9, §10; ADR-006, ADR-007 (item 5 complementado), ADR-008 (Proposto, novo)
+Regras: RN-BRAIN07, RN-BRAIN09 (e, sem mudança, RN-BRAIN01, RN-BRAIN04, RN-BRAIN06, RN-BRAIN08, RN-CONV05); ARCHITECTURE §2 (R1–R4), §3, §6.1, §6.3, §9, §10; ADR-006, ADR-007 (item 5 complementado), ADR-008 (Aceito, novo)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Classificar as falhas do `claude -p` (`CliNotFound`, `NotAuthenticated`, `UsageL
 
 ## 2. Abordagem
 
-A decisão central está no **ADR-008 (Proposto)**: `docs/adr/ADR-008-classificacao-de-falhas-e-tempo-maximo-do-claude-code.md`. Em resumo:
+A decisão central está no **ADR-008 (Aceito)**: `docs/adr/ADR-008-classificacao-de-falhas-e-tempo-maximo-do-claude-code.md`. Em resumo:
 
 - a classificação é do adaptador (`ClaudeCodeTutorBrain`, `ClaudeCodeOutput` e um novo `internal static class ClaudeCodeFailures`);
 - o tempo máximo é um `CancellationTokenSource(TimeSpan, TimeProvider)` ligado ao token do chamador, por chamada ao processo;
@@ -277,7 +277,7 @@ Só o próprio código os chama, sempre com valores válidos.
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-008-classificacao-de-falhas-e-tempo-maximo-do-claude-code.md` | Decisão (Proposto), criada junto com este plano; revisada com S2, S4, S6 e S8 |
+| Criar | `docs/adr/ADR-008-classificacao-de-falhas-e-tempo-maximo-do-claude-code.md` | Decisão (Aceito em 2026-10-20), criada junto com este plano; revisada com S2, S4, S6 e S8 |
 | Alterar | `docs/adr/ADR-007-claude-code-processo-por-turno-historico-e-resume.md` | Linha "Complementado por" (§2.8), pelo orquestrador antes da T1 |
 | Alterar | `ARCHITECTURE.md` | §3 e §6.3 (§2.8), pelo orquestrador antes da T1 |
 | Alterar | `specs/sprints/SPRINT_1.md` | D5 da US-005 (§2.8), pelo orquestrador antes da T1 |
@@ -464,6 +464,8 @@ Nenhum pacote novo em `src/`.
 Adiamentos procurados também nas P* e nos comentários de teste (AP-040): nenhum "a US-YYY troca/atualiza" nesta US.
 
 ## 9. Perguntas em aberto
+
+**Respostas do usuário (2026-10-20):** os padrões propostos de P1 a P18 foram aceitos como estão, inclusive a mudança do D5 na spec (P4 e P15, aplicada em `docs(ai): update spec for US-005`). Aprovação dada no chat junto com a incorporação das sugestões das Rodadas 1, 2 e 3 da revisão do plano (§12).
 
 - **P1 — Onde moram as mensagens ao aluno.** **Padrão proposto:** no adaptador, como `BrainException.Message` (o que houve e o que fazer); o console só acrescenta o prefixo e a linha de próximo passo (ADR-008, itens 3 e 4). Teste: `ClaudeCodeTutorBrainTests.SendAsync_WhenExecutableIsNotFound_ThrowsCliNotFoundWithInstallInstructionAndKey` e `EnglishTutorAppTests.RunAsync_WhenBrainFails_ShowsErrorAndContinuesSession`.
 - **P2 — Instrução de instalação e `claude auth login`.** O cenário pede "claude auth login". **Padrão proposto:** manter o texto da spec, conferido na T4a com `claude auth --help`; instalação pelo instalador nativo (`irm https://claude.ai/install.ps1 | iex`), o único suportado (ADR-007). Se a CLI instalada não tiver `auth login`, o Executor para e o usuário decide o texto na §12. Teste: `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedNotAuthenticatedOutput_ThrowsNotAuthenticatedAskingForAuthLogin`.
