@@ -603,3 +603,8 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-21 — pedido do Revisor do plano (rodada 1, REPROVADO)
+
+- **B1 (bloqueante):** a P9 define `<detalhe>` (primeira linha não vazia da mensagem da exceção, sem espaços nas pontas, ou `no error details were provided`), mas a §4 só testa mensagens de uma linha e não vazias (`boom t5`, `boom t7`). Mapear na §4 (e na T4, com Red e mutação) um caso por ramo da derivação: mensagem com várias linhas, mensagem começando por linha vazia, mensagem vazia ou só espaços. A mensagem exibida não pode embutir linhas extras de stack ou corpo HTTP, nem ficar com parênteses vazios. Atualizar contagens (§4, §6, D11) e a tabela de testes.
+- **S1:** a linha `Branch:` do cabeçalho deve ser `feature/US-006_ollama-brain` (a branch real foi renomeada para esse nome; já confere, só verificar).
