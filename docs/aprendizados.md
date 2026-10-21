@@ -407,7 +407,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o plano disse "última estável 10.x" para `Microsoft.Extensions.TimeProvider.Testing`. O Executor fixou `10.11.0` em `Directory.Packages.props` no commit do teste e só escreveu a escolha na §12 no commit de evidências. Desvio pequeno (pacote só de testes, Core intocado), mas é o padrão do AP-014/AP-027 aplicado a versão de pacote.
 - **Por que importa:** escolha que o plano deixou em aberto chega ao documento depois do código (hábito 4); a versão muda o que o build restaura.
 - **Correção (proposta):** (a) `.claude/agents/planejador.md`: a §6 (pacotes) fixa a versão, ou diz "o Executor registra a versão na §12 no mesmo commit"; (b) `.claude/agents/executor.md`: mudança de `Directory.Packages.props` com versão não prevista no plano entra na §12 antes ou no mesmo commit. Vale como regra só se o padrão se repetir (primeira ocorrência).
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 43")
 
 ### AP-044 — Hook de edição acusa build vermelho transitório quando um tipo novo é usado antes do arquivo que o declara
 
