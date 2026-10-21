@@ -437,12 +437,12 @@ Comentários de código com adiamento ou texto que muda com esta US (AP-040; Gre
 
 **Mutações depois do Green.** Quando um teste nasce verde porque o esqueleto do Red ainda não tem a regra (validador sem as faixas, `IsServerFailure` devolvendo `false`), a mutação não tem o que quebrar no Red. Nesses casos a tarefa diz "mutação depois do Green": o Executor faz o commit `feat`, aplica a mutação pelo efeito descrito, roda o teste e vê falhar, desfaz pela edição inversa (sem commit), confere que `git status --short` não mostra mudança em `src/` e cola o resultado nas Evidências (AP-017, AP-029, AP-037, AP-045). Mutação sobre teste de fixture gravada é escolhida depois da gravação, para o ramo que a fixture percorre.
 
-- [ ] T1 — `Brain:Ollama`: opções, validação e configuração.
+- [x] T1 — `Brain:Ollama`: opções, validação e configuração. (feito: test 7c8ed13, feat 1acc4a9; D15c e mutações nas Evidências)
   Red: esqueleto `OllamaOptions` com as propriedades **sem** inicializador e as constantes; `OllamaOptionsValidator.Validate` devolvendo `Success`; testes `OllamaOptionsTests.Constructor_Always_UsesDocumentedDefaults`, os 12 métodos de `OllamaOptionsValidatorTests`, `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_Always_RegistersOllamaOptionsValidator` (o validador ainda não está registrado), `EnglishTutorAppTests.RunAsync_WhenOllamaTimeoutSecondsIsZero_ExitsWithInvalidConfigurationBeforePrompt` e o novo caso de `EnglishTutorAppTests.RunAsync_WhenSeveralSectionsAreInvalid_ShowsEveryFailureAndReturnsInvalidConfiguration` (a seção ainda não é ligada: a sessão abre e sai com 0). Falham pela asserção, exceto os cinco que esperam sucesso do validador, que nascem verdes porque o esqueleto aceita tudo: `Validate_WithDefaultOptions_Succeeds`, `Validate_WithHttpAndHttpsEndpoints_Succeeds`, `Validate_WithTemperatureAtLimits_Succeeds`, `Validate_WhenOutputModeCaseDiffers_Succeeds` e `Validate_WithTimeoutSecondsAtLimits_Succeeds` (mutação depois do Green).
   Green: inicializadores, regras do validador (§2.1), registro do validador em `AddEnglishTutorInfrastructure`, bloco `Brain:Ollama` no `appsettings.json`, bind com `ValidateOnStart` no `EnglishTutorApp.BuildHost`.
   Mutações depois do Green, cada uma desfeita pela edição inversa: "o limite inferior de `TimeoutSeconds` aceito passa a ser 2" (caso 1 de `Validate_WithTimeoutSecondsAtLimits_Succeeds` falha) e "o superior passa a ser 3599" (caso 3600 falha); "a temperatura aceita deixa de incluir 0" e, separadamente, "deixa de incluir 2" (os dois casos de `Validate_WithTemperatureAtLimits_Succeeds`); "o validador do `OutputMode` passa a diferenciar maiúsculas" (`Validate_WhenOutputModeCaseDiffers_Succeeds` falha); "`https` deixa de ser aceito" (`Validate_WithHttpAndHttpsEndpoints_Succeeds` falha); "o `Model` padrão passa a ser vazio" (`Validate_WithDefaultOptions_Succeeds` falha).
   Commits: `test(brain): cover Ollama options and validation` + `feat(brain): add Brain:Ollama options with validation`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
 - [ ] T2 — Adaptador: pedido, modos e leitura da resposta (sem falhas e sem tempo máximo).
   Estado dos ramos até a T4 e a T5: uma `HttpRequestException` ou qualquer outra exceção do cliente propaga sem tradução; não há relógio (`SendAsync` passa o `ct` direto ao `IChatClient`). Os testes desta tarefa usam só respostas e histórico válidos, que ficam nos ramos implementados.
@@ -611,6 +611,13 @@ Também entram, da DoD comum:
 ## 11. Evidências
 
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+**T1 (2026-10-21)**
+
+- D15c (antes do primeiro teste, em `864b98d`): achou linhas em `ARCHITECTURE.md` (1), `EnglishTutorApp.cs` (2), `ConsoleText.cs` (1), `TutorNotConnectedInputHandler.cs` (3), `TutorReplySchema.cs` (1), `InfrastructureServiceCollectionExtensions.cs` (1) e `EnglishTutorAppTests.cs` (4): cada padrão e arquivo esperado enxerga o texto antigo.
+- Red (7c8ed13): 17 falhas em Infrastructure.Tests e 2 em Console.Tests, todas pela asserção (valores vazios do esqueleto, validador que aceita tudo, validador não registrado, seção não ligada). Os cinco testes de sucesso do validador nasceram verdes, como previsto.
+- Mutações depois do Green (1acc4a9), cada uma revertida (`git checkout` do arquivo, tudo já commitado; `git status --short` limpo): `MinTimeoutSeconds` 2 → `Validate_WithTimeoutSecondsAtLimits_Succeeds(1)` falha; `MaxTimeoutSeconds` 3599 → caso 3600 falha; `MinTemperature` 0,01 → `Validate_WithTemperatureAtLimits_Succeeds(0)` falha; `MaxTemperature` 1,99 → caso 2 falha; `OutputMode` com caixa → `Validate_WhenOutputModeCaseDiffers_Succeeds` (2 casos) falha; `https` recusado → `Validate_WithHttpAndHttpsEndpoints_Succeeds(https)` falha; `Model` padrão vazio → `Constructor_Always_UsesDocumentedDefaults` e as demais falham.
+- Pós-Green: Core 134, Infrastructure 127 (+26), Console 53 (+2), todos verdes.
 
 ## 12. Comentários do usuário
 
