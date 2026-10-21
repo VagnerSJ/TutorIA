@@ -379,54 +379,54 @@ Só o próprio código os chama, sempre com valores válidos.
 
 **Mutações depois do Green (S3).** Quando um teste nasce verde porque o esqueleto do Red ainda não tem a regra (validador sem a faixa, `Classify` devolvendo sempre `Unknown`), a mutação não tem o que quebrar no Red. Nesses casos a tarefa diz "mutação depois do Green": o Executor faz o commit `feat`, aplica a mutação pelo efeito descrito, roda o teste e vê falhar, desfaz pela edição inversa (sem commit), confere que `git status --short` não mostra mudança em `src/` e cola o resultado nas Evidências (AP-017, AP-029, AP-037).
 
-- [ ] T1 — `TimeoutSeconds`.
+- [x] T1 — `TimeoutSeconds`. feito: 187a7dd (test), f4b785f (feat).
   Red: esqueleto `public int TimeoutSeconds { get; set; }` (sem inicializador) e as três constantes; testes `ClaudeCodeOptionsTests.Constructor_Always_UsesDocumentedDefaults` (alterado), `ClaudeCodeOptionsValidatorTests.Validate_WhenTimeoutSecondsIsOutOfRange_FailsWithRangeAndFoundValue`, `ClaudeCodeOptionsValidatorTests.Validate_WithTimeoutSecondsAtLimits_Succeeds` e `EnglishTutorAppTests.RunAsync_WhenTimeoutSecondsIsZero_ExitsWithInvalidConfigurationBeforePrompt`. Falham pela asserção (padrão 0; nenhuma falha de validação; o app abre a sessão e sai com 0), exceto `Validate_WithTimeoutSecondsAtLimits_Succeeds`, que nasce verde porque o validador ainda não confere a faixa.
   Green: inicializador 60, regra do validador, `"TimeoutSeconds": 60` no `appsettings.json`.
   Mutação depois do Green (S3), para `ClaudeCodeOptionsValidatorTests.Validate_WithTimeoutSecondsAtLimits_Succeeds`: "o limite inferior aceito passa a ser 2" (o caso 1 falha) e, separadamente, "o limite superior aceito passa a ser 3599" (o caso 3600 falha); cada uma desfeita pela edição inversa.
   Commits: `test(brain): cover TimeoutSeconds default and range` + `feat(brain): add Brain:ClaudeCode:TimeoutSeconds with validation`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T2 — Tempo máximo por chamada.
+- [x] T2 — Tempo máximo por chamada. feito: c545c9f (test), 0d782f9 (feat), 25ca6c7 (refactor).
   Red: pacote `Microsoft.Extensions.TimeProvider.Testing` (§6); `FakeProcessRunner.HangsUntilCancelled(Action? onCancelled = null)` (§2.9); `_timeProvider` passa a `FakeTimeProvider`; `ClaudeCodeFailures` com `Timeout(int, OperationCanceledException)` lançando `NotImplementedException`; sai `ClaudeCodeTutorBrainTests.SendAsync_Always_PassesCallerTokenToProcessRunner`; testes `ClaudeCodeTutorBrainTests.SendAsync_WhenProcessDoesNotAnswerWithinTimeout_CancelsProcessAndThrowsTimeout`, `ClaudeCodeTutorBrainTests.SendAsync_OnEachCall_StartsTimeoutAgain` e `ClaudeCodeTutorBrainTests.SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation` (falham pelo `WaitAsync` de 10 s: o adaptador ainda não tem relógio, o `Advance` não cancela nada e o fake não termina) e `ClaudeCodeTutorBrainTests.SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout`, que nasce verde (o token do chamador ainda vai direto ao runner): Red por mutação temporária pelo efeito, aplicada no próprio Red porque o repasse do token já existe, "o cancelamento do chamador deixa de chegar ao runner" (o fake não termina e o teste falha pelo `WaitAsync` de 10 s, com `TimeoutException`, sem travar a suíte; R2-S3), desfeita pela edição inversa.
   Green: §2.2 (só o `catch` de `OperationCanceledException`, com o filtro completo; o de `Win32Exception` é da T3 e, até lá, a `Win32Exception` continua propagando como na US-004) e a mensagem `Timeout` da §2.5.
   Mutação depois do Green (S2, S3), para `ClaudeCodeTutorBrainTests.SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation`: "a condição do chamador deixa de contar no filtro do `Timeout`" (o teste recebe `BrainException(Timeout)` e falha), desfeita pela edição inversa.
   Refactor: apagar `ManualTimeProvider.cs` (Grep sem outro uso).
   Commits: `test(brain): cover Claude Code timeout and caller cancellation` + `feat(brain): stop Claude Code after TimeoutSeconds` + `refactor(brain): replace ManualTimeProvider with FakeTimeProvider`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T3 — Executável que não pode ser iniciado.
+- [x] T3 — Executável que não pode ser iniciado. feito: 17ef943 (test), f973492 (feat).
   Red: `FakeProcessRunner.Throws(Exception)`; `ClaudeCodeFailures.StartFailed(string, Win32Exception)` lançando `NotImplementedException`; testes `ClaudeCodeTutorBrainTests.SendAsync_WhenExecutableIsNotFound_ThrowsCliNotFoundWithInstallInstructionAndKey` e `ClaudeCodeTutorBrainTests.SendAsync_WhenExecutableCannotBeStartedForOtherReason_ThrowsUnknownWithErrorCode` (falham: a `Win32Exception` propaga).
   Green: `catch (Win32Exception)` da §2.2, tabela da §2.3, mensagens da §2.5; comentários de `IProcessRunner.cs` e `ProcessRunner.cs` (§2.3, §2.9).
   Commits: `test(brain): cover missing Claude Code executable` + `feat(brain): classify missing Claude Code CLI as CliNotFound`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T4a — Gravação das fixtures de erro (sem código de produção).
+- [x] T4a — Gravação das fixtures de erro (sem código de produção). feito: 4470b74.
   Rodar `claude auth --help` e `claude --help` e colar nas Evidências o trecho que mostra `auth login` (P2); se `claude auth login` não existir, parar e registrar na §12. Gravar `not-authenticated` e `unknown-model` com o bloco da §2.7 (mesmos argumentos de isolamento do adaptador, S4); registrar nas Evidências o código de saída de `unknown-model` e a linha da §2.4 em que ela cai (1 ou 3; linha 2 = parar, §2.7; R2-S2); montar `usage-limit-synthetic-1` e `usage-limit-synthetic-2`; escrever o `README.md`, com a seção "Diferenças em relação à chamada do adaptador" (§2.7, P18); rodar o D14.
   Commit: `test(brain): record Claude Code error fixtures`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T4b — Classificação por texto.
+- [x] T4b — Classificação por texto. feito: 6269814 (test), d048663 (feat).
   Red: `ClaudeErrorFixtures` (Support); `ClaudeCodeFailures.Classify` devolvendo sempre `BrainErrorKind.Unknown` e `NotAuthenticated(string)`/`UsageLimitReached(string)` lançando `NotImplementedException`; testes `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedNotAuthenticatedOutput_ThrowsNotAuthenticatedAskingForAuthLogin`, `ClaudeCodeTutorBrainTests.SendAsync_WithUsageLimitOutput_ThrowsUsageLimitReached` e `ClaudeCodeTutorBrainTests.SendAsync_WhenFailureTextNamesAKind_ClassifiesByRowAndSource` (falham, exceto os casos 9 e 10, que esperam `Unknown` e nascem verdes porque o esqueleto já devolve `Unknown`; os casos 11 e 12 falham), e `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedUnknownFailureOutput_ThrowsUnknownWithDetail`, que nasce verde pelo mesmo motivo (caracterização).
   Green: §2.4 e as duas mensagens da §2.5; comentário do `ClaudeCodeOutput.cs` (§2.9). Se o texto gravado não casar com a linha a, ver §2.4 (padrão novo, com §12).
   Mutações depois do Green (S3), cada uma desfeita pela edição inversa: "a linha 2 passa a ser classificada" (caso 9 de `ClaudeCodeTutorBrainTests.SendAsync_WhenFailureTextNamesAKind_ClassifiesByRowAndSource` falha); "`rate_limit` passa a contar como limite de uso" (caso 10 falha); "quando nenhum padrão casa (ordem c da §2.4), o `Classify` passa a devolver `NotAuthenticated` em vez de `Unknown`" (R2-S2: vale para as linhas 1 e 3 ao mesmo tempo, então atinge `ClaudeCodeTutorBrainTests.SendAsync_WithRecordedUnknownFailureOutput_ThrowsUnknownWithDetail` qualquer que seja a linha registrada na T4a; o teste falha pela asserção de `Kind`, não por `NotImplementedException`; o caso 10 também falha, o que é esperado). Nas Evidências, o Executor cita a linha registrada na T4a ao lado do resultado dessa mutação.
   Commits: `test(brain): cover Claude Code failure classification` + `feat(brain): classify not-authenticated and usage-limit failures`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T5 — Console: a falha do cérebro não encerra a sessão.
+- [x] T5 — Console: a falha do cérebro não encerra a sessão. feito: 615804c (test), 9d678a7 (feat).
   Red: `ConsoleText.BrainFailed` e `AppLog.BrainFailed` lançando `NotImplementedException` (o gerador de `LoggerMessage` exige `partial`: o esqueleto do log é o próprio método parcial, sem chamada ainda); construtor novo do `ConversationInputHandler` (guarda `error` e `logger`, ainda sem `catch`); **`EnglishTutorApp.RunSessionAsync` passa a construir o handler com `options.Error` e o logger (§2.6), sem `catch` e sem mudar comportamento, para o Red compilar (S7)**; `MissingExecutableProcessRunner`; atualizar o construtor em `ConversationInputHandlerTests`; sai `EnglishTutorAppTests.RunAsync_WhenBrainFails_ReturnsOneAndShowsUnexpectedError` com os dois comentários; testes `EnglishTutorAppTests.RunAsync_WhenBrainFails_ShowsErrorAndContinuesSession`, `EnglishTutorAppTests.RunAsync_WhenClaudeExecutableIsNotFound_ShowsCliNotFoundInstructionAndContinues`, `EnglishTutorAppTests.RunAsync_WhenBrainFails_LogsBrainFailedWarningWithKind`, `ConversationInputHandlerTests.HandleAsync_WhenBrainFails_WritesMessageAndNextStepToErrorOnly` (falham: a exceção propaga e o app sai com 1) e `ConversationInputHandlerTests.HandleAsync_WhenFailureIsNotBrainException_PropagatesIt`, que nasce verde: Red por mutação temporária pelo efeito, aplicada no próprio Red (ela acrescenta comportamento, não depende da regra), "o handler passa a capturar qualquer exceção" (os 2 casos falham), desfeita pela edição inversa.
   Green: §2.6; comentário do `ConversationInputHandler.cs` (§2.9).
   Commits: `test(console): cover brain failures that keep the session` + `feat(console): show brain failures and keep the session`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T6 — Contrato real do `ProcessRunner` (`LiveBrain`, caracterização).
+- [x] T6 — Contrato real do `ProcessRunner` (`LiveBrain`, caracterização). feito: 66e37c6.
   Testes `ProcessRunnerLiveTests.RunAsync_WhenExecutableDoesNotExist_ThrowsWin32ExceptionWithFileNotFoundCode` e `ProcessRunnerLiveTests.RunAsync_WhenCancelled_KillsWholeProcessTree`, com `[Trait("Category", "LiveBrain")]` (P7). Nascem verdes. Red por mutação temporária pelo efeito (o runner real já existe, então a mutação vale aqui), desfeita pela edição inversa: "a falha de início deixa de chegar ao chamador como `Win32Exception`" (1º teste falha) e "o encerramento deixa de incluir os processos netos" (o arquivo `finished` aparece e o 2º falha). Rodar o D10.
   Commit: `test(infra): cover ProcessRunner start failure and process tree kill`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T7 — DoD e evidências.
+- [x] T7 — DoD e evidências. feito: ver commit `docs(ai): add DoD evidence for US-005`.
   Rodar D1–D17 (D16 depois de todo o código), colar nas Evidências com data e hash, atualizar as contagens da §4 e de D2/D8 se algo mudou (AP-031).
   Commit: `docs(ai): add US-005 evidence`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
 ## 6. Pacotes NuGet
 
@@ -546,7 +546,45 @@ Também entram, da DoD comum:
 
 ## 11. Evidências
 
-_Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+Data: 2026-10-21. Hash do código da US: `66e37c6` (último commit de código; as evidências vêm no commit seguinte). Ambiente dos comandos com CLI real: Windows PowerShell 5.1, sem `CLAUDECODE`, `ANTHROPIC_BASE_URL` e `CLAUDE_CODE_*`; `claude --version` = 2.1.304.
+
+**Controles e fixtures**
+
+- D16c (T1, antes do primeiro teste): `git grep` em `f033915` acusou `ProcessRunner.cs`, `ConversationInputHandler.cs`, `ClaudeCodeOutput.cs`, `EnglishTutorAppTests.cs` (3 padrões), `ClaudeCodeTutorBrainTests.cs`, `ManualTimeProvider.cs` e `ARCHITECTURE.md` (linha 212); padrões e caminhos enxergam o texto antigo.
+- T4a, P2: `claude auth --help` lista `login [options]   Sign in to your Anthropic account`, `logout` e `status`; `claude auth login` existe.
+- T4a, `not-authenticated`: gravado de primeira com `CLAUDE_CONFIG_DIR` vazio (sem `ANTHROPIC_API_KEY` inválida); código 1, stdout JSON `type: result`, `is_error: true`, `result` = `Not logged in · Please run /login`, stderr vazio. Casa com a linha a (`not logged in`, `/login`).
+- T4a, `unknown-model`: código de saída 1; stdout é o JSON `type: result` com `is_error: true` (`api_error_status: 404`); stderr `[claude-code:unrecognized_model] ...`; cai na **linha 1** da §2.4; o `result` ecoa `nao-existe-us005`. Nenhum padrão da lista casa (fica `Unknown`). Sem parada: não caiu na linha 2.
+- Mutações depois do Green, todas desfeitas pela edição inversa e `git status --short` limpo em `src/`:
+  - T1: limite inferior 2 → `Validate_WithTimeoutSecondsAtLimits_Succeeds(1)` falhou; limite superior 3599 → `(3600)` falhou.
+  - T2 (Red): token do chamador deixa de chegar ao runner → `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout` falhou com `TimeoutException` em 10 s. Depois do Green: filtro sem `!ct.IsCancellationRequested` → `SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation` falhou (recebeu `BrainException`).
+  - T4b: linha 2 classificada → caso 9 falhou; `rate_limit` como limite → caso 10 falhou; "nenhum padrão → `NotAuthenticated`" → 7 falhas, entre elas `SendAsync_WithRecordedUnknownFailureOutput_ThrowsUnknownWithDetail` (fixture na **linha 1**) e o caso 10, pela asserção de `Kind`.
+  - T5 (Red): handler captura qualquer exceção → os 2 casos de `HandleAsync_WhenFailureIsNotBrainException_PropagatesIt` falharam.
+  - T6: início deixa de lançar `Win32Exception` → 1º teste falhou; `Kill(entireProcessTree: false)` → `finished` apareceu e o 2º falhou.
+
+**Definition of Done**
+
+| # | Resultado |
+|---|---|
+| D1 | `dotnet build` → 0 avisos, 0 erros (2026-10-21, 66e37c6) |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` → 286 passed, 0 failed (Core 134, Infrastructure 101, Console 51), 4,6 s no total, incluindo build (2026-10-21, 66e37c6) |
+| D3 | gerou 3 `coverage.cobertura.xml` (um por projeto de teste) (2026-10-21, 66e37c6) |
+| D3b | reportgenerator: `EnglishTutor.Core` 100% de linhas (meta ≥ 80%); cobertura de linhas da solução 89,2% (2026-10-21, 66e37c6) |
+| D4 | `dotnet format --verify-no-changes` → exit 0, sem diferenças (2026-10-21, 66e37c6) |
+| D5 | `dotnet test --filter "Category!=LiveBrain&FullyQualifiedName~ClaudeCode"` → 69 passed, 0 failed; inclui um teste por tipo (CliNotFound, NotAuthenticated, UsageLimitReached, Timeout, Unknown) (2026-10-21, 66e37c6) |
+| D6 | PowerShell 5.1 com pipe: duas vezes `The tutor could not answer: Claude Code CLI not found ("nao-existe")...` com `irm https://claude.ai/install.ps1 \| iex` e `Brain:ClaudeCode:ExecutablePath`, cada uma seguida de `You can send a sentence again or type /quit to exit.`; sem `An unexpected error occurred`; `exit=0` (2026-10-21, 66e37c6) |
+| D7 | `FullyQualifiedName~EnglishTutorAppTests` → 25 passed; `ReturnsOneAndShowsUnexpectedError` não existe; `RunAsync_WhenBrainFails_ShowsErrorAndContinuesSession` listado com 5 casos (2026-10-21, 66e37c6) |
+| D8 | `FullyQualifiedName~ClaudeCodeTutorBrainTests` → 53 passed (2026-10-21, 66e37c6) |
+| D9 | `appsettings.json:8: "TimeoutSeconds": 60,` dentro de `Brain:ClaudeCode` (2026-10-21, 66e37c6) |
+| D10 | 3 rodadas de `ProcessRunnerLiveTests`: `round 1/2/3 exit=0`, 2 testes por rodada, 6 s cada (2026-10-21, 66e37c6) |
+| D11 | `TimeoutSeconds=1`: `The tutor could not answer: Claude Code did not answer in time (limit: 1 s) and was stopped...`; sem erro inesperado; `exit=0` (2026-10-21, 66e37c6) |
+| D12 | `CLAUDE_CONFIG_DIR` vazio: `Claude Code is not logged in (Not logged in · Please run /login). Run "claude auth login"...` e a frase de `ANTHROPIC_API_KEY`; `exit=0` (2026-10-21, 66e37c6) |
+| D13 | 3 rodadas de `ClaudeCodeTutorBrainLiveTests`, ambiente limpo: `round 1/2/3 exit=0`, 3 testes por rodada, 41 a 43 s (2026-10-21, 66e37c6) |
+| D14 | `Select-String ... 'Users','@','sk-ant'` → nenhuma linha; inspeção: sem nome do titular da conta (2026-10-21, 66e37c6) |
+| D15 | contagem `0`, código de saída 1 (esperado) (2026-10-21, 66e37c6) |
+| D16 | `scanned=117 named=1`; nenhuma linha (2026-10-21, 66e37c6) |
+| D17 | `git status --short` vazio depois de D2–D16 (2026-10-21, 66e37c6) |
+
+Contagens da §4 conferidas contra a execução: Core 134, Console 41 → 51, Infrastructure 74 → 101 (`ClaudeCodeTutorBrainTests` 53 casos), total 286; `LiveBrain` +2. Sem mudança em relação ao plano.
 
 ## 12. Comentários do usuário
 
@@ -601,3 +639,7 @@ Plano aprovado com a condição de incorporar as sugestões S1 a S8 de `tasks/US
 
 - **R3-S1** → §12 (resposta a R2-S1). Conferido contra a tabela da §4 e a §2.7 antes de escrever: `hit your limit` está no stderr (caso 7, `usage-limit-synthetic-2`) e no `result` de erro (caso 12); `usage limit` está só no `result` de erro (casos 6 e 8, `usage-limit-synthetic-1`). A frase passa a dizer só isso e que o AP-041 pede um caso por padrão e um por fonte, não cada padrão nas duas fontes; nenhum caso novo.
 - **R3-S2** → §4 (asserção de `SendAsync_OnEachCall_StartsTimeoutAgain`): a 2ª chamada fica pendente com `HangsUntilCancelled()`, e a espera pela tarefa dela usa `WaitAsync(TimeSpan.FromSeconds(10))`, então o Red (adaptador sem relógio) falha com `TimeoutException` em 10 s. Com isso a descrição de cada um dos quatro testes que a §7 cita declara a espera limitada. A §5 T2 e a §7 já diziam isso e não mudam.
+
+### 2026-10-21 — Executor
+
+- Versão do pacote `Microsoft.Extensions.TimeProvider.Testing`: o plano dizia "última estável 10.x"; foi fixada a `10.11.0` (a mais recente na pesquisa do NuGet em 2026-10-21), em `Directory.Packages.props` (commit `c545c9f`). Não estava prevista no §12 antes do commit; registrada aqui.
