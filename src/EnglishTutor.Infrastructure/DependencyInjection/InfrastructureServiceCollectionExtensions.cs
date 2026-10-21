@@ -26,6 +26,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.TryAddSingleton<ITutorBrain, ClaudeCodeTutorBrain>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<ClaudeCodeOptions>, ClaudeCodeOptionsValidator>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<OllamaOptions>, OllamaOptionsValidator>());
         return services;
     }
 }

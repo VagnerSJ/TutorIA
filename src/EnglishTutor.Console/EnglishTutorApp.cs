@@ -139,6 +139,9 @@ public static class EnglishTutorApp
         builder.Services.AddOptions<ClaudeCodeOptions>()
             .Bind(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName))
             .ValidateOnStart();
+        builder.Services.AddOptions<OllamaOptions>()
+            .Bind(builder.Configuration.GetSection(OllamaOptions.SectionName))
+            .ValidateOnStart();
         builder.Services.AddOptions<ConversationOptions>()
             .Bind(builder.Configuration.GetSection(ConversationOptions.SectionName))
             .ValidateOnStart();

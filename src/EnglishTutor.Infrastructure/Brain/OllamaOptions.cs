@@ -22,13 +22,13 @@ public sealed class OllamaOptions
 
     public const double MaxTemperature = 2;
 
-    public string Endpoint { get; set; } = string.Empty;
+    public string Endpoint { get; set; } = DefaultEndpoint;
 
-    public string Model { get; set; } = string.Empty;
+    public string Model { get; set; } = DefaultModel;
 
-    public double Temperature { get; set; }
+    public double Temperature { get; set; } = DefaultTemperature;
 
-    public string OutputMode { get; set; } = string.Empty;
+    public string OutputMode { get; set; } = BrainOutputModes.JsonSchema;
 
-    public int TimeoutSeconds { get; set; }
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 }
