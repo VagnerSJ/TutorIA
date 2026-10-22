@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using EnglishTutor.Core.Brain;
@@ -208,6 +210,119 @@ public sealed class OllamaTutorBrainTests : IDisposable
         _logger.Entries.Should().NotContain(e =>
             e.Message.Contains("student t1", StringComparison.Ordinal)
             || e.Message.Contains("Reply t1?", StringComparison.Ordinal));
+    }
+
+    // US-006 — Cenário: Ollama indisponível — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenNothingAnswers_ThrowsNotRunningWithStartInstructionAndKey()
+    {
+        var original = new HttpRequestException(HttpRequestError.ConnectionError, "refused t1", new SocketException());
+        _chatClient.Throws(original);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Contain("Ollama is not running at \"http://ollama-test:1234\"")
+            .And.Contain("ollama serve")
+            .And.Contain("Brain:Ollama:Endpoint")
+            .And.NotContain("refused t1");
+        exception.InnerException.Should().BeSameAs(original);
+    }
+
+    // US-006 — Cenário: modelo não baixado — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenModelIsNotDownloaded_ThrowsPullCommandForConfiguredModel()
+    {
+        var original = new HttpRequestException(HttpRequestError.Unknown, "gone t2", inner: null, HttpStatusCode.NotFound);
+        _chatClient.Throws(original);
+        var sut = CreateSut(options => options.Model = "model-t2");
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Contain("Ollama model \"model-t2\" is not downloaded")
+            .And.Contain("ollama pull model-t2")
+            .And.Contain("Brain:Ollama:Model")
+            .And.NotContain("Ollama is not running");
+        exception.InnerException.Should().BeSameAs(original);
+    }
+
+    // US-006 — Cenários: Ollama indisponível / modelo não baixado (apoio: tabela da §2.3, uma linha e uma condição por caso)
+    [Theory]
+    [InlineData(1, "Ollama is not running at \"http://ollama-test:1234\"")]
+    [InlineData(2, "Ollama is not running at \"http://ollama-test:1234\"")]
+    [InlineData(3, "ollama pull model-t0")]
+    [InlineData(4, "ollama pull model-t0")]
+    [InlineData(5, "Ollama failed (boom t5)")]
+    [InlineData(6, "ollama pull model-t0")]
+    public async Task SendAsync_WhenServerCallFails_ClassifiesByStatusAndText(int caseNumber, string expectedFragment)
+    {
+        var original = caseNumber switch
+        {
+            1 => new HttpRequestException(HttpRequestError.ConnectionError, "refused t1", new SocketException()),
+            2 => new HttpRequestException(HttpRequestError.NameResolutionError, "dns t2"),
+            3 => new HttpRequestException(HttpRequestError.Unknown, "gone t3", inner: null, HttpStatusCode.NotFound),
+            4 => new HttpRequestException(HttpRequestError.Unknown, "model \"m\" not found t4", inner: null, HttpStatusCode.BadRequest),
+            5 => new HttpRequestException(HttpRequestError.Unknown, "boom t5", inner: null, HttpStatusCode.InternalServerError),
+            _ => new HttpRequestException(HttpRequestError.ConnectionError, "model m not found t6"),
+        };
+        _chatClient.Throws(original);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Contain(expectedFragment);
+        exception.InnerException.Should().BeSameAs(original);
+        if (caseNumber == 5)
+        {
+            exception.Message.Should().StartWith("Ollama failed (").And.EndWith(
+                "Check that the Ollama server is healthy and that Brain:Ollama:Endpoint points to it.");
+        }
+
+        if (caseNumber == 6)
+        {
+            exception.Message.Should().NotContain("Ollama is not running");
+        }
+    }
+
+    // US-006 — Cenário: Ollama indisponível (apoio: <detalhe> da falha genérica, P9, B1)
+    [Theory]
+    [InlineData("first t8\nsecond t8\nat Stack.Frame t8", "first t8")]
+    [InlineData("\n   \nline t9\nafter t9", "line t9")]
+    [InlineData("  padded t10  \r\nafter t10", "padded t10")]
+    [InlineData("", "no error details were provided")]
+    [InlineData("  \n \t ", "no error details were provided")]
+    public async Task SendAsync_WhenServerFailureDetailVaries_UsesFirstNonBlankLineOrFallback(string message, string expectedDetail)
+    {
+        var original = new HttpRequestException(HttpRequestError.Unknown, message, inner: null, HttpStatusCode.InternalServerError);
+        _chatClient.Throws(original);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Be(
+            $"Ollama failed ({expectedDetail}). Check that the Ollama server is healthy and that Brain:Ollama:Endpoint points to it.");
+        exception.InnerException.Should().BeSameAs(original);
+    }
+
+    // US-006 — Cenário: Ollama indisponível (apoio: só falha do servidor é traduzida)
+    [Fact]
+    public async Task SendAsync_WhenFailureIsNotFromTheServer_PropagatesIt()
+    {
+        var original = new InvalidOperationException("bug t1");
+        _chatClient.Throws(original);
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(original);
     }
 
     public void Dispose()

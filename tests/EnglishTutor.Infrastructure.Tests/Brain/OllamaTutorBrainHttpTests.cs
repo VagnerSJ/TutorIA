@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
 using System.Text.Json.Nodes;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Brain;
@@ -91,6 +93,53 @@ public sealed class OllamaTutorBrainHttpTests : IDisposable
         ReplySentences.Split(reply.Reply).Count(ReplySentences.IsQuestion).Should().Be(1);
         reply.Corrections.Should().NotBeEmpty();
         reply.RawText.Should().StartWith("{");
+    }
+
+    // US-006 — Cenário: modelo não baixado (resposta gravada de verdade) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WithRecordedModelNotFoundResponse_ThrowsPullCommandForConfiguredModel()
+    {
+        var status = (HttpStatusCode)int.Parse(Fixture.Read("Ollama/model-not-found.status.txt").Trim(), CultureInfo.InvariantCulture);
+        _handler.Returns(status, Fixture.Read("Ollama/model-not-found.json"));
+        var sut = CreateSut(options => options.Model = "model-t2");
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Contain("ollama pull model-t2");
+        exception.InnerException.Should().BeOfType<HttpRequestException>()
+            .Which.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // US-006 — Cenário: Ollama indisponível (no fio: conexão recusada) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenConnectionIsRefused_ThrowsNotRunningWithEndpoint()
+    {
+        _handler.Throws(new HttpRequestException(HttpRequestError.ConnectionError, "refused t1", new SocketException()));
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().Contain("Ollama is not running at \"http://ollama-test:1234\"");
+    }
+
+    // US-006 — Cenário: Ollama indisponível (apoio: falha genérica no fio) — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenServerFails_ThrowsUnknownWithGenericMessage()
+    {
+        _handler.Returns(HttpStatusCode.InternalServerError, "{\"error\":\"boom t7\"}");
+        var sut = CreateSut();
+
+        var act = () => sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Unknown);
+        exception.Message.Should().StartWith("Ollama failed (").And.EndWith(
+            "Check that the Ollama server is healthy and that Brain:Ollama:Endpoint points to it.")
+            .And.NotContain("Ollama is not running").And.NotContain("ollama pull");
     }
 
     public void Dispose()
