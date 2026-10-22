@@ -302,6 +302,24 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().BeEmpty();
     }
 
+    // US-007 — Cenário: reserva igual ao primário — RN-BRAIN08
+    [Fact]
+    public async Task RunAsync_WhenFallbackProviderEqualsProvider_ExitsWithInvalidConfigurationBeforePrompt()
+    {
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode", extraValues: new Dictionary<string, string?> { ["Brain:FallbackProvider"] = "claudecode" }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("is the same as Brain:Provider 'ClaudeCode'");
+        _output.ToString().Should().BeEmpty();
+    }
+
     // US-005 — Cenário: tempo esgotado (apoio: chave inválida encerra antes do prompt) — RN-BRAIN09
     [Fact]
     public async Task RunAsync_WhenTimeoutSecondsIsZero_ExitsWithInvalidConfigurationBeforePrompt()
@@ -343,6 +361,8 @@ public sealed class EnglishTutorAppTests : IDisposable
     [Theory]
     [InlineData("Inexistente", "Brain:ClaudeCode:OutputMode", "JsonSchema",
         "Brain:Provider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.")]
+    [InlineData("ClaudeCode", "Brain:FallbackProvider", "Inexistente",
+        "Brain:FallbackProvider 'Inexistente' is invalid. Accepted values: ClaudeCode, Ollama.")]
     [InlineData("ClaudeCode", "Brain:ClaudeCode:OutputMode", "Json",
         "Brain:ClaudeCode:OutputMode 'Json' is invalid. Accepted values: JsonSchema, Tags.")]
     [InlineData("ClaudeCode", "Brain:Ollama:TimeoutSeconds", "0",
