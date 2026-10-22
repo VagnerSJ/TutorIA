@@ -497,7 +497,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** variação inversa do AP-044: ao apagar a classe e a constante antes de editar os usos, o hook `post-edit-dotnet` devolveu erro de símbolo inexistente até o último uso ser removido. Removendo os usos primeiro e a declaração por último, o hook não acusou erro intermediário.
 - **Por que importa:** ruído no feedback rápido e risco de "corrigir" um erro que desaparece sozinho.
 - **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md` (junto do AP-044): "para remover um tipo ou membro, remova primeiro os usos e por último a declaração; para criar, declare primeiro e use depois".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-22, ver commit "docs(ai): apply learning 053")
 
 ### AP-054 — Plano cobre o caminho feliz de `<placeholder>` e de condicionais; Revisor cita nome de branch sem conferir
 
