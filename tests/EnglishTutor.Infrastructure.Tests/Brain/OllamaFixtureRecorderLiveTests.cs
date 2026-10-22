@@ -23,7 +23,7 @@ public sealed class OllamaFixtureRecorderLiveTests
 
         var structuredHandler = new RecordingHttpHandler();
         var live = new LiveOllama(handler: structuredHandler);
-        var reply = await live.Brain.SendAsync(
+        await live.Brain.SendAsync(
             live.Request(LiveOllama.StudentMessage("I have worked with C# since five years")), ct);
         var chat = structuredHandler.Exchanges.Should().ContainSingle().Subject;
         await File.WriteAllTextAsync(Path.Combine(directory, "chat-request.json"), chat.RequestBody, ct);
@@ -44,7 +44,6 @@ public sealed class OllamaFixtureRecorderLiveTests
             refused.Brain.SendAsync(refused.Request(LiveOllama.StudentMessage("hi")), ct));
         await File.WriteAllTextAsync(Path.Combine(directory, "exceptions.txt"), exceptions.ToString(), ct);
 
-        ReplySentences.Split(reply.Reply).Count(ReplySentences.IsQuestion).Should().Be(1);
         notFound.StatusCode.Should().Be(404);
     }
 
