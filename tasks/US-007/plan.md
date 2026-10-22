@@ -288,35 +288,35 @@ Convenções: o Red de cada tarefa lista o que **nasce verde** (declarado) e o q
   Green: `BrainOptionsValidator` coleta falhas (Provider, depois FallbackProvider, §2.1) com as mensagens exatas.
   Refactor: constantes das mensagens agrupadas, sem mudar os textos de `Provider`.
   Commit: `test(core): cover Brain:FallbackProvider validation` + `feat(core): validate Brain:FallbackProvider`.
-  Escolhas de forma: nenhuma | §12 em `<hash>`
+  Escolhas de forma: nenhuma
 
 - [x] **T2 — Política e porta do aviso no Core** (feito: test bd42857, feat 3a7645a)
   Red: P1, P2, P3 de `BrainFallbackPolicyTests`, com `BrainFallbackPolicy.ShouldFallBack` devolvendo `false` e `BrainSwitchNotice`/`IBrainSwitchNotifier` só como tipos. Falha: P1 (4 linhas). Nascem verdes: P2 (devolve `false` mesmo) e P3 (só conta o enum).
   Green: `ShouldFallBack` verdadeiro para os 4 tipos da RN-BRAIN08.
   Refactor: nenhum previsto.
   Commit: `test(core): cover the fallback policy` + `feat(core): add fallback policy and switch notice port`.
-  Escolhas de forma: nenhuma | §12 em `<hash>`
+  Escolhas de forma: nenhuma
 
 - [x] **T3 — `FallbackTutorBrain`** (feito: test 014d1ee, feat d08b7c6)
   Red: `StubTutorBrain`, `RecordingBrainSwitchNotifier`, F1–F14 de `FallbackTutorBrainTests` e F15 de `FallbackTutorBrainConversationTests`, com `SendAsync` apenas repassando `primary.SendAsync` (sem catch). Nascem verdes: F1, F2, F6, F7, F8 (repassar já cumpre). Falham: F3, F4, F5, F9, F10, F11, F12, F13, F14, F15. Mutação depois do Green: trocar o filtro do `catch` por `catch (Exception)` quebra F7 e F8; ignorar `ShouldFallBack` quebra F6.
   Green: §2.3 e `FallbackLog` (EventId 2003).
   Refactor: nenhum previsto.
   Commit: `test(brain): cover the fallback decorator` + `feat(brain): add FallbackTutorBrain`.
-  Escolhas de forma: nenhuma | §12 em `<hash>`
+  Escolhas de forma: §12 em 6594ede (registrado depois do feat; desvio da AP-009 explicado no §12)
 
 - [x] **T4 — `BrainFactory`, DI e fim do seletor provisório** (feito: test e138b09, feat e673750)
   Red: B1–B6 de `BrainFactoryTests` (com `Create()` lançando `NotImplementedException`), DI1–DI5 em `InfrastructureServiceCollectionExtensionsTests` (DI1 é o teste renomeado), mais C1, C4 e C5 de `EnglishTutorAppTests` e o `FixedResultProcessRunner`. Falham: B1–B6 (inclui B5), DI2, DI3 (o aviso não chega ao notificador registrado: o seletor provisório ignora as chaves e o reserva, §4), DI4, DI5. Entre os DI, só DI1 nasce verde. Nascem verdes: DI1 (o `ITutorPromptSource` já é registrado), os dois testes de resolução existentes, C1 (o cabeçalho já usa o nome canônico), C4 (sem reserva, o seletor atual devolve o Claude Code puro) e C5 (o `Unknown` do primário propaga; o seletor atual ignora o reserva). Mutações depois do Green: C4 — a fábrica embrulhar o primário num decorator com o Ollama quando `FallbackProvider` é vazio quebra C4 e B2; C5 — `ShouldFallBack` devolver `true` para `Unknown` quebra C5 e P2; C1 — o cabeçalho mostrar sempre `ClaudeCode` quebra C1; DI3 — trocar o `TryAddSingleton` do `SilentBrainSwitchNotifier` por `AddSingleton` quebra DI3.
   Green: §2.4; a fábrica devolve o primário ou o decorator; `SilentBrainSwitchNotifier`; remove o bloco `Provisional selector` e atualiza o comentário do cabeçalho.
   Refactor: nenhum previsto.
   Commit: `test(brain): cover the brain factory` + `feat(brain): replace the provisional selector with BrainFactory`.
-  Escolhas de forma: nenhuma | §12 em `<hash>`
+  Escolhas de forma: §12 em 6594ede (registrado depois do feat; desvio da AP-009 explicado no §12)
 
 - [x] **T5 — Aviso no console e ligação ponta a ponta** (feito: test 7cd48a1, feat a712b33)
   Red: C8, C9, C10 de `ConsoleTextTests`, C11 de `ConsoleBrainSwitchNotifierTests`, C12 de `AppSettingsTests`, C2 e C3 de `EnglishTutorAppTests`, com `ConsoleText.BrainSwitched` e `ConsoleBrainSwitchNotifier` só como esqueleto (`BrainSwitched` devolve `string.Empty`, `NotifyAsync` não escreve) e sem o registro no `BuildHost`. Falham: C8, C9, C10 (não lança), C11, C12 (o `appsettings.json` ainda não tem a chave), C2 e C3 (a linha `Switched to` não aparece: o notificador padrão é silencioso). Nenhum teste da tarefa nasce verde. Mutação depois do Green: registrar o notificador do console **depois** de `AddEnglishTutorInfrastructure` (o `TryAdd` da Infrastructure vence) quebra C2 e C3.
   Green: §2.5; `appsettings.json` com `"FallbackProvider": ""`.
   Refactor: nenhum previsto.
   Commit: `test(console): cover the switch notice and fallback end to end` + `feat(console): show the fallback switch notice`.
-  Escolhas de forma: nenhuma | §12 em `<hash>`
+  Escolhas de forma: §12 em 6594ede (registrado depois do feat; desvio da AP-009 explicado no §12)
 
 ## 6. Pacotes NuGet
 
@@ -386,6 +386,26 @@ Notas: D8 e D9 rodam no ambiente do desenvolvedor; o `claude` real não é chama
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+Código da US no commit a712b33 (2026-10-22); a única mudança depois dele é este `plan.md`.
+
+| # | Comando | Resultado |
+|---|---|---|
+| D1 | `dotnet build` | 0 avisos, 0 erros (2026-10-22, a712b33) |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | Core 155, Infrastructure 209, Console 71: 435 passed, 0 failed, < 1 s por projeto (2026-10-22, a712b33) |
+| D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | `EnglishTutor.Core` line-rate 0,9822 no relatório do Core.Tests (o do Infrastructure.Tests e o do Console.Tests mostram o Core parcial, 0,7494 e 0,8181; a meta vale para a suíte do Core) (2026-10-22, a712b33) |
+| D4 | `dotnet format --verify-no-changes` | código de saída 0 (2026-10-22, a712b33) |
+| D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory|FullyQualifiedName~FallbackTutorBrain"` | 32 passed, 0 failed (2026-10-22, a712b33) |
+| D6 | PowerShell 5.1: `Brain__Provider=Ollama` com `/quit` | cabeçalho `Brain: Ollama | Mode: free-conversation`; `exit=0` (2026-10-22, a712b33) |
+| D7 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha (código de saída 1) (2026-10-22, a712b33) |
+| D8 | PowerShell 5.1, Ollama rodando com `qwen2.5:14b-instruct-q4_K_M` | `> Switched to Ollama (CLI not found)` seguida de `Tutor: That's great experience with C#. How do you like working with ASP.NET Core?` e do feedback; `exit=0`; variáveis `Brain__*` removidas (2026-10-22, a712b33). O prefixo `> ` é o prompt (ver §12) |
+| D9 | PowerShell 5.1: `Brain__ClaudeCode__ExecutablePath="claude-missing-us007"` | `The tutor could not answer: Claude Code CLI not found ("claude-missing-us007")` e `You can send a sentence again or type /quit to exit.` na saída de erro; nenhuma linha `Switched to`; `exit=0` (2026-10-22, a712b33) |
+| D10 | filtro de política, validador, `ConsoleBrainSwitchNotifier`, `ConsoleText`, `AppSettings` | 23 (Core) + 9 (Console) passed, 0 failed (2026-10-22, a712b33) |
+| D11 | `dotnet test --filter "FullyQualifiedName~EnglishTutorAppTests"` | 36 passed, 0 failed (2026-10-22, a712b33) |
+| D12 | `git grep -n -F "Always_RegistersClaudeCodeBrainAndFilePromptSource" -- src tests prompts docs` | nenhuma linha (código de saída 1) (2026-10-22, a712b33) |
+| D13 | `git grep -n -F "IBrainSwitchNotifier" -- ARCHITECTURE.md` | linhas 56 e 109 (2026-10-22, a712b33) |
+| D14 | `git diff develop...HEAD | LC_ALL=C grep -c ...` | `0` (2026-10-22, a712b33) |
+| D15 | `git status --short` depois de D2-D11 | vazio (2026-10-22, a712b33) |
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
