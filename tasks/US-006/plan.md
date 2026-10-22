@@ -651,3 +651,12 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 - Texto do log `OllamaLog.Replied` (EventId 2002, o plano fixa só as propriedades): `Brain {Provider} replied in {ElapsedMs} ms (model {Model}, output mode {OutputMode})`, no mesmo formato do evento 2001 do Claude Code.
 - `ChatResponseFormat.ForJsonSchema(schema)` é chamado sem nome nem descrição de schema (o `format` do Ollama carrega só o JSON Schema).
 - Conferência do fio com o `OllamaSharp` 5.5.0 (testes `OllamaTutorBrainHttpTests`, verdes): `POST /api/chat` no `Endpoint`; `model` e `messages` (`system`, `user`, `assistant`) como esperado; `ResponseFormat` com schema sai como `format` igual ao `TutorReplySchema` (comparação estrutural); `ChatOptions.Temperature` sai em `options.temperature`; sem `ResponseFormat` nenhum `format` no corpo. Nada diferiu do esperado; condição de parada da T2 não ocorreu.
+
+### 2026-10-21 — conclusão da gravação (T3)
+
+- Ollama 0.40.7 instalado com `winget install Ollama.Ollama`; `ollama --help` lista `serve` e `pull` (instruções da §2.5 conferidas); modelo `qwen2.5:14b-instruct-q4_K_M` baixado (9,0 GB). Condições de parada de instalação e de tamanho não ocorreram.
+- Resposta com `format`: `message.content` é JSON puro (sem cerca nem texto em volta); a decisão P6 (parser continua rejeitando cerca) não precisou ser reaberta. O `format` com o schema foi aceito pelo Ollama.
+- Modelo ausente: a biblioteca lança `System.Net.Http.HttpRequestException` com `StatusCode` = `NotFound` (404); o corpo é `{"error":"model 'nao-existe-us006' not found"}` (o texto `model`/`not found` está só no corpo, não na mensagem da exceção, que é `Response status code does not indicate success: 404 (Not Found).`). Logo a linha a da §2.3 casa pelo **status 404**, sem ajuste.
+- Conexão recusada: `System.Net.Http.HttpRequestException` sem `StatusCode`, com `System.Net.Sockets.SocketException` interna (mensagem do sistema operacional, em português nesta máquina; por isso nenhuma mensagem ao aluno a embute). A linha b casa por "sem status".
+- Tipos capturados pelo adaptador (T4): somente `HttpRequestException`; a biblioteca não usa tipo próprio para o 404.
+- Primeira chamada do modelo na máquina: `total_duration` ~54,7 s (`load_duration` ~30,8 s) em `chat-structured.json`, próximo do padrão de 60 s (risco já listado na §7; o D5 roda com o modelo aquecido).
