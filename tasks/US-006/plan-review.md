@@ -139,3 +139,45 @@ Resultado: REPROVADO (2 bloqueantes)
 ## Aprendizados para o processo
 - O D20 (busca de texto antigo) deixou um arquivo de fora porque o inventário foi feito pelos testes que mudam de comportamento, não pelo texto do comentário. → Regra sugerida: ao renomear um cenário, o inventário da tabela de conferência inclui todo arquivo que cita o nome antigo, rodando o Grep do D20c antes de fechar a §2.12 (variação de AP-035/AP-040).
 - Uma asserção acrescentada a um teste "que nasce verde" depois de desenhar a mensagem nova. → Ao fechar a lista de Red de uma tarefa, rodar mentalmente cada asserção contra o `src` atual (variação de AP-046).
+
+---
+
+## Rodada 4
+
+# Revisão do plano — US-006 Professor local via Ollama (rodada 4, revisão de escopo)
+
+Data: 2026-10-22
+Escopo revisado: `tasks/US-006/plan.md`, diff `293ca32..aa68b5b` (só o `plan.md` mudou). Li a §2.12, a §3, a §4, a §5 T10 e T12, a §7, a §10 (D20 e D20c) e o registro da rodada 3 no fim do arquivo. Conferi nomes de arquivo e linhas com `git grep` sobre `139adee` e com Grep em `src` e `tests`. Não rodei build nem testes, porque nenhum código mudou. Não repeti o que as rodadas anteriores aprovaram.
+Resultado: APROVADO (0 bloqueantes)
+
+## Itens da rodada anterior
+| Item | Status |
+|---|---|
+| **B1** (Red de T10 incoerente com `TutorReplyRejections.cs`) | Resolvido em `aa68b5b`. A T10 agora lista os 4 casos de 3 ou mais perguntas do validador entre os que falham pela asserção, junto com os 3 casos de `TutorReplyRejectionsTests`. `TutorReplyRejections.cs:30` não tem a frase `Replies with 1 or 2 questions are accepted`, então essa lista está certa. Só `Parse_WhenJsonReplyAsksThreeQuestions_...` nasce verde, porque confere apenas `has 3 questions`. A mutação "limite superior até 3" derruba os 3 casos de 3 perguntas e deixa o caso de 4 verde, o que está coerente. Entrou a mutação "frase sai da Message". A §2.12.1, a §4, a P13 e as alternativas descartadas dizem a mesma coisa. |
+| **B2** (`ReplySentencesTests.cs` fora do inventário) | Resolvido em `aa68b5b`. O arquivo entrou na tabela da §2.12, no parágrafo de inventário, na §3 (`Alterar`, só o comentário), na linha de apoio da §4, na T10 (o comentário novo faz parte do Red), na T12, no risco da §7, no D20 e no D20c. O D20c lista os 6 arquivos. Conferi o Grep dos padrões do D20 sobre `139adee`. Ele devolve exatamente os 6 arquivos, nas linhas que o plano cita: `TutorReplyValidator.cs:19`, `ReplySentencesTests.cs:28`, `TutorReplyRejectionsTests.cs:58` e `:61`, `TutorReplyValidatorTests.cs:68`, `:74` e `:80`, `ClaudeCodeTutorBrainLiveTests.cs:44`, `TutorReplyParserTests.cs:122`, `:124` e `:132`. Nenhum outro arquivo casa. |
+| S1–S5 (rodada 3) | Não incorporadas, como pedido. O diff não mexe em nenhum dos pontos das S1–S5. A T13, `SPRINT_1.md`, `PromptFilesContentTests` e a §2.12.2 seguem como estavam. O plano registra as cinco como pendentes para o usuário decidir. |
+
+## Verificações (só o que mudou)
+| Item | Resultado |
+|---|---|
+| Contagem D2 | ✅ 364 = Core 138 + Console 55 + Infrastructure 171. A rodada 4 não altera contagem: B1 mudou só a declaração do Red e B2 só um comentário. Core +4: o teste de 3 ou mais perguntas tem 4 casos, o de 2 perguntas substitui o de rejeição com os mesmos 4 casos, e `TutorReplyRejectionsTests` fica com 3. Parser +1. |
+| Contagem D11 | ✅ 69, sem alteração. As contagens de Ollama (1+24+30+7, mais 4 de console e 3 de DI) seguem as da rodada 2. |
+| Ordem das tarefas e Red da T10 | ✅ Cada asserção do Red bate com o `src` atual. Os testes que nascem verdes estão declarados, com mutação depois do Green. |
+| AP-035 (D20 e D20c) | ✅ O D20c sobre `139adee` acha todos os padrões, incluindo `ReplySentencesTests.cs`. O D20 fica sem linha depois da T10 e da T12. |
+| Consistência §3, §4 e §5 | ✅ Os nomes do método de `ReplySentencesTests` são iguais nas três seções. |
+
+## Bloqueantes
+Nenhum.
+
+## Sugestões
+- **S6** — `plan.md` §2.12, cabeçalho da tabela de conferência. O texto diz que o nome antigo do cenário "aparece em 5 arquivos de teste". O Grep dá 4 arquivos de teste com `reply com duas perguntas é inválido`: `ReplySentencesTests`, `TutorReplyRejectionsTests`, `TutorReplyValidatorTests` e `TutorReplyParserTests`. O inventário de 6 arquivos está certo: soma `TutorReplyValidator.cs` e `ClaudeCodeTutorBrainLiveTests.cs`, que casam outros padrões. Corrigir o número, ou dizer "5 arquivos de teste no inventário". Hoje o Executor, ao conferir o D20c, pode estranhar a diferença. Não bloqueia, porque o D20c já exige a lista dos 6 arquivos.
+- As S1–S5 da rodada 3 seguem pendentes de decisão do usuário e não bloqueiam. Se o usuário quiser fechar alguma, a S3 é a mais útil: a T11 hoje só tem prova por `LiveBrain`.
+
+## Pontos positivos
+- A correção do B1 declarou o Red assertiva por assertiva. Escolheu a opção que mantém a frase da tolerância nas duas camadas e registrou o motivo em "Alternativas descartadas". Entrou também a mutação "frase sai da Message".
+- O inventário do B2 foi refeito pelo Grep do D20c sobre `139adee`, arquivo por arquivo e com linhas. Há um risco novo na §7 e uma instrução para registrar na §12 se o resultado divergir da lista.
+- O plano transcreveu os bloqueantes e deixou as S1–S5 como pendentes, sem alterar o plano.
+
+## Aprendizados para o processo
+- Confirma a regra sugerida na rodada 3: ao renomear um cenário, o inventário deve vir do Grep pelo nome antigo antes de fechar a tabela de conferência. A correção só funcionou porque o Grep foi refeito. Falta transformar isso numa regra ou skill do Planejador (variação de AP-035 e AP-040).
+- Contagens citadas em prosa ("aparece em N arquivos") envelhecem. Preferir a lista nominal, que o D20c confere, a um número solto (S6).
