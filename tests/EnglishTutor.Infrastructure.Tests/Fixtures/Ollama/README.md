@@ -20,3 +20,7 @@ Respostas reais de `POST /api/chat`, gravadas pelo próprio adaptador (`OllamaTu
 - A requisição gravada é a do adaptador (mesmo `OllamaChatClients.Create`, mesmo `prompts/tutor.md`, mesmo arquivo de formato e mesma mensagem de aluno montada pelo `TurnMessageBuilder`). O teste usa a pasta `prompts` copiada para a saída do teste, não a do aplicativo instalado.
 - A primeira chamada do modelo inclui o carregamento dele na VRAM: `load_duration` de cerca de 30,8 s e `total_duration` de cerca de 54,7 s em `chat-structured.json`. Chamadas com o modelo aquecido são bem mais rápidas.
 - Cadeia de exceções observada (não é fixture; `exceptions.txt` do gravador): modelo ausente chega como `System.Net.Http.HttpRequestException` com `StatusCode` `NotFound` (404); conexão recusada chega como `HttpRequestException` sem `StatusCode`, com `SocketException` interna.
+
+## Nota sobre os prompts (US-006, T11)
+
+`chat-request.json` foi gravado antes do reforço dos prompts da US-006 (T11); a mensagem `system` atual difere (os arquivos `format.json.md` e `format.tags.md` ganharam a checagem final de contagem de `?` e um par de exemplos). Nenhum teste lê esse arquivo, então ele não é regravado; `chat-structured.json` é resposta gravada e não depende do prompt para ser lido pelo teste.
