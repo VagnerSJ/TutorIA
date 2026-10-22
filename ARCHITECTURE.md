@@ -52,7 +52,8 @@ src/
                        ITutorPromptSource, TurnMessageBuilder, TutorMode, LocalCommandParser, LocalCommand, LocalCommands
     Brain/             ITutorBrain, BrainRequest, BrainMessage, BrainRole, TutorReply, Correction, TutorReplyParseResult,
                        TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,
-                       BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders
+                       BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders,
+                       BrainFallbackPolicy, BrainSwitchNotice, IBrainSwitchNotifier
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
@@ -61,7 +62,7 @@ src/
                        ClaudeCodePromptRenderer, ClaudeCodeLog, BrainOutputModes, TutorReplySchema,
                        FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain, OllamaOptions,
                        OllamaOptionsValidator, OllamaFailures, OllamaChatClients, OllamaLog,
-                       TutorReplyParser, BrainFactory, FallbackTutorBrain
+                       TutorReplyParser, BrainFactory, FallbackTutorBrain, FallbackLog, SilentBrainSwitchNotifier
     Processes/         IProcessRunner, ProcessRequest, ProcessResult, ProcessRunner
     DependencyInjection/ InfrastructureServiceCollectionExtensions
     Stt/               WhisperNetSpeechToText, WhisperModelDownloader
@@ -69,7 +70,7 @@ src/
     Audio/             NAudioRecorder, NAudioPlayer
     Persistence/       SqliteConversationStore
   EnglishTutor.Console/
-    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/ (ChatSession, ConversationInputHandler), Logging/; prompts/ copiado para a saída
+    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/ (ChatSession, ConversationInputHandler, ConsoleBrainSwitchNotifier), Logging/; prompts/ copiado para a saída
 prompts/
   tutor.md             system prompt único (regras de conteúdo)
   format.json.md       instrução de formato quando o provedor usa saída estruturada
@@ -105,6 +106,8 @@ public enum BrainRole { User, Assistant }   // o system prompt vai em BrainReque
 public enum BrainErrorKind { CliNotFound, NotAuthenticated, UsageLimitReached, Timeout, InvalidOutput, Unknown }
 public sealed class BrainException : Exception { /* Kind; Rejection e RawText só via BrainException.InvalidOutput(rejection, rawText) (ADR-006) */ }
 public interface ITutorPromptSource { Task<string> GetSystemPromptAsync(CancellationToken ct); }   // conteúdo de prompts/tutor.md
+public interface IBrainSwitchNotifier { Task NotifyAsync(BrainSwitchNotice notice, CancellationToken ct); }   // aviso de troca para o reserva (RN-BRAIN08, ADR-010)
+public sealed record BrainSwitchNotice(string FromProvider, string ToProvider, BrainErrorKind Reason);
 public sealed record TutorReply(string Reply, IReadOnlyList<Correction> Corrections,
                                 string? Pronunciation, string? Vocabulary, string? Praise,
                                 bool IsRawFallback, string RawText);
@@ -183,6 +186,8 @@ classDiagram
 
 Validação das Options na inicialização (`ValidateOnStart`).
 
+`Brain:FallbackProvider` vazio (padrão do `appsettings.json`) desliga o reserva; preenchido, deve ser um provedor conhecido e diferente de `Brain:Provider` (o exemplo acima mostra a configuração com reserva).
+
 ### 6.2 Contrato de saída (ver ADR-002)
 
 - Forma canônica: objeto JSON `{ reply, corrections[{original, corrected, explanation}], pronunciation, vocabulary, praise }`.
@@ -213,7 +218,7 @@ claude -p
 - Prompt enviado via stdin (evita limites e escaping de linha de comando no Windows): sem `--resume`, as mensagens do `BrainRequest` num texto único (`ClaudeCodePromptRenderer`); com `--resume`, só a mensagem nova (ADR-007). O arquivo temporário do system prompt fica fora da pasta de trabalho e é apagado ao fim da chamada.
 - Saída: `structured_output` (JsonSchema) ou `result` (Tags) vai para o `TutorReplyParser`; o `session_id` fica no adaptador (ADR-007). Falhas viram `BrainException` classificada pelo adaptador (ADR-008): executável não encontrado → `CliNotFound`; texto de autenticação ou de limite de uso no `result` de erro ou no stderr → `NotAuthenticated` ou `UsageLimitReached`; `TimeoutSeconds` estourado → `Timeout`, com o processo encerrado junto com a árvore; o resto → `Unknown` com o detalhe. A mensagem da exceção é o texto mostrado ao aluno (o que houve e o que fazer); o console a mostra na saída de erro e a sessão continua.
 - Erros mapeados para `BrainException` com `BrainErrorKind`: `CliNotFound`, `NotAuthenticated`, `UsageLimitReached`, `Timeout`, `InvalidOutput`, `Unknown`.
-- `UsageLimitReached` (e, se configurado, `CliNotFound`/`NotAuthenticated`) aciona o `FallbackTutorBrain`.
+- Com `Brain:FallbackProvider` configurado, `UsageLimitReached`, `Timeout`, `CliNotFound` e `NotAuthenticated` acionam o `FallbackTutorBrain` (RN-BRAIN08; política em `BrainFallbackPolicy`, no Core). `Unknown` e `InvalidOutput` não acionam (ADR-010).
 
 ### 6.4 Provedor Ollama (HTTP)
 
@@ -221,6 +226,12 @@ claude -p
 - Mensagem `system` = `BrainRequest.SystemPrompt` + instrução de formato do modo (`prompts/format.json.md` ou `format.tags.md`, ADR-002). `OutputMode=JsonSchema` envia `format` com o `TutorReplySchema`; `Tags` não envia `format`. Modelo e temperatura vêm de `Brain:Ollama`.
 - Falhas viram `BrainException` classificada pelo adaptador (ADR-009): servidor sem resposta → `Unknown` com "Ollama is not running ..."; modelo ausente → `Unknown` com `ollama pull <modelo>`; `TimeoutSeconds` estourado → `Timeout`, com a requisição cancelada. O console mostra a mensagem como nas falhas do Claude Code.
 - O mesmo `IChatClient` servirá de base para o futuro provedor `AnthropicApi`.
+
+### 6.5 Reserva (fallback)
+
+- A `BrainFactory` (Infrastructure) lê `Brain:Provider` e `Brain:FallbackProvider` e entrega o `ITutorBrain`: o cérebro primário, ou o `FallbackTutorBrain` que o envolve quando há reserva. Cada cérebro concreto também é registrado com chave (o nome do provedor).
+- O `FallbackTutorBrain` chama o primário; se ele lançar `BrainException` cujo `Kind` a `BrainFallbackPolicy` manda trocar (RN-BRAIN08), avisa o `IBrainSwitchNotifier` e envia o mesmo `BrainRequest` ao reserva, só naquele turno. Outras falhas, `InvalidOutput` (retentativa do `ConversationService`, ADR-006) e cancelamento passam adiante sem troca.
+- O console implementa o aviso (`Switched to <reserva> (<motivo>)`, saída padrão, antes da linha `Tutor:`) (ADR-010).
 
 ## 7. Voz
 

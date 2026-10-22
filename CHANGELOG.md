@@ -41,3 +41,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Changed: o D5 do Ollama mede o adaptador dentro do `ConversationService`, contando a retentativa única de formato (ADR-006) (US-006).
 - Removed: `TutorNotConnectedInputHandler` e o texto "The tutor is not connected yet." (US-006).
 - Hábitos de trabalho com IA: skill `revisar-contexto`, `docs/aprendizados.md`, `specs/archive/`, Definition of Done verificável por US, seções Evidências e Comentários do usuário no plano, ADR proposto antes do código, hooks `post-edit-dotnet` e `executor-stop-gate`.
+- Added: `BrainFactory` escolhe o cérebro por `Brain:Provider`; o seletor provisório da US-006 foi removido, e cada cérebro também fica registrado com chave (nome do provedor) (US-007).
+- Added: cérebro reserva (`Brain:FallbackProvider`, vazio por padrão): `UsageLimitReached`, `Timeout`, `CliNotFound` e `NotAuthenticated` do primário mandam o turno ao reserva e o console mostra `Switched to <reserva> (<motivo>)` antes da resposta; sem reserva a falha aparece como antes e a sessão continua (RN-BRAIN08) (US-007).
+- Added: `FallbackTutorBrain` (decorator), `BrainFallbackPolicy` e a porta `IBrainSwitchNotifier` no Core, implementada pelo console; ADR-010 (US-007).
+- Added: `Brain:FallbackProvider` validado na partida: provedor desconhecido ou igual a `Brain:Provider` encerra o app com código 2 e mensagem que diz o esperado (US-007).
+- Changed: sem a partida do host (ex.: DI nos testes), `Brain:Provider` vazio ou inválido deixa de cair em silêncio no Claude Code e lança erro com os provedores aceitos (US-007).

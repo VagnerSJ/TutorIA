@@ -22,6 +22,22 @@ public static class ConsoleText
         "You can send a sentence again or type /quit to exit.",
     ];
 
+    // RN-BRAIN08: shown before the reply of the turn that went to the fallback brain.
+    public static string BrainSwitched(BrainSwitchNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        var reason = notice.Reason switch
+        {
+            BrainErrorKind.UsageLimitReached => "usage limit reached",
+            BrainErrorKind.Timeout => "timed out",
+            BrainErrorKind.CliNotFound => "CLI not found",
+            BrainErrorKind.NotAuthenticated => "not authenticated",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(notice), notice.Reason, "Expected a kind that BrainFallbackPolicy sends to the fallback brain."),
+        };
+        return $"Switched to {notice.ToProvider} ({reason})";
+    }
+
     public const string FeedbackHeader = "Feedback:";
 
     // US-004 P8: "Tutor: <reply>", then the feedback lines when there are any (none for a raw fallback).

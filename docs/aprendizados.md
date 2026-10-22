@@ -509,3 +509,30 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** os casos felizes passam sem provar a regra; a lista de Red errada leva o Executor a achar que o teste está certo quando nasce verde.
 - **Correção (proposta):** `.claude/agents/planejador.md`: "para cada `<placeholder>` derivado de texto de biblioteca ou de número, um caso por ramo da derivação (e a cultura, para números); ao fechar a lista de Red de uma tarefa, rodar mentalmente cada asserção contra o `src` atual"; `.claude/agents/revisor.md`: "confira nomes de branch com `git branch` antes de citá-los". Pode ser fundida ao AP-016 e AP-046 se o usuário preferir.
 - **Status:** Aplicada (2026-10-22, fundida com AP-016 e AP-046, ver commit "docs(ai): apply learning 54")
+
+### AP-055 — AP-014/AP-027 recorrem pela quarta vez: escolhas de forma registradas depois do `feat`
+
+- **Data / US:** 2026-10-22 / US-007 (`review.md` S1 e Aprendizados)
+- **Quem errou:** executor
+- **O que aconteceu:** as escolhas de forma das T3, T4 e T5 (texto do log 2003, mensagem de `InvalidOperationException` da fábrica, mensagem de `ArgumentOutOfRangeException` de `ConsoleText.BrainSwitched`, posição do aviso depois do prompt `> `) foram registradas na §12 em `6594ede`, depois dos três `feat` (`d08b7c6`, `e673750`, `a712b33`). As linhas "Escolhas de forma" das tarefas foram preenchidas com "§12 em 6594ede (registrado depois do feat)": o campo criado pelo AP-027 virou registro tardio, e não ponto de parada. O Executor reconheceu o desvio na própria §12. Nenhuma escolha mudou comportamento da spec, então o Revisor não bloqueou.
+- **Por que importa:** é a quarta ocorrência (AP-009, AP-014, AP-027). A regra escrita (no `executor.md`, no modelo da §5 e no `checklist-revisao` §1) não bastou, porque nada impede o commit `feat` com o campo preenchido depois. A intenção chega ao documento depois do código (hábito 4).
+- **Correção (proposta, não aplicada; o usuário decidiu não aplicar as sugestões da revisão agora):** (a) `.claude/agents/executor.md`, passo Green: "antes do commit `feat`, rode `git log -1 --format=%H -- tasks/US-XXX/plan.md` e confirme que o commit `docs(ai)` da §12 com o texto de log, mensagem de exceção ou aviso novo é **anterior** ao `feat`; a linha 'Escolhas de forma' nunca cita um hash posterior ao `feat` da tarefa"; (b) `.claude/skills/checklist-revisao/SKILL.md` §1: tornar [O] (obrigatório) o item "escolha de forma que cria texto exibido ou mensagem de exceção tem commit na §12 anterior ao `feat`", em vez de sugestão; (c) avaliar um lembrete no hook `executor-stop-gate` quando o diff de uma tarefa cria literais de texto sem commit prévio em `tasks/US-XXX/plan.md`.
+- **Status:** Proposta
+
+### AP-056 — Evidência de cobertura do Core com número de um único projeto de teste
+
+- **Data / US:** 2026-10-22 / US-007 (`review.md` S2 e Aprendizados)
+- **Quem errou:** executor (evidência) e planejador (D3 não diz qual relatório vale)
+- **O que aconteceu:** o D3 do `plan.md` registrou `line-rate` 0,9822 do Core no relatório do `Core.Tests`, anotando que os relatórios do `Infrastructure.Tests` e do `Console.Tests` mostram o Core parcial (0,7494 e 0,8181). O Revisor mesclou os três com `reportgenerator` e obteve 100% para o assembly Core (solução 90,5%). Os dois números passam de 80%, mas são grandezas diferentes, e a comparação entre US fica ambígua (a US-006 registrou 100%, a US-007 98,22%).
+- **Por que importa:** cobertura do Core é critério do projeto (CLAUDE.md); número de fonte variável impede ver tendência e esconde queda real.
+- **Correção (proposta, não aplicada):** `.claude/skills/tdd-dotnet/SKILL.md` e o modelo do D3 em `.claude/agents/planejador.md`: "a evidência do D3 é o relatório **mesclado** (`reportgenerator` sobre todos os `coverage.cobertura.xml`), com o line-rate do assembly `EnglishTutor.Core` e o total da solução; relatório de um único projeto de teste só entra como nota". Padronizar também no `docs/us/US-XXX.md` (seção Testes e evidências).
+- **Status:** Proposta
+
+### AP-057 — Teste procura "linha" exata de saída, mas o prompt `> ` não quebra linha
+
+- **Data / US:** 2026-10-22 / US-007 (relato do Executor, `plan.md` §12 e DoD D8)
+- **Quem errou:** planejador (redação da spec) e executor (descoberta tardia)
+- **O que aconteceu:** a spec (D8/D9 da US-007) e os testes C2/C3 falam da "linha `Switched to ...`". Na saída padrão do console o prompt `> ` não é seguido de quebra de linha, então o aviso sai como `> Switched to Ollama (CLI not found)`, igual a `> Tutor: ...`. Os testes C2/C3 passaram a usar `EndsWith` e a DoD confere o trecho. O prefixo é do prompt, não do aviso, e a spec ficou com redação mais estreita do que o comportamento real.
+- **Por que importa:** qualquer teste de componente ou comando de DoD que procure uma linha exata na saída do console falha por causa do prefixo; o erro aparece só na execução real (D8).
+- **Correção (proposta, não aplicada):** (a) `.claude/skills/bdd-para-testes/SKILL.md`: "no console, o prompt `> ` não quebra linha: testes que procuram uma linha de saída consideram o prefixo (`EndsWith`/`Contains`), e cenários e DoD dizem 'a saída contém', não 'a linha'"; (b) `.claude/agents/planejador.md`: ao escrever critério de saída do console, usar 'a saída contém'. Para a US-007, a redação de D8 e D9 em `specs/sprints/SPRINT_1.md` ("a linha `Switched to`") pode ser ajustada para "a saída contém"; isso é spec e depende de decisão do usuário (o Documentador não altera a spec).
+- **Status:** Proposta

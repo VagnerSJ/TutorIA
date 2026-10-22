@@ -129,6 +129,9 @@ public static class EnglishTutorApp
 
         builder.Services.Configure<ConsoleLifetimeOptions>(lifetime => lifetime.SuppressStatusMessages = true);
         builder.Services.AddEnglishTutorCore();
+
+        // Before the Infrastructure: its TryAdd keeps the console notifier instead of the silent default (ADR-010).
+        builder.Services.TryAddSingleton<IBrainSwitchNotifier>(new ConsoleBrainSwitchNotifier(options.Output));
         builder.Services.AddEnglishTutorInfrastructure(Path.Combine(builder.Environment.ContentRootPath, "prompts"));
         builder.Services.AddOptions<BrainOptions>()
             .Bind(builder.Configuration.GetSection(BrainOptions.SectionName))
