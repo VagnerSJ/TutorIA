@@ -18,7 +18,11 @@ internal static class OllamaFailures
     }
 
     public static BrainException Timeout(int timeoutSeconds, OperationCanceledException inner) =>
-        throw new NotImplementedException();
+        new(
+            BrainErrorKind.Timeout,
+            $"Ollama did not answer in time (limit: {timeoutSeconds} s) and the request was cancelled. " +
+            $"Send your sentence again, or raise {OllamaOptions.SectionName}:TimeoutSeconds.",
+            inner);
 
     // Rows in order, the first that matches decides (ADR-009): a) model missing, b) no answer, c) anything else.
     public static BrainException Translate(Exception exception, OllamaOptions options)

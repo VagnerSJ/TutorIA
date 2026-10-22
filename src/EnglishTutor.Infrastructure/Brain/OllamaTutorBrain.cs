@@ -40,26 +40,33 @@ public sealed class OllamaTutorBrain(
         }
 
         var startedAt = _timeProvider.GetTimestamp();
-        var formatPath = mode == BrainOutputModes.JsonSchema ? _promptFiles.FormatJsonPath : _promptFiles.FormatTagsPath;
-        var formatInstruction = await File.ReadAllTextAsync(formatPath, ct);
-
-        // ADR-002: the format instruction travels in the system message, after the system prompt.
-        List<ChatMessage> messages = [new(ChatRole.System, request.SystemPrompt + "\n\n" + formatInstruction)];
-        messages.AddRange(request.Messages.Select(ToChatMessage));
-
-        var chatOptions = new ChatOptions
-        {
-            ModelId = options.Model,
-            Temperature = (float)options.Temperature,
-            ResponseFormat = mode == BrainOutputModes.JsonSchema
-                ? ChatResponseFormat.ForJsonSchema(JsonDocument.Parse(TutorReplySchema.Json).RootElement.Clone())
-                : null,
-        };
-
+        // ADR-009: one clock per call, linked to the caller's token; it also covers reading the format file.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(options.TimeoutSeconds), _timeProvider);
+        using var call = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         ChatResponse response;
         try
         {
-            response = await _chatClient.GetResponseAsync(messages, chatOptions, ct);
+            var formatPath = mode == BrainOutputModes.JsonSchema ? _promptFiles.FormatJsonPath : _promptFiles.FormatTagsPath;
+            var formatInstruction = await File.ReadAllTextAsync(formatPath, call.Token);
+
+            // ADR-002: the format instruction travels in the system message, after the system prompt.
+            List<ChatMessage> messages = [new(ChatRole.System, request.SystemPrompt + "\n\n" + formatInstruction)];
+            messages.AddRange(request.Messages.Select(ToChatMessage));
+
+            var chatOptions = new ChatOptions
+            {
+                ModelId = options.Model,
+                Temperature = (float)options.Temperature,
+                ResponseFormat = mode == BrainOutputModes.JsonSchema
+                    ? ChatResponseFormat.ForJsonSchema(JsonDocument.Parse(TutorReplySchema.Json).RootElement.Clone())
+                    : null,
+            };
+
+            response = await _chatClient.GetResponseAsync(messages, chatOptions, call.Token);
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw OllamaFailures.Timeout(options.TimeoutSeconds, exception);
         }
         catch (Exception exception) when (OllamaFailures.IsServerFailure(exception))
         {
