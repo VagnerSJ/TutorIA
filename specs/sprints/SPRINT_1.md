@@ -421,7 +421,7 @@ Como aluno,
 quero escolher o cérebro no appsettings e ter um reserva automático,
 para não perder a sessão quando a assinatura atingir o limite.
 
-**Regras:** RN-BRAIN08.
+**Regras:** RN-BRAIN07, RN-BRAIN08; ARCHITECTURE §6.1, §6.3.
 
 ```gherkin
 Cenário: escolha por configuração
@@ -441,6 +441,32 @@ Cenário: sem fallback configurado
   E o Claude Code retorna UsageLimitReached
   Quando envio uma frase
   Então vejo a mensagem de limite de uso e continuo na sessão
+
+Esquema do Cenário: fallback por outras falhas do primário
+  Dado Provider "ClaudeCode" e FallbackProvider "Ollama"
+  E o Claude Code retorna <falha>
+  Quando envio uma frase
+  Então a resposta vem do Ollama
+  E vejo o aviso "Switched to Ollama (<motivo>)"
+
+  Exemplos:
+    | falha            | motivo            |
+    | Timeout          | timed out         |
+    | CliNotFound      | CLI not found     |
+    | NotAuthenticated | not authenticated |
+
+Cenário: falha que não aciona o reserva
+  Dado Provider "ClaudeCode" e FallbackProvider "Ollama"
+  E o Claude Code retorna uma falha desconhecida (Unknown)
+  Quando envio uma frase
+  Então o Ollama não é chamado
+  E vejo a mensagem da falha na saída de erro e continuo na sessão
+
+Cenário: reserva igual ao primário
+  Dado Provider "ClaudeCode" e FallbackProvider "claudecode"
+  Quando a aplicação inicia
+  Então a aplicação termina com código 2 e a saída de erro explica que o reserva deve ser outro provedor
+  E nenhuma sessão é aberta
 ```
 
 **DoD extra**
@@ -450,6 +476,8 @@ Cenário: sem fallback configurado
 | D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde |
 | D6 | `$env:Brain__Provider="Ollama"; "/quit" \| dotnet run --project src/EnglishTutor.Console` | cabeçalho mostra "Ollama" |
 | D7 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha: o seletor provisório de `ITutorBrain` por `Brain:Provider` (US-006, em `InfrastructureServiceCollectionExtensions`) foi substituído pela `BrainFactory` |
+| D8 | No Windows PowerShell 5.1, com o Ollama rodando e o modelo baixado: `$env:Brain__ClaudeCode__ExecutablePath="claude-missing-us007"; $env:Brain__FallbackProvider="Ollama"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__ClaudeCode__ExecutablePath, Env:Brain__FallbackProvider` | a linha `Switched to Ollama (CLI not found)` seguida de uma linha `Tutor: <reply>`; `exit=0` |
+| D9 | No Windows PowerShell 5.1: `$env:Brain__ClaudeCode__ExecutablePath="claude-missing-us007"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console 2>&1; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__ClaudeCode__ExecutablePath` | a mensagem `The tutor could not answer: Claude Code CLI not found`; nenhuma linha `Switched to`; `exit=0` |
 
 ---
 
