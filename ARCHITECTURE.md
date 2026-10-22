@@ -238,6 +238,8 @@ claude -p
 | LLM local 14B Q4 | ~9–10 GB |
 | LLM local 7–8B Q4 | ~5–6 GB |
 
+Medido (US-006, 2026-10-21): 10828 MiB de VRAM em uso durante o teste real com `qwen2.5:14b-instruct-q4_K_M` (linha de base 1568 MiB sem o modelo; `nvidia-smi`; `ollama ps`: 9,5 GB, 100% GPU, contexto 4096).
+
 ## 8. Persistência
 
 SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala transcrita, resposta, feedback, provedor, latência), `RecurringErrors` (padrão → contagem → último exemplo), `LowConfidenceWords`. No início de cada sessão o resumo dos erros mais frequentes entra no `BrainRequest` (RN-CONV04).
