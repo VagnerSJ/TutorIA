@@ -127,6 +127,45 @@ public sealed class EnglishTutorAppTests : IDisposable
         _output.ToString().Should().Contain("Brain: Ollama | Mode: free-conversation");
     }
 
+    // US-007 — Cenário: fallback por limite de uso — RN-BRAIN08 (P4: saída padrão, antes da linha Tutor:)
+    [Fact]
+    public async Task RunAsync_WhenPrimaryHitsUsageLimit_AnswersFromFallbackAfterShowingSwitchNotice()
+    {
+        var runner = new FixedResultProcessRunner(UsageLimitResult);
+        var chatClient = new ScriptedChatClient().Returns(OllamaReplyJson("t1"));
+        var options = CreateFallbackOptions(runner, chatClient, fallbackProvider: "Ollama", "sentence t1", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        var lines = _output.ToString().Split(Environment.NewLine);
+        var noticeIndex = Array.IndexOf(lines, "Switched to Ollama (usage limit reached)");
+        var replyIndex = Array.FindIndex(lines, line => line.EndsWith("Tutor: Reply t1?", StringComparison.Ordinal));
+        noticeIndex.Should().BeGreaterThanOrEqualTo(0);
+        replyIndex.Should().BeGreaterThan(noticeIndex);
+        _error.ToString().Should().BeEmpty();
+        chatClient.Calls.Should().ContainSingle();
+    }
+
+    // US-007 — Cenário: fallback por outras falhas do primário (CliNotFound) — RN-BRAIN08
+    [Fact]
+    public async Task RunAsync_WhenClaudeExecutableIsNotFoundAndFallbackIsSet_AnswersFromFallbackWithCliNotFoundNotice()
+    {
+        var chatClient = new ScriptedChatClient().Returns(OllamaReplyJson("t1"));
+        var options = CreateFallbackOptions(
+            new MissingExecutableProcessRunner(), chatClient, fallbackProvider: "Ollama", "sentence t1", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        var lines = _output.ToString().Split(Environment.NewLine);
+        var noticeIndex = Array.IndexOf(lines, "Switched to Ollama (CLI not found)");
+        var replyIndex = Array.FindIndex(lines, line => line.EndsWith("Tutor: Reply t1?", StringComparison.Ordinal));
+        noticeIndex.Should().BeGreaterThanOrEqualTo(0);
+        replyIndex.Should().BeGreaterThan(noticeIndex);
+        _error.ToString().Should().BeEmpty();
+    }
+
     // US-007 — Cenário: sem fallback configurado — RN-BRAIN07, RN-BRAIN08
     [Fact]
     public async Task RunAsync_WhenFallbackProviderIsEmptyAndPrimaryHitsUsageLimit_ShowsLimitMessageAndContinuesSession()
