@@ -92,3 +92,50 @@ Nenhum.
 ## Aprendizados para o processo
 - Confirma o AP-016: `<placeholder>` derivado de texto de biblioteca precisa de um caso por ramo da derivação (e a cultura, para números).
 - O Revisor deve conferir nomes de branch com `git branch` antes de citá-los.
+
+---
+
+## Rodada 3
+
+# Revisão do plano — US-006 Professor local via Ollama (rodada 3, revisão de escopo)
+
+Data: 2026-10-22
+Escopo revisado: `tasks/US-006/plan.md` — T10–T14, §2.12, §4 (linhas novas e contagens), §5, §7, §9 (P13–P17) e §10 (D5, D19, D20, D20c). Branch conferida: `feature/US-006_ollama-brain`. Commit de spec conferido: `15b4291`. Não repeti o que as rodadas 1 e 2 já aprovaram.
+Resultado: REPROVADO (2 bloqueantes)
+
+## Itens do checklist de plano (só o que a revisão de escopo mexe)
+| Item | Resultado |
+|---|---|
+| Cenários BDD novos no mapa da §4 (duas perguntas aceitas, três inválidas; Core e parser) | ✅ nomes `Metodo_Cenario_Resultado`, nomes dos cenários iguais aos de `SPRINT_1.md` (linhas 241 e 246) |
+| P* com efeito observável têm teste (§4) e tarefa (§5) | ✅ P13 (mensagem), P14 (sem aviso), P15 (guarda de prompts), P16 e P17 mapeadas |
+| DoD da §10 cobre a DoD da US (D5 com retentativa, 3 rodadas; cobertura do Core) | ✅ |
+| Conformidade R1–R4, RN, regras rápidas | ✅ regra no Core (R4); `padroes-codigo` já traz a convenção "Tolerância de verificação" |
+| Escopo e adiamentos (AP-022/AP-040) | ✅ consumidores da tolerância listados na §7 e na §2.12.5; sem adiamento novo |
+| Consistência interna §3 × §4 × §5 e contagens | ❌ ver B1 e B2. As contagens 356 → 364 batem: Core 134+4=138; Console 55; Infrastructure 167+1+3=171 |
+| Ordem das tarefas preserva o Red | ❌ ver B1 |
+| LiveBrain sobre saída de modelo (AP-032) | ✅ D5 diz a camada (serviço com retentativa), tolerância zero, 3 rodadas, risco de oscilação e quem decide o vermelho; D19 diz camada, tolerância e 1 rodada |
+| Verificação de "nenhuma linha" com o outro lado (AP-035, D20/D20c) | ❌ ver B2 |
+| Alteração na `ARCHITECTURE.md` lista as repetições (§2.12.5) | ✅ o texto antigo existe em `ARCHITECTURE.md:191` (§6.2), em ADR-005 (linhas 5 e 19) e em ADR-002 (linha 30); `padroes-codigo` já foi atualizado |
+| Viabilidade e riscos | ✅ `ConversationService` retenta só em `InvalidOutput` e cai em `TutorReply.RawFallback` (`ConversationService.cs:62-72`); `ConversationTurnResult.Reply` e `LiveClaudeCode.KnownErrors` existem; os prompts atuais já têm "exactly one question" e "second question", então o guarda nasce verde como o plano diz |
+
+## Bloqueantes
+- [ ] **B1** — §4 (asserções principais de `Validate_WhenReplyAsksMoreThanTwoQuestions_RejectsWithExactlyOneQuestionReason`) × §5 T10 — A §4 diz que o teste confere `Message` com `Replies with 1 or 2 questions are accepted`. A T10 diz que os 4 casos "nascem verdes" e que, na mutação "limite superior aceita até 3", "o caso de 4 continua verde". Hoje a mensagem não tem essa frase (`TutorReplyRejections.cs:30`), então os 4 casos nascem vermelhos no Red, não verdes. Esperado: o plano diz uma coisa só. Ou a frase da tolerância sai das asserções desse teste e fica só no `TutorReplyRejectionsTests` (3 casos), ou a T10 passa a listar esses 4 casos entre os que falham pela asserção. Reescrever a lista de Red e a de mutações de acordo, para o Executor saber que o Red falha pelo motivo certo (checklist: ordem das tarefas preserva o Red; AP-025/AP-046).
+- [ ] **B2** — `tests/EnglishTutor.Core.Tests/Brain/ReplySentencesTests.cs:28` (comentário do teste `IsQuestion_WithSentence_ReturnsWhetherFinalPunctuationContainsQuestionMark`) — O comentário `// US-004 — Cenário: reply com duas perguntas é inválido (apoio, P21...)` casa com o padrão `reply com duas perguntas é inválido` do D20. O D20 exige "nenhuma linha" depois da T10 e da T12, mas nenhuma tarefa, nem a §3, nem a tabela de conferência da §2.12 toca esse arquivo. O D20 ficaria vermelho por um arquivo que o plano não prevê. O D20c ("pelo menos uma linha para cada padrão") também não o lista. Esperado: o arquivo entra na §2.12, na §3 e na T10, com o novo texto do comentário (o cenário antigo não existe mais na spec). Conferi com Grep em `src` e `tests`: além dos arquivos já listados, só esse comentário casa.
+
+## Sugestões
+- **S1** — `specs/sprints/SPRINT_1.md:233` (US-004, cenário "frase com erro gramatical": `Então recebo um reply com no máximo 3 frases e exatamente uma pergunta`) e linha 306 (D6 da US-004: `reply com exatamente uma pergunta`). O commit `15b4291` não os alterou. A T12 relaxa o `LiveBrain` do Claude Code para 1..2, e o teste continua citando esse cenário. A justificativa está na P17, mas a spec não diz que o cenário descreve a regra pedida. Esperado: o plano registra que esses dois textos ficam como regra pedida, com o comentário do teste dizendo "pedida 1, verificada 1..2", ou propõe uma nota na spec.
+- **S2** — §2.12.1, P13 e §2.12.2(iii) — A `Message` da rejeição é a instrução de correção enviada ao modelo na retentativa (`TurnMessageBuilder.BuildFormatCorrection`). Com a frase `Replies with 1 or 2 questions are accepted.`, a tolerância chega ao modelo, e o plano e o guarda `PromptFilesContentTests` dizem que ela não vai para o prompt. O plano reconhece isso e registra que foi pedido pelo usuário (P13), então não bloqueia. Peço só que a §2.12.2 diga que a exceção é a mensagem de correção da retentativa, para o guarda não parecer contradito. Se o D5 oscilar, essa frase é a primeira candidata a sair.
+- **S3** — §4 (`PromptFilesContentTests`) e T11 — O guarda confere só texto que os prompts já têm (`exactly one question`, `second question`). Ele nasce verde e continua verde sem o reforço, então a T11 não tem teste que falhe antes e passe depois do que ela entrega (a checagem final por contagem de `?` e o par bom/ruim). A prova é o D5, `LiveBrain`, como o plano diz. Esperado: incluir no guarda um trecho que só o reforço produz (ex.: a linha de contagem de `?`), ou registrar na T11 que o reforço só tem prova por `LiveBrain`.
+- **S4** — T13 — A frase "Outra mutação, 'o decorator conta mas não altera' é o estado final" confunde. Esperado: dizer só que o estado final é o decorator que conta sem alterar a resposta.
+- **S5** — `CHANGELOG.md:28` registra a RN-FEED01 antiga (US-004). O Documentador acrescenta a entrada da tolerância. Vale uma linha na §2.12.5.
+
+## Pontos positivos
+- A tabela de conferência da §2.12 (onde "exatamente 1" vive ou é testado) está completa e distingue testes de fixture gravada (mantidos, P17) de `LiveBrain` ao vivo (relaxados, T12).
+- Os dois lados do limite superior (2 válido, 3 inválido) e do inferior (0 inválido, 1 válido) têm teste. A mensagem da rejeição é conferida por trecho que só o projeto produz (AP-015, AP-016).
+- A T13 troca o teste de adaptador puro pelo de serviço com retentativa. O filtro `FullyQualifiedName~Ollama` continua com 5 testes `LiveBrain` por rodada (3 + 1 + 1), como o D5 diz.
+- O risco de oscilação do D5 e o limite aceito da tolerância estão na §7 (AP-032, AP-040).
+- Os textos antigo e novo das alterações em `ARCHITECTURE.md`, ADR-005 e ADR-002 estão identificados pelo texto antigo, e confere com os arquivos (AP-023). O commit de arquitetura da revisão está antes da T10 (AP-030).
+
+## Aprendizados para o processo
+- O D20 (busca de texto antigo) deixou um arquivo de fora porque o inventário foi feito pelos testes que mudam de comportamento, não pelo texto do comentário. → Regra sugerida: ao renomear um cenário, o inventário da tabela de conferência inclui todo arquivo que cita o nome antigo, rodando o Grep do D20c antes de fechar a §2.12 (variação de AP-035/AP-040).
+- Uma asserção acrescentada a um teste "que nasce verde" depois de desenhar a mensagem nova. → Ao fechar a lista de Red de uma tarefa, rodar mentalmente cada asserção contra o `src` atual (variação de AP-046).
