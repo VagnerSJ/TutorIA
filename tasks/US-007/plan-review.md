@@ -46,3 +46,28 @@ Resultado: REPROVADO (2 bloqueantes)
 ## Aprendizados para o processo
 - Contagem de testes por faixa ("B1–B6") sem lista nominal derivada da §4 tornou a lacuna invisível → reforçar AP-025: o Planejador deriva as faixas citadas em §3, §5 e DoD a partir da tabela §4, com conferência mecânica (listar os IDs da §4 antes de fechar o plano).
 - Teste de DI que só resolve o serviço registrado nasce verde com facilidade → ao declarar o Red de testes de registro (`TryAdd`, "mantém o já registrado"), a §4 deve dizer o efeito observável, não só o tipo resolvido (relacionado a AP-010 e AP-025).
+
+## Rodada 2
+
+Data: 2026-10-22
+Escopo revisado: `tasks/US-007/plan.md` (commit e436cb7, que mudou só o plano: 10 inserções e 4 remoções), `tasks/US-007/plan-review.md` (rodada 1) e a seção 12 do plano com as respostas do Planejador.
+Resultado: APROVADO (0 bloqueantes)
+
+### Itens da rodada anterior
+- [x] **B1** (B5 ausente do mapa) — Resolvido em e436cb7. A §4 passou a ter `BrainFactoryTests` B5 `Create_WhenFallbackProviderIsUnknown_ThrowsNamingValueAndAcceptedProviders`, com projeto, classe e método. Os IDs da §4 são B1–B6 e batem com a §3, a T4, a D5 e a P10. B5 invalida só o reserva e B4 só o `Provider`, então os dois papéis estão cobertos (AP-047).
+- [x] **B2** (DI3 nascia verde) — Resolvido em e436cb7. O DI3 registra um `RecordingBrainSwitchNotifier` e dois `StubTutorBrain` com chave (o primário lança `UsageLimitReached`, o reserva responde `t1`), resolve `ITutorBrain` e espera a resposta `t1` e exatamente um aviso no notificador registrado. Antes da T4 ele falha. A T4 lista DI3 entre os que falham, só DI1 nasce verde entre os DI, e a mutação `TryAddSingleton` → `AddSingleton` do notificador silencioso derruba o DI3. Dependências vêm de T2 e T3.
+
+### Verificações
+Todas ✅ (cenários BDD no mapa, P* com teste e tarefa, DoD e cobertura ≥ 80%, R1–R4/RN/CLAUDE.md/ADR Proposto, escopo e adiamentos, consistência §3×§4×§5×§6 com contagens B1–B6, F1–F15, DI1–DI5, C1–C12, V1–V6, ordem das tarefas preservando o Red, AP-016/015/047/039/035/050, sincronia ARCHITECTURE × CLAUDE.md, viabilidade no SDK). AP-051, AP-032 e AP-052: N/A.
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões (pendentes, o usuário não as aceitou nem recusou)
+- **S1** — §10 D5: o texto "e os testes DI cujo nome tem `BrainFactory`/`FallbackTutorBrain`" não corresponde a nenhum teste. Remova o trecho ou diga que os DI são provados pela D2.
+- **S2** — §10 D8: diga que, sem o Ollama e o modelo, o Executor registra "não reproduzido" na §11 e o C3 vale como prova.
+- **S3** — §4 DI1: o teste renomeado deixa de afirmar `brain.Name == "ClaudeCode"`. Registre que o `Name` de cada provedor já é coberto pelos cérebros e pelo DI5.
+- **S4** — §2.3: `BrainSwitchNotice.FromProvider` não tem consumidor. Justifique o campo (log e consumidores futuros) ou remova.
+
+### Aprendizados para o processo
+- Sugestão: exigir que o Planejador liste os IDs da §4 antes de fechar o plano (AP-025) e descreva o efeito observável em testes de `TryAdd` (AP-010).
