@@ -116,6 +116,52 @@ public sealed class EnglishTutorAppTests : IDisposable
             .Which.Text.Should().Contain("second sentence t2");
     }
 
+    // US-007 — Cenário: escolha por configuração
+    [Fact]
+    public async Task RunAsync_WhenProviderIsOllama_ShowsOllamaInHeader()
+    {
+        var options = CreateOllamaOptions(new ScriptedChatClient(), "/quit");
+
+        await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        _output.ToString().Should().Contain("Brain: Ollama | Mode: free-conversation");
+    }
+
+    // US-007 — Cenário: sem fallback configurado — RN-BRAIN07, RN-BRAIN08
+    [Fact]
+    public async Task RunAsync_WhenFallbackProviderIsEmptyAndPrimaryHitsUsageLimit_ShowsLimitMessageAndContinuesSession()
+    {
+        var runner = new FixedResultProcessRunner(UsageLimitResult);
+        var chatClient = new ScriptedChatClient();
+        var options = CreateFallbackOptions(runner, chatClient, fallbackProvider: string.Empty, "sentence t1", "sentence t2", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _error.ToString().Should().Contain("The tutor could not answer: Claude Code usage limit reached")
+            .And.Contain("You can send a sentence again or type /quit to exit.");
+        _output.ToString().Should().NotContain("Switched to");
+        runner.Calls.Should().Be(2);
+        chatClient.Calls.Should().BeEmpty();
+    }
+
+    // US-007 — Cenário: falha que não aciona o reserva — RN-BRAIN08
+    [Fact]
+    public async Task RunAsync_WhenPrimaryFailsWithUnknown_DoesNotSwitchAndShowsTheFailure()
+    {
+        var runner = new FixedResultProcessRunner(
+            new ProcessResult(1, """{"type":"result","is_error":true,"result":"boom t1"}""", string.Empty));
+        var chatClient = new ScriptedChatClient();
+        var options = CreateFallbackOptions(runner, chatClient, fallbackProvider: "Ollama", "sentence t1", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _error.ToString().Should().Contain("The tutor could not answer: Claude Code failed (exit code 1): boom t1");
+        _output.ToString().Should().NotContain("Switched to");
+        chatClient.Calls.Should().BeEmpty();
+    }
+
     // US-001 — Cenário: logs estruturados
     [Fact]
     public async Task RunAsync_WhenAppStops_WritesStructuredStartAndStopEventsToLogFile()
@@ -498,6 +544,32 @@ public sealed class EnglishTutorAppTests : IDisposable
             });
 
     // Like CreateOptions, but the ITutorBrain is NOT replaced: the real OllamaTutorBrain runs on a scripted IChatClient.
+    // The shape of Fixtures/ClaudeCode/errors/usage-limit-synthetic-1 (is_error, "usage limit" in result, exit code 1).
+    private static ProcessResult UsageLimitResult { get; } = new(
+        1, """{"type":"result","is_error":true,"result":"Claude AI usage limit reached|1760000000 (synthetic)"}""", string.Empty);
+
+    // Real ClaudeCodeTutorBrain over the fake runner and real OllamaTutorBrain over the scripted chat client.
+    private AppRunOptions CreateFallbackOptions(
+        IProcessRunner runner, ScriptedChatClient chatClient, string fallbackProvider, params string[] lines) =>
+        new([],
+            new StringReader(Lines(lines)),
+            _output,
+            _error,
+            TestConfiguration.Create(
+                "ClaudeCode",
+                extraValues: new Dictionary<string, string?>
+                {
+                    ["Brain:FallbackProvider"] = fallbackProvider,
+                    ["Brain:ClaudeCode:ExecutablePath"] = "claude-missing-t1",
+                    ["Brain:ClaudeCode:WorkingDirectory"] = Path.Combine(_logDirectory, "brain"),
+                }),
+            ConfigureServices: services =>
+            {
+                services.AddSingleton(runner);
+                services.AddKeyedSingleton<IChatClient>("Ollama", chatClient);
+                services.AddSingleton<ITutorPromptSource>(new FixedTutorPromptSource());
+            });
+
     private AppRunOptions CreateOllamaOptions(ScriptedChatClient chatClient, params string[] lines) =>
         new([],
             new StringReader(Lines(lines)),
