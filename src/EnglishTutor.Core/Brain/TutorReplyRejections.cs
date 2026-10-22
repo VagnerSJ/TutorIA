@@ -28,7 +28,8 @@ public static class TutorReplyRejections
             ReplyMustAskExactlyOneQuestionReason,
             $"{ReplyMustAskExactlyOneQuestionReason}: the reply \"{quoted}\" {found}. " +
             "Expected 1 to 3 short sentences with exactly one question to the student " +
-            "(one sentence ending with \"?\", in any position); the other sentences are comments or encouragement.");
+            "(one sentence ending with \"?\", in any position); the other sentences are comments or encouragement. " +
+            "Replies with 1 or 2 questions are accepted.");
     }
 
     public static TutorReplyRejection InvalidJson(string detail)
