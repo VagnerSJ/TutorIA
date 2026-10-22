@@ -598,7 +598,7 @@ private const int _maxQuestions = 2;
 
 **Revisão de escopo (2026-10-22): T10 a T14.** Ordem: regra do Core (T10), prompts (T11), `LiveBrain` do Claude Code com a tolerância (T12), D5 com a retentativa (T13), DoD final (T14). Cada uma é independente do resultado das seguintes até a T13, que é a que fecha o D5.
 
-- [ ] T10 — Core: o validador aceita 1 ou 2 perguntas (RN-FEED01). (§2.12.1)
+- [x] T10 — Core: o validador aceita 1 ou 2 perguntas (RN-FEED01). (§2.12.1) (feito: test 6ee8e54, feat e0931d0; mutações nas Evidências)
   Antes do primeiro teste: **D20c** (controle do D20, sobre `139adee`), colado nas Evidências; o resultado tem de listar os 6 arquivos do inventário da §2.12 (`TutorReplyValidatorTests.cs`, `TutorReplyRejectionsTests.cs`, `TutorReplyParserTests.cs`, **`ReplySentencesTests.cs`**, `TutorReplyValidator.cs`, `ClaudeCodeTutorBrainLiveTests.cs`).
   Estado dos ramos: o limite inferior (0 inválido) e a razão não mudam; só o limite superior sobe de 1 para 2.
   Red: alterar os testes existentes e acrescentar os novos (sem tocar em `src/`): `TutorReplyValidatorTests.Validate_WhenReplyAsksTwoQuestions_ReturnsValidReplyWithoutWarnings` (4 casos; substitui `Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason`), `TutorReplyValidatorTests.Validate_WhenReplyAsksMoreThanTwoQuestions_RejectsWithExactlyOneQuestionReason` (4 casos), `TutorReplyRejectionsTests.ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound` (3 casos; o caso 2 vira 4; todos com a frase da tolerância), `TutorReplyParserTests.Parse_WhenJsonReplyAsksTwoQuestions_ReturnsReply` (substitui `Parse_WhenJsonReplyAsksTwoQuestions_RejectsWithExactlyOneQuestionReason`) e `TutorReplyParserTests.Parse_WhenJsonReplyAsksThreeQuestions_RejectsWithExactlyOneQuestionReason`; os comentários de cenário dos testes alterados passam para os nomes novos da spec (`reply com duas perguntas é aceito pela tolerância`, `reply com três perguntas é inválido`); e, **só o comentário** (corpo e 7 casos intactos), o de `ReplySentencesTests.IsQuestion_WithSentence_ReturnsWhetherFinalPunctuationContainsQuestionMark` (`ReplySentencesTests.cs:28`), que passa a `// US-004 — Cenário: reply com duas perguntas é aceito pela tolerância (apoio, P21: o que é pergunta) — RN-FEED01` (B2). **Falham pela asserção (rodada 3, B1; cada asserção conferida contra o `src` atual):** os 4 casos de duas perguntas no validador (a regra atual rejeita); o teste de 2 perguntas no parser (idem); os 3 casos de `ReplyMustAskExactlyOneQuestion_WithQuestionCount_...` (falta a frase da tolerância; o caso novo de 4 também não tem `has 4 questions` na entrada antiga, mas o motivo da falha é a frase); e **os 4 casos de 3 ou mais perguntas no validador** (`IsValid` falso e `Reason` já passam hoje; a `Message` atual não contém `Replies with 1 or 2 questions are accepted`, então a asserção da frase falha). **Nascem verdes** (só estes dois): `Parse_WhenJsonReplyAsksThreeQuestions_RejectsWithExactlyOneQuestionReason` (confere só `has 3 questions`, que a regra atual já produz; mutação depois do Green) e o teste de `ReplySentencesTests` (só mudou um comentário; não é teste novo, sem Red a provar).
@@ -608,28 +608,28 @@ private const int _maxQuestions = 2;
   Commits: `test(core): cover the 1 or 2 questions tolerance` + `feat(core): accept replies with one or two questions`.
   Escolhas de forma: nenhuma
 
-- [ ] T11 — Prompts reforçados para o 14B, regra de exatamente uma pergunta mantida. (§2.12.2)
+- [x] T11 — Prompts reforçados para o 14B, regra de exatamente uma pergunta mantida. (§2.12.2) (feito: test 87112ad, feat b38b907; §12 em 2cab4b6)
   Red (S3, 2026-10-22): a classe `PromptFilesContentTests` com dois métodos, lendo `prompts` da saída do teste.
   (1) `PromptFilesContentTests.Prompt_Always_KeepsExactlyOneQuestionRuleAndNoToleranceWording` (3 casos). **Nasce verde** (os prompts atuais já têm a regra e não citam tolerância): Red por mutação temporária pelo efeito, aplicada no próprio Red e desfeita pela edição inversa: "a regra de exatamente uma pergunta sai do `format.json.md`" (o caso `format.json.md` falha) e, separadamente, "o `tutor.md` ganha a frase `one or two questions are fine`" (o caso `tutor.md` falha pelo `NotContain`).
   (2) `PromptFilesContentTests.FormatPrompt_Always_ContainsFinalQuestionCountCheck` (2 casos, `format.json.md` e `format.tags.md`). **Nasce vermelho**, pela asserção: os prompts atuais não têm o trecho `count the "?"` (conferido por Grep em `prompts/`: nenhuma ocorrência de `count the`); é o Red que a T11 não tinha.
   Green: reforço de `prompts/format.json.md` e `prompts/format.tags.md` conforme a §2.12.2 (checagem final por contagem de `?` com o trecho `count the "?"`, par bom/ruim, sem tolerância); nota no `tests/EnglishTutor.Infrastructure.Tests/Fixtures/Ollama/README.md` (§2.8); `tutor.md` não muda (P15). Os 5 casos passam (o guarda da regra continua verde e o do reforço passa a verde). A prova do **efeito** sobre o modelo é o D5 (T13); a do outro consumidor dos prompts (Claude Code) é a T12.
   Mutações depois do Green, cada uma desfeita pela edição inversa: "a linha de contagem de `?` sai do `format.json.md`" (o caso `format.json.md` do teste 2 falha) e, separadamente, "sai do `format.tags.md`" (o caso `format.tags.md` falha); "o reforço do `format.tags.md` ganha a frase `1 or 2 questions are fine`" (o caso `format.tags.md` do teste 1 falha pelo `NotContain`).
   Commits: `test(brain): guard the one-question rule in the prompts` + `feat(brain): reinforce the one-question rule in the format prompts`.
-  Escolhas de forma: nenhuma (o Executor registra na §12 o texto final do reforço)
+  Escolhas de forma: §12 em 2cab4b6 (texto final do reforço; anterior ao feat b38b907)
 
-- [ ] T12 — `LiveBrain` do Claude Code com a tolerância (P17).
+- [x] T12 — `LiveBrain` do Claude Code com a tolerância (P17). (feito: 2c36daf; D19 verde, D20 sem linha)
   Alterar `ClaudeCodeTutorBrainLiveTests`: em `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithExactlyOneQuestion` (renomeado para `SendAsync_WithGrammarErrorSentence_RepliesUpToThreeSentencesWithOneOrTwoQuestions`, com o comentário de cenário atualizado) e em `SendAsync_OnSecondTurnWithUseResume_ResumesAndReturnsValidReply`, a asserção `Should().Be(1)` sobre `Count(ReplySentences.IsQuestion)` passa a `BeInRange(1, 2)`. **Comentários (S1):** o comentário de cenário dos dois métodos passa a `// US-004 — Cenário: frase com erro gramatical — RN-FEED01 (pedida 1 pergunta, verificada 1..2: tolerância de verificação)`; o cenário e o D6 da US-004 em `SPRINT_1.md` seguem descrevendo a regra pedida (§2.12, S1), sem mudança de spec. Sem Red executável na suíte rápida (os testes são `LiveBrain`): nascem verdes com o Claude Code autenticado; Red por mutação pelo efeito, aplicada antes da mudança e desfeita: "a asserção passa a exigir 0 perguntas" (o teste falha pela asserção); a mudança então é feita e o teste roda **uma vez** (D19).
   Green: as duas asserções, o nome e os comentários; rodar o D19 (a primeira vez conta como o novo Red/Green do consumidor dos prompts reforçados na T11: o Claude Code continua no formato). Rodar o **D20** (agora sem nenhuma linha).
   Commit: `test(brain): accept one or two questions in the Claude Code LiveBrain tests`.
   Escolhas de forma: nenhuma
 
-- [ ] T13 — D5 com a retentativa do ADR-006 e fechamento do D5. (§2.12.3)
+- [x] T13 — D5 com a retentativa do ADR-006 e fechamento do D5. (§2.12.3) (feito: 8592c0c; D5 verde nas 3 rodadas, Evidências)
   Red: `CountingTutorBrain` (Support) e a propriedade `LiveOllama.PromptFiles`; `OllamaConversationLiveTests.SendAsync_WithFiveKnownErrors_AllInFormatCountingTheSingleRetry`; o teste antigo `OllamaTutorBrainLiveTests.SendAsync_WithFiveKnownErrors_AllInFormat` sai no mesmo commit (a camada do D5 mudou). **Nasce verde ou vermelho conforme o modelo** (é `LiveBrain`, o adaptador e o serviço existem): o Red é por mutação temporária pelo efeito, determinística: "o decorator do teste rejeita **toda** resposta como `InvalidOutput`, nas duas tentativas" (as 5 frases caem no `RawFallback` e o teste falha pela asserção `IsRawFallback == false`, com os motivos na mensagem); desfeita pela edição inversa. O estado final é o decorator que só conta, sem alterar a resposta.
   Green: o teste final passa; rodar o **D5 em 3 rodadas seguidas** (comando da §10) e o D6 não precisa repetir (a VRAM medida não muda). Colar nas Evidências as 3 linhas `round <n> exit=<c>` e, de cada rodada, as linhas de `recorded-fixtures/ollama-smoke.txt` (`first attempt invalid`, `retries used`, `expected corrections found`). **Se qualquer rodada ficar vermelha:** parar, classificar a causa na §12 (as duas tentativas inválidas, por quantas perguntas e por qual frase; ou erro de outro tipo) e o usuário decide, com registro prévio na spec (§7, AP-032); se só `tutor.md` ficar para mexer, é a decisão P15, que o usuário confirma antes; a frase da tolerância na mensagem de correção da retentativa é a primeira candidata a sair (§2.12.2, S2).
   Commits: `test(brain): run the Ollama LiveBrain smoke through the conversation retry`.
   Escolhas de forma: nenhuma
 
-- [ ] T14 — DoD e evidências finais da US.
+- [x] T14 — DoD e evidências finais da US. (feito: DoD final nas Evidências, commit abaixo)
   Rodar D1–D20 de novo (D15 e D20 depois de todo o código; D19 já rodado na T12, repetir se `prompts/` mudou depois), colar nas Evidências com data e hash (nova subseção; a de 2026-10-21 fica como histórico), atualizar contagens (AP-031: D2 366, Core 138, Console 55, Infrastructure 173; D11 69) e conferir cada afirmação de cobertura da §12 e da §4 contra a tabela (AP-049).
   Commit: `docs(ai): add US-006 final evidence`.
   Escolhas de forma: nenhuma
@@ -807,6 +807,41 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 | D17 | `git status --short` | ✅ vazio |
 | D18 | `dotnet list package --vulnerable --include-transitive` | ✅ nenhum pacote vulnerável nos 6 projetos |
 | D15c | (T1) | ✅ ver T1 |
+
+**T10 a T14 (2026-10-22)**
+
+- D20c (antes do primeiro teste, sobre `139adee`): 6 arquivos, os do inventário da §2.12 (`TutorReplyValidator.cs:19`, `ReplySentencesTests.cs:28`, `TutorReplyRejectionsTests.cs:58,61`, `TutorReplyValidatorTests.cs:68,74,80`, `ClaudeCodeTutorBrainLiveTests.cs:44`, `TutorReplyParserTests.cs:122,124,132`); nenhum a mais, nenhum a menos.
+- T10 Red (6ee8e54), todas pela asserção: 11 falhas em Core.Tests (4 de 2 perguntas no validador, 4 de 3 ou mais por falta da frase da tolerância, 3 de `ReplyMustAskExactlyOneQuestion_WithQuestionCount_...`) e 1 em Infrastructure.Tests (`Parse_WhenJsonReplyAsksTwoQuestions_ReturnsReply`); `Parse_WhenJsonReplyAsksThreeQuestions_...` nasceu verde, como previsto. Mutações depois do Green (e0931d0), todas revertidas (`git status` limpo): limite superior 3 → 3 casos de 3 perguntas do validador + teste de 3 do parser falham (o caso de 4 fica verde); frase da tolerância fora da `Message` → 4 do validador + 3 das rejeições falham (parser de 3 verde); limite inferior 0 → 3 casos de `Validate_WhenReplyHasNoQuestion_...` + 2 do parser + 1 de `ClaudeCodeTutorBrainTests` falham; limite superior 1 → 4 casos de 2 perguntas + o do parser falham.
+- T11 Red (87112ad): `FormatPrompt_Always_ContainsFinalQuestionCountCheck` (2 casos) falha pela asserção; `Prompt_Always_KeepsExactlyOneQuestionRuleAndNoToleranceWording` (3 casos) nasceu verde. Mutações no Red: `format.json.md` sem "with exactly one question" e `tutor.md` com "one or two questions are fine" → o guarda da regra falha (cada uma no seu caso, além dos 2 casos do reforço, ainda vermelhos). Mutações depois do Green (b38b907, revertidas): linha `count the "?"` fora do `format.json.md` → só o caso `format.json.md` do teste 2 falha; fora do `format.tags.md` → só o caso `format.tags.md`; `format.tags.md` com "1 or 2 questions are fine" → só o caso `format.tags.md` do teste 1 falha.
+- T12 (2c36daf): mutação "a asserção exige 0 perguntas" → `SendAsync_WithGrammarErrorSentence_...` falha pela asserção (`Expected ... to be 0, but found 1`), revertida pela edição; **D19**: `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ClaudeCodeTutorBrainLiveTests"` → 3 passed, 0 failed, 41 s (1 rodada). **D20**: sem linha (exit 1).
+- T13 (8592c0c): mutação "o decorator rejeita toda resposta como `InvalidOutput`" → `SendAsync_WithFiveKnownErrors_AllInFormatCountingTheSingleRetry` falha pela asserção (`Fell back to raw text: sentence: "I have worked with C# since five years"; ... reasons: missing reply ...`), revertida pela edição inversa (`grep mutation` = 0).
+- **D5 (2026-10-22, 8592c0c)**: `round 1 exit=0`, `round 2 exit=0`, `round 3 exit=0`; cada rodada 5 testes, 5 passed, 14-15 s. `ollama-smoke.txt` (uma linha por rodada): `first attempt invalid: 0/5; retries used: 0; expected corrections found: 4/5; out of format: 0` (as 3 rodadas iguais: com os prompts reforçados nenhuma primeira tentativa foi rejeitada e a retentativa não foi usada). Critério (tolerância zero, 3 rodadas, com a retentativa) atendido; nada a registrar na §12.
+
+| # | Comando | Resultado (2026-10-22, código em 8592c0c) |
+|---|---|---|
+| D1 | `dotnet build` | ✅ 0 warnings, 0 erros |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | ✅ 366 passed, 0 failed (Core 138, Console 55, Infrastructure 173), < 1 s por projeto |
+| D3 | `... --collect:"XPlat Code Coverage" --results-directory TestResults` | ✅ 3 `coverage.cobertura.xml` |
+| D3b | `dotnet reportgenerator ...` | ✅ `EnglishTutor.Core` 100% (linha geral 90,1%; Console 95,1%) |
+| D4 | `dotnet format --verify-no-changes` | ✅ sem diferenças (exit 0) |
+| D5 | ver acima | ✅ 3 × `exit=0` |
+| D6 | não repetido (§10: a VRAM do modelo não muda) | ✅ coletado na T8 (3744531) |
+| D7 | PowerShell 5.1, `Brain__Provider=Ollama` | ✅ `Tutor: That's great experience with C#. How did you get started with C#?`, `Feedback:` com `since five years → for five years`, nenhuma linha "not connected", `exit=0` |
+| D8 | `Brain__Ollama__Endpoint=http://localhost:1` | ✅ 2× `The tutor could not answer: Ollama is not running at "http://localhost:1". Start it ...` + `You can send a sentence again or type /quit to exit.`; `exit=0` |
+| D9 | `Brain__Ollama__Model=nao-existe-us006` | ✅ `Ollama model "nao-existe-us006" is not downloaded. Run "ollama pull nao-existe-us006" ...`; `exit=0` |
+| D10 | `Brain__Ollama__TimeoutSeconds=1` | ✅ `Ollama did not answer in time (limit: 1 s) and the request was cancelled. ...`; `exit=0` (primeira tentativa) |
+| D11 | `dotnet test --filter "Category!=LiveBrain&FullyQualifiedName~Ollama"` | ✅ 69 casos (Infrastructure 65, Console 4), como previsto |
+| D12 | `Select-String ... appsettings.json` | ✅ 5 linhas |
+| D13 | `Select-String ... Fixtures/Ollama/*` | ✅ 0 linhas (inclui a nota nova do README) |
+| D14 | `git diff develop...HEAD \| grep -c ...` | ✅ `0` (exit 1) |
+| D15 | bloco PowerShell | ✅ `scanned=137 named=1`; nenhuma linha |
+| D16 | `git grep -n -F "Provisional selector" -- src tests` | ✅ 1 linha, `InfrastructureServiceCollectionExtensions.cs:33` |
+| D17 | `git status --short` | ✅ vazio |
+| D18 | `dotnet list package --vulnerable --include-transitive` | ✅ nenhum pacote vulnerável nos 6 projetos |
+| D19 | `... FullyQualifiedName~ClaudeCodeTutorBrainLiveTests` | ✅ 3 passed (T12, 2c36daf); `prompts/` não mudou depois |
+| D20 | `git grep ... -- src tests` | ✅ nenhuma linha (exit 1) |
+
+Contagens conferidas (AP-031): Core 138, Console 55, Infrastructure 173, total 366; D11 69; a §4 e D2 batem. Cobertura do Core: 100% (≥ 80%).
 
 ## 12. Comentários do usuário
 
