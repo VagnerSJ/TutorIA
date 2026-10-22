@@ -386,3 +386,8 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-22 — pedido do Revisor do plano (rodada 1, REPROVADO)
+- **B1** — §3 e T4 prometem "B1–B6", mas a §4 só tem B1, B2, B3, B4 e B6 (falta B5). Definir o B5 (projeto, classe, método e cenário) ou renumerar para B1–B5 em §3, §4, §5 T4 e D5.
+- **B2** — O DI3 (`AddEnglishTutorInfrastructure_WhenNotifierIsAlreadyRegistered_KeepsIt`) nasce verde após a T2. Descrever na §4 a observação que o faz falhar antes da fábrica (o notificador registrado antes é o que recebe o aviso na troca), ou declará-lo na T4 entre os que nascem verdes, com a mutação que o derruba (`TryAdd` → `Add`). Ajustar D5/T4.
+- Sugestões a avaliar junto com o usuário: S1 (remover do D5 o trecho sobre testes DI), S2 (D8: "não reproduzido" se não houver Ollama), S3 (frase sobre `Name` coberto por cérebros/DI5), S4 (justificar `FromProvider` ou remover).
