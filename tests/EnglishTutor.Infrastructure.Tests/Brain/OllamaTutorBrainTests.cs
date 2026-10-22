@@ -325,6 +325,101 @@ public sealed class OllamaTutorBrainTests : IDisposable
         (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(original);
     }
 
+    // US-006 — Cenário: tempo esgotado — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenOllamaDoesNotAnswerWithinTimeout_CancelsRequestAndThrowsTimeout()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var started = new TaskCompletionSource();
+        _chatClient.OnRun = _ => started.SetResult();
+        _chatClient.HangsUntilCancelled();
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        var run = sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), ct);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        _chatClient.Tokens[0].IsCancellationRequested.Should().BeFalse();
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var act = () => run.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        var exception = (await act.Should().ThrowAsync<BrainException>()).Which;
+        exception.Kind.Should().Be(BrainErrorKind.Timeout);
+        exception.Message.Should().Contain("Ollama did not answer in time (limit: 1 s)").And.Contain("Brain:Ollama:TimeoutSeconds");
+        _chatClient.Tokens[0].IsCancellationRequested.Should().BeTrue();
+    }
+
+    // US-006 — Cenário: tempo esgotado (apoio: um relógio por chamada) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_OnEachCall_StartsTimeoutAgain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var secondStarted = new TaskCompletionSource();
+        _chatClient.OnRun = _ =>
+        {
+            if (_chatClient.Calls.Count == 1)
+            {
+                _timeProvider.Advance(TimeSpan.FromMilliseconds(900));
+            }
+            else
+            {
+                secondStarted.SetResult();
+            }
+        };
+        _chatClient.Returns(OllamaTestKit.ValidReplyJson("t1")).HangsUntilCancelled();
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        await sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), ct);
+        var second = sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t2"), ct);
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        _chatClient.Tokens[1].IsCancellationRequested.Should().BeFalse();
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var act = () => second.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        (await act.Should().ThrowAsync<BrainException>()).Which.Kind.Should().Be(BrainErrorKind.Timeout);
+    }
+
+    // US-006 — Cenário: tempo esgotado (apoio: Ctrl+C não é Timeout) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var started = new TaskCompletionSource();
+        _chatClient.OnRun = _ => started.SetResult();
+        _chatClient.HangsUntilCancelled();
+        var sut = CreateSut();
+
+        var run = sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), caller.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        await caller.CancelAsync();
+        var act = () => run.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _chatClient.Tokens[0].IsCancellationRequested.Should().BeTrue();
+    }
+
+    // US-006 — Cenário: tempo esgotado (apoio: tempo estourado e Ctrl+C ao mesmo tempo não é Timeout) — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var started = new TaskCompletionSource();
+        _chatClient.OnRun = _ => started.SetResult();
+        _chatClient.HangsUntilCancelled(onCancelled: () => caller.Cancel());
+        var sut = CreateSut(options => options.TimeoutSeconds = 1);
+
+        var run = sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), caller.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        _timeProvider.Advance(TimeSpan.FromMilliseconds(1000));
+        var act = () => run.WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        caller.IsCancellationRequested.Should().BeTrue();
+        _chatClient.Tokens[0].IsCancellationRequested.Should().BeTrue();
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_rootDirectory))
