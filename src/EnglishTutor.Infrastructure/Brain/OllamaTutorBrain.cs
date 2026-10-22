@@ -56,7 +56,15 @@ public sealed class OllamaTutorBrain(
                 : null,
         };
 
-        var response = await _chatClient.GetResponseAsync(messages, chatOptions, ct);
+        ChatResponse response;
+        try
+        {
+            response = await _chatClient.GetResponseAsync(messages, chatOptions, ct);
+        }
+        catch (Exception exception) when (OllamaFailures.IsServerFailure(exception))
+        {
+            throw OllamaFailures.Translate(exception, options);
+        }
 
         var elapsedMs = (long)_timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
         var text = response.Text;
