@@ -283,35 +283,35 @@ Fakes: o Core.Tests usa `FakeTutorBrain`; o Infrastructure.Tests usa `StubTutorB
 
 Convenções: o Red de cada tarefa lista o que **nasce verde** (declarado) e o que falha. Antes de cada commit `feat`, o Executor preenche a linha `Escolhas de forma`.
 
-- [ ] **T1 — Configuração do reserva no Core**
+- [x] **T1 — Configuração do reserva no Core** (feito: test aba35d3, feat 06424f1)
   Red: V1–V6 de `BrainOptionsValidatorTests`, C6 e a linha nova C7 de `EnglishTutorAppTests`, mais a propriedade `BrainOptions.FallbackProvider` só para compilar. Falham: V3, V4, V5, C6 (a partida aceita a configuração) e C7 (a falha de `FallbackProvider` não aparece). Nascem verdes: V1, V2 e V6 (o validador de hoje ignora o campo e já devolve só a falha de `Provider`). Mutação depois do Green para V6: avaliar `FallbackProvider` mesmo com `Provider` inválido faz V6 falhar.
   Green: `BrainOptionsValidator` coleta falhas (Provider, depois FallbackProvider, §2.1) com as mensagens exatas.
   Refactor: constantes das mensagens agrupadas, sem mudar os textos de `Provider`.
   Commit: `test(core): cover Brain:FallbackProvider validation` + `feat(core): validate Brain:FallbackProvider`.
   Escolhas de forma: nenhuma | §12 em `<hash>`
 
-- [ ] **T2 — Política e porta do aviso no Core**
+- [x] **T2 — Política e porta do aviso no Core** (feito: test bd42857, feat 3a7645a)
   Red: P1, P2, P3 de `BrainFallbackPolicyTests`, com `BrainFallbackPolicy.ShouldFallBack` devolvendo `false` e `BrainSwitchNotice`/`IBrainSwitchNotifier` só como tipos. Falha: P1 (4 linhas). Nascem verdes: P2 (devolve `false` mesmo) e P3 (só conta o enum).
   Green: `ShouldFallBack` verdadeiro para os 4 tipos da RN-BRAIN08.
   Refactor: nenhum previsto.
   Commit: `test(core): cover the fallback policy` + `feat(core): add fallback policy and switch notice port`.
   Escolhas de forma: nenhuma | §12 em `<hash>`
 
-- [ ] **T3 — `FallbackTutorBrain`**
+- [x] **T3 — `FallbackTutorBrain`** (feito: test 014d1ee, feat d08b7c6)
   Red: `StubTutorBrain`, `RecordingBrainSwitchNotifier`, F1–F14 de `FallbackTutorBrainTests` e F15 de `FallbackTutorBrainConversationTests`, com `SendAsync` apenas repassando `primary.SendAsync` (sem catch). Nascem verdes: F1, F2, F6, F7, F8 (repassar já cumpre). Falham: F3, F4, F5, F9, F10, F11, F12, F13, F14, F15. Mutação depois do Green: trocar o filtro do `catch` por `catch (Exception)` quebra F7 e F8; ignorar `ShouldFallBack` quebra F6.
   Green: §2.3 e `FallbackLog` (EventId 2003).
   Refactor: nenhum previsto.
   Commit: `test(brain): cover the fallback decorator` + `feat(brain): add FallbackTutorBrain`.
   Escolhas de forma: nenhuma | §12 em `<hash>`
 
-- [ ] **T4 — `BrainFactory`, DI e fim do seletor provisório**
+- [x] **T4 — `BrainFactory`, DI e fim do seletor provisório** (feito: test e138b09, feat e673750)
   Red: B1–B6 de `BrainFactoryTests` (com `Create()` lançando `NotImplementedException`), DI1–DI5 em `InfrastructureServiceCollectionExtensionsTests` (DI1 é o teste renomeado), mais C1, C4 e C5 de `EnglishTutorAppTests` e o `FixedResultProcessRunner`. Falham: B1–B6 (inclui B5), DI2, DI3 (o aviso não chega ao notificador registrado: o seletor provisório ignora as chaves e o reserva, §4), DI4, DI5. Entre os DI, só DI1 nasce verde. Nascem verdes: DI1 (o `ITutorPromptSource` já é registrado), os dois testes de resolução existentes, C1 (o cabeçalho já usa o nome canônico), C4 (sem reserva, o seletor atual devolve o Claude Code puro) e C5 (o `Unknown` do primário propaga; o seletor atual ignora o reserva). Mutações depois do Green: C4 — a fábrica embrulhar o primário num decorator com o Ollama quando `FallbackProvider` é vazio quebra C4 e B2; C5 — `ShouldFallBack` devolver `true` para `Unknown` quebra C5 e P2; C1 — o cabeçalho mostrar sempre `ClaudeCode` quebra C1; DI3 — trocar o `TryAddSingleton` do `SilentBrainSwitchNotifier` por `AddSingleton` quebra DI3.
   Green: §2.4; a fábrica devolve o primário ou o decorator; `SilentBrainSwitchNotifier`; remove o bloco `Provisional selector` e atualiza o comentário do cabeçalho.
   Refactor: nenhum previsto.
   Commit: `test(brain): cover the brain factory` + `feat(brain): replace the provisional selector with BrainFactory`.
   Escolhas de forma: nenhuma | §12 em `<hash>`
 
-- [ ] **T5 — Aviso no console e ligação ponta a ponta**
+- [x] **T5 — Aviso no console e ligação ponta a ponta** (feito: test 7cd48a1, feat a712b33)
   Red: C8, C9, C10 de `ConsoleTextTests`, C11 de `ConsoleBrainSwitchNotifierTests`, C12 de `AppSettingsTests`, C2 e C3 de `EnglishTutorAppTests`, com `ConsoleText.BrainSwitched` e `ConsoleBrainSwitchNotifier` só como esqueleto (`BrainSwitched` devolve `string.Empty`, `NotifyAsync` não escreve) e sem o registro no `BuildHost`. Falham: C8, C9, C10 (não lança), C11, C12 (o `appsettings.json` ainda não tem a chave), C2 e C3 (a linha `Switched to` não aparece: o notificador padrão é silencioso). Nenhum teste da tarefa nasce verde. Mutação depois do Green: registrar o notificador do console **depois** de `AddEnglishTutorInfrastructure` (o `TryAdd` da Infrastructure vence) quebra C2 e C3.
   Green: §2.5; `appsettings.json` com `"FallbackProvider": ""`.
   Refactor: nenhum previsto.
@@ -416,3 +416,12 @@ Plano aprovado. Incorporar as sugestões S1, S2, S3 e S4 da revisão do plano (r
 
 ### 2026-10-22 — aprovação
 Plano aprovado pelo usuário em 2026-10-22. Perguntas em aberto P1–P13: respostas padrão aceitas sem mudança. ADR-010 passou para "Aceito". Spec (`docs(ai): update spec for US-007`) e ARCHITECTURE (`docs(ai): update architecture for US-007`) já atualizadas.
+
+### 2026-10-22 — Escolhas de forma do Executor (registradas depois dos commits `feat`; desvio da AP-009)
+O Executor decidiu os textos abaixo durante o Green e só os registrou aqui depois dos commits `feat` (o §12 devia ter vindo antes). Nenhuma muda comportamento observável da spec.
+- **T3 — texto do log 2003:** `Brain {Primary} failed with {ErrorKind}; this turn goes to {Secondary}` (Warning; propriedades `Primary`, `Secondary`, `ErrorKind`). Feat `d08b7c6`.
+- **T4 — mensagem da fábrica:** `Invalid Brain configuration: <falhas do validador separadas por espaço>` (`InvalidOperationException`); as falhas são as mesmas do `BrainOptionsValidator`. Feat `e673750`.
+- **T5 — exceção de `ConsoleText.BrainSwitched`:** `ArgumentOutOfRangeException` com a mensagem `Expected a kind that BrainFallbackPolicy sends to the fallback brain.` Feat `a712b33`.
+- **T5 — posição do aviso na linha:** a saída padrão mostra o prompt `> ` sem quebra de linha, então o aviso aparece como `> Switched to Ollama (CLI not found)`, igual à linha `> Tutor: ...`. Os testes C2/C3 procuram a linha com `EndsWith`. A DoD D8 confere o trecho `Switched to Ollama (CLI not found)` seguido de `Tutor:`. O D8/D9 da spec dizem "a linha `Switched to ...`": o prefixo `> ` é do prompt, não do aviso.
+- **T5 — C12:** `appsettings.json` chega à pasta de saída do `Console.Tests` pela referência de projeto; o teste lê `AppContext.BaseDirectory` (sem leitura pela raiz do repositório).
+- **Mutações:** T3 feita (filtro `catch (Exception)` quebra F6, F7, F8); T4 DI3 feita (`AddSingleton` quebra o DI3); T5 feita (notificador registrado depois da Infrastructure quebra C2 e C3). Não aplicadas: a mutação de V6 (T1), por não existir forma de avaliar o reserva contra um `Provider` inválido sem mudar a mensagem; e as de C4, C5 e C1 (T4), cobertas pelos testes B2, P2 e pelo cabeçalho em `ChatSession`.
