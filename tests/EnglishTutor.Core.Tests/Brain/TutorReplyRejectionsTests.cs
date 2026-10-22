@@ -55,11 +55,11 @@ public sealed class TutorReplyRejectionsTests
         rejection.Message.Should().NotContain("...");
     }
 
-    // US-004 — Cenário: reply com duas perguntas é inválido (apoio, P23, AP-016: contagem) — RN-FEED01
+    // US-004 — Cenário: reply com três perguntas é inválido (apoio, P13, P23, AP-016: contagem) — RN-FEED01
     [Theory]
     [InlineData("I like that.", 0, "the reply \"I like that.\" has no question", "has 0")]
-    [InlineData("Was it busy? How long was the trip?", 2, "has 2 questions", "no question")]
     [InlineData("Why? When? Where?", 3, "has 3 questions", "no question")]
+    [InlineData("Why? When? Where? Who?", 4, "has 4 questions", "no question")]
     public void ReplyMustAskExactlyOneQuestion_WithQuestionCount_StatesHowManyQuestionsWereFound(
         string reply, int questionCount, string expected, string unexpected)
     {
@@ -67,6 +67,7 @@ public sealed class TutorReplyRejectionsTests
 
         rejection.Message.Should().Contain(expected).And.NotContain(unexpected);
         rejection.Message.Should().Contain("Expected 1 to 3 short sentences with exactly one question");
+        rejection.Message.Should().Contain("Replies with 1 or 2 questions are accepted.");
     }
 
     // US-002 — §12: detalhe da JsonException terminado em "." não gera ".." antes de Expected (revisão S3)
