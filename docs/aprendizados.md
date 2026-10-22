@@ -488,7 +488,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o D5 foi redefinido para medir "o adaptador mais a retentativa única do ADR-006". Nas 3 rodadas nenhuma primeira tentativa foi inválida (`retries used: 0`), então o D5 verde mediu o adaptador com os prompts reforçados, não a retentativa. Do mesmo modo, a fumaça registrou 4/5 correções esperadas nas 3 rodadas sem margem, e o critério só exige o formato. Ambos ficaram registrados como limites em `docs/us/US-006.md`.
 - **Por que importa:** a US seguinte pode herdar uma garantia que nunca foi medida ao vivo (a retentativa) e o `eval` da US-009 parte de um valor no limite (AP-032).
 - **Correção (proposta):** `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md`: "o critério de um teste `LiveBrain` diz se o mecanismo medido precisa ter sido exercitado (ex.: pelo menos uma retentativa usada) ou se basta o teste unitário; quando só o unitário prova, a US registra isso como limite, e métricas só registradas (ex.: correções esperadas encontradas) entram como risco para a US que as usará como critério".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-22, ver commit "docs(ai): apply learning 052")
 
 ### AP-053 — Remover um tipo apagando a declaração antes dos usos gera erro de compilação transitório no hook
 
