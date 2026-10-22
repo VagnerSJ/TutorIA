@@ -1,9 +1,9 @@
 # Plano — US-007 Troca de cérebro por configuração e fallback
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-22
 Branch: feature/US-007_troca-cerebro-fallback
 Spec: specs/sprints/SPRINT_1.md#us-007
-Regras: RN-BRAIN08 (da US), RN-BRAIN07 e RN-BRAIN04 (sem mudança), RN-BRAIN01; ARCHITECTURE §2 (R1–R4), §3, §4, §6.1, §6.3, §9; ADR-006, ADR-008, ADR-009, ADR-010 (Proposto, novo)
+Regras: RN-BRAIN08 (da US), RN-BRAIN07 e RN-BRAIN04 (sem mudança), RN-BRAIN01; ARCHITECTURE §2 (R1–R4), §3, §4, §6.1, §6.3, §9; ADR-006, ADR-008, ADR-009, ADR-010 (Aceito)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Trocar o seletor provisório de `ITutorBrain` pela `BrainFactory` (escolha por `
 
 ## 2. Abordagem
 
-A decisão central está no **ADR-010 (Proposto)**: `docs/adr/ADR-010-cerebro-reserva-decorator-politica-no-core-e-aviso-por-porta.md`. Resumo:
+A decisão central está no **ADR-010 (Aceito)**: `docs/adr/ADR-010-cerebro-reserva-decorator-politica-no-core-e-aviso-por-porta.md`. Resumo:
 
 - A **política** (quais falhas trocam) é regra de negócio: mora no Core (`BrainFallbackPolicy`, R4). O **decorator** `FallbackTutorBrain` (Infrastructure) só a consulta.
 - O **aviso** chega à tela por uma porta do Core, `IBrainSwitchNotifier`, que o console implementa (R2). `ConversationService` e `TutorReply` não mudam.
@@ -68,6 +68,8 @@ Comportamento de `SendAsync`:
 3. Qualquer outra exceção (`BrainException` fora da política, `InvalidOutput`, `OperationCanceledException`, erro inesperado) propaga sem troca e sem aviso.
 4. Falha do notificador propaga (o reserva não é chamado). Falha do reserva propaga como está, inclusive `InvalidOutput` (o `ConversationService` faz a retentativa da RN-BRAIN04) (P7).
 5. Sem estado: a chamada seguinte tenta o primário de novo ("para aquele turno", RN-BRAIN08; `SendAsync_OnNextCall_TriesPrimaryFirstAgain`).
+
+`BrainSwitchNotice.FromProvider` existe para log e consumidores futuros: o console de hoje só usa `ToProvider` e `Reason`, e o F5 confere o valor de `FromProvider`.
 
 ### 2.4 `BrainFactory` e DI (Infrastructure)
 
@@ -214,7 +216,7 @@ Cada trecho identificado pelo texto antigo.
 | Criar | `tests/EnglishTutor.Console.Tests/Ui/ConsoleTextTests.cs`, `ConsoleBrainSwitchNotifierTests.cs` | C8–C11 |
 | Criar | `tests/EnglishTutor.Console.Tests/AppSettingsTests.cs` | C12 |
 | Criar | `tests/EnglishTutor.Console.Tests/Support/FixedResultProcessRunner.cs` | `IProcessRunner` falso que devolve um `ProcessResult` fixo e conta chamadas |
-| Criar | `docs/adr/ADR-010-cerebro-reserva-decorator-politica-no-core-e-aviso-por-porta.md` | Status Proposto (já criado com este plano) |
+| Criar | `docs/adr/ADR-010-cerebro-reserva-decorator-politica-no-core-e-aviso-por-porta.md` | Status Aceito (criado com este plano; aceito na aprovação) |
 | Alterar | `specs/sprints/SPRINT_1.md`, `ARCHITECTURE.md` | Só pelo orquestrador, §2.7 e §2.8, antes da T1 |
 
 Nenhuma tarefa altera `specs/`, `ARCHITECTURE.md` ou ADR; `CHANGELOG` e `docs/us/US-007.md` são do Documentador.
@@ -230,7 +232,7 @@ Fakes: o Core.Tests usa `FakeTutorBrain`; o Infrastructure.Tests usa `StubTutorB
 | escolha por configuração | Infrastructure.Tests | `BrainFactoryTests` | B2 `Create_WithBlankFallbackProvider_ReturnsThePrimaryBrain` (Theory: `""`, `"   "`; `resolve` chamado uma vez) | Unidade |
 | escolha por configuração | Infrastructure.Tests | `BrainFactoryTests` | B4 `Create_WhenProviderIsInvalid_ThrowsExplainingAcceptedProviders` (Theory: `""`, `"Inexistente"`; a mensagem tem `Accepted values: ClaudeCode, Ollama.`) | Unidade |
 | (apoio) validação de `FallbackProvider` na fábrica (P10) | Infrastructure.Tests | `BrainFactoryTests` | B5 `Create_WhenFallbackProviderIsUnknown_ThrowsNamingValueAndAcceptedProviders` (`Provider` `ClaudeCode`, reserva `Inexistente`; `InvalidOperationException` com `Brain:FallbackProvider 'Inexistente' is invalid` e `Accepted values: ClaudeCode, Ollama.`; papéis trocados em relação a B4, que invalida só o `Provider`) | Unidade |
-| escolha por configuração | Infrastructure.Tests | `InfrastructureServiceCollectionExtensionsTests` | DI1 `AddEnglishTutorInfrastructure_Always_RegistersFilePromptSource` (renomeado; ver abaixo) | Unidade |
+| escolha por configuração | Infrastructure.Tests | `InfrastructureServiceCollectionExtensionsTests` | DI1 `AddEnglishTutorInfrastructure_Always_RegistersFilePromptSource` (renomeado; ver abaixo). O `Name` de cada provedor continua coberto pelos testes dos cérebros e pelo DI5 | Unidade |
 | escolha por configuração | Infrastructure.Tests | `InfrastructureServiceCollectionExtensionsTests` | `AddEnglishTutorInfrastructure_WhenProviderIsOllama_ResolvesOllamaBrain` e `AddEnglishTutorInfrastructure_WhenProviderIsClaudeCode_ResolvesClaudeCodeBrain` (existentes, sem mudança; **continuam verdes** com a fábrica) | Unidade |
 | escolha por configuração | Infrastructure.Tests | `InfrastructureServiceCollectionExtensionsTests` | DI5 `AddEnglishTutorInfrastructure_Always_RegistersEachBrainUnderItsProviderKey` (`GetRequiredKeyedService<ITutorBrain>("ClaudeCode")` é `ClaudeCodeTutorBrain`, `"Ollama"` é `OllamaTutorBrain`) | Unidade |
 | fallback por limite de uso | Console.Tests | `EnglishTutorAppTests` | C2 `RunAsync_WhenPrimaryHitsUsageLimit_AnswersFromFallbackAfterShowingSwitchNotice` (`FixedResultProcessRunner` devolve o `ProcessResult` do limite de uso; `ScriptedChatClient` responde `t1`; a saída tem a linha `Switched to Ollama (usage limit reached)` **antes** da linha `Tutor: Reply t1?`; saída de erro vazia; `exit 0`; vermelho na T5, depois que a T4 liga o decorator) | Componente |
@@ -368,10 +370,10 @@ Adiamentos procurados também nas P*, nos comentários de teste e nos ADRs (AP-0
 | D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s |
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
-| D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde (B1–B6, F1–F15 e os testes DI cujo nome tem `BrainFactory`/`FallbackTutorBrain`) |
+| D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde (B1–B6 e F1–F15; os testes DI1–DI5 são provados pelo D2) |
 | D6 | No Windows PowerShell 5.1: `$env:Brain__Provider="Ollama"; "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__Provider` | cabeçalho com `Brain: Ollama`; `exit=0` (depende do `FallbackProvider` vazio, P1) |
 | D7 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha. Prova do comando (AP-035): antes da T4 acha **uma** linha, em `src/EnglishTutor.Infrastructure/DependencyInjection/InfrastructureServiceCollectionExtensions.cs` |
-| D8 | Comando D8 da spec (§2.7 c), Windows PowerShell 5.1, com o Ollama rodando e o modelo `qwen2.5:14b-instruct-q4_K_M` baixado | linha `Switched to Ollama (CLI not found)` seguida de uma linha `Tutor: <reply>`; `exit=0`; as variáveis `Brain__*` removidas ao fim |
+| D8 | Comando D8 da spec (§2.7 c), Windows PowerShell 5.1, com o Ollama rodando e o modelo `qwen2.5:14b-instruct-q4_K_M` baixado | linha `Switched to Ollama (CLI not found)` seguida de uma linha `Tutor: <reply>`; `exit=0`; as variáveis `Brain__*` removidas ao fim. Sem Ollama ou sem o modelo no ambiente, o Executor registra "não reproduzido" na §11 e o C3 vale como prova |
 | D9 | Comando D9 da spec (§2.7 c), Windows PowerShell 5.1, sem precisar do Ollama | `The tutor could not answer: Claude Code CLI not found`; nenhuma linha `Switched to`; `exit=0` |
 | D10 | `dotnet test --filter "FullyQualifiedName~BrainFallbackPolicy\|FullyQualifiedName~BrainOptionsValidator\|FullyQualifiedName~ConsoleBrainSwitchNotifier\|FullyQualifiedName~ConsoleText\|FullyQualifiedName~AppSettings"` | verde (P1–P3, V1–V6, C8–C12) |
 | D11 | `dotnet test --filter "FullyQualifiedName~EnglishTutorAppTests"` | verde (C1–C7 e os existentes) |
@@ -404,3 +406,13 @@ Plano aprovado. Incorporar as sugestões S1, S2, S3 e S4 da revisão do plano (r
 - S2: D8 — sem Ollama/modelo, o Executor registra "não reproduzido" na §11 e o C3 vale como prova.
 - S3: §4 DI1 — frase dizendo que o `Name` de cada provedor continua coberto pelos cérebros e pelo DI5.
 - S4: §2.3 — registrar que `BrainSwitchNotice.FromProvider` existe para log e consumidores futuros.
+
+**Respostas do Planejador (rodada 2)**
+- S1 → §10 D5 (a coluna "Esperado" passa a dizer "B1–B6 e F1–F15; os testes DI1–DI5 são provados pelo D2"; o comando não muda).
+- S2 → §10 D8 (a coluna "Esperado" ganha: sem Ollama ou sem o modelo, o Executor registra "não reproduzido" na §11 e o C3 vale como prova). O texto do D8 da spec (§2.7 c) não muda: a regra de "não reproduzido" é do plano.
+- S3 → §4 (linha DI1: frase de que o `Name` de cada provedor continua coberto pelos testes dos cérebros e pelo DI5).
+- S4 → §2.3 (parágrafo depois da lista: `BrainSwitchNotice.FromProvider` existe para log e consumidores futuros; o console só usa `ToProvider` e `Reason`; o F5 confere `FromProvider`, que já constava na descrição do F5).
+- P1–P13 → Sem mudança, como pedido. Nenhum teste renumerado; Status mantido em "Aguardando aprovação".
+
+### 2026-10-22 — aprovação
+Plano aprovado pelo usuário em 2026-10-22. Perguntas em aberto P1–P13: respostas padrão aceitas sem mudança. ADR-010 passou para "Aceito". Spec (`docs(ai): update spec for US-007`) e ARCHITECTURE (`docs(ai): update architecture for US-007`) já atualizadas.
