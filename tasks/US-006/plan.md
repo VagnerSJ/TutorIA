@@ -889,3 +889,14 @@ O usuário escolheu, para resolver o D5 vermelho (§11/§12 do Executor): **(c)*
 - Escopo novo (T10–T14) aprovado com os padrões propostos das perguntas P13 a P17 (nenhuma resposta alterada).
 - Sugestões S1 a S6 da revisão do plano (rodadas 3 e 4): **não incorporadas**, por decisão do usuário.
 - Aplicado o commit `docs(ai): update architecture for US-006` (`ARCHITECTURE.md` §6.2, ADR-005 e ADR-002), conforme §2.12.5, antes da T10. Nenhum ADR novo.
+
+### 2026-10-22 — decisão do usuário: incorporar as sugestões S1 a S6
+
+O usuário pediu, depois da aprovação do escopo T10–T14, que **todas as sugestões S1 a S6** das rodadas 3 e 4 entrem no plano (a execução de T10 em diante ainda não tinha começado; árvore limpa em `c115b49`). Pedido ao Planejador (mexer só no que cada sugestão pede, mantendo contagens e inventário consistentes; as contagens de testes só mudam se a S3 acrescentar teste):
+
+- **S1:** registrar no plano que `specs/sprints/SPRINT_1.md` linha 233 (cenário "frase com erro gramatical" da US-004, "exatamente uma pergunta") e a linha do D6 da US-004 ("reply com exatamente uma pergunta") continuam descrevendo a regra **pedida**; o comentário do `LiveBrain` do Claude Code (T12) diz "pedida 1, verificada 1..2". Se for preciso mexer na spec, propor o texto antigo e novo para o orquestrador aplicar em `docs(ai): update spec for US-006` antes da T10.
+- **S2:** §2.12.2: dizer que a exceção à regra "a tolerância não vai ao prompt" é a mensagem de correção da retentativa (`TurnMessageBuilder.BuildFormatCorrection`, que usa a `Message` da rejeição); anotar que, se o D5 oscilar, essa frase é a primeira candidata a sair.
+- **S3:** §4 e T11: incluir no guarda `PromptFilesContentTests` um trecho que só o reforço produz (ex.: a linha de contagem de `?` que a T11 acrescenta), de modo que o guarda **falhe antes e passe depois** do reforço; atualizar Red/Green da T11, mutações e contagens (D2, D11 e demais que mudem; Infrastructure.Tests e total).
+- **S4:** T13: trocar a frase "Outra mutação, 'o decorator conta mas não altera' é o estado final" por uma que diga só que o estado final é o decorator que conta sem alterar a resposta.
+- **S5:** §2.12.5: uma linha dizendo que o Documentador acrescenta ao `CHANGELOG.md` a entrada da tolerância (RN-FEED01 alterada; hoje o `CHANGELOG.md:28` registra a regra antiga).
+- **S6:** §2.12: corrigir "aparece em 5 arquivos de teste" para o número certo (4 arquivos de teste com o nome antigo do cenário; o inventário tem 6 arquivos, somando `TutorReplyValidator.cs` e `ClaudeCodeTutorBrainLiveTests.cs`), de preferência pela lista nominal.
