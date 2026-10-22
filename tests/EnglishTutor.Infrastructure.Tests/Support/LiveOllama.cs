@@ -15,6 +15,7 @@ public sealed class LiveOllama
     public LiveOllama(Action<OllamaOptions>? configure = null, HttpMessageHandler? handler = null)
     {
         var promptFiles = new PromptFiles(Path.Combine(AppContext.BaseDirectory, "prompts"));
+        PromptFiles = promptFiles;
         SystemPrompt = File.ReadAllText(promptFiles.TutorPath);
         var options = new OllamaOptions();
         var endpoint = Environment.GetEnvironmentVariable("ENGLISHTUTOR_OLLAMA_ENDPOINT");
@@ -41,6 +42,8 @@ public sealed class LiveOllama
     }
 
     public OllamaOptions Options { get; }
+
+    public PromptFiles PromptFiles { get; }
 
     public OllamaTutorBrain Brain { get; }
 

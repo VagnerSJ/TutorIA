@@ -7,46 +7,10 @@ namespace EnglishTutor.Infrastructure.Tests.Brain;
 
 // Real Ollama (running, with the default model downloaded; ENGLISHTUTOR_OLLAMA_ENDPOINT and
 // ENGLISHTUTOR_OLLAMA_MODEL are optional); excluded from the fast suite. Layer: the adapter, without the
-// ADR-006 retry (US-006 §10, D5).
+// ADR-006 retry (smoke with the retry: OllamaConversationLiveTests, US-006 §10, D5).
 [Trait("Category", "LiveBrain")]
 public sealed class OllamaTutorBrainLiveTests
 {
-    // US-006 — Cenário: saída estruturada (apoio: 5 frases de fumaça, D5) — RN-BRAIN03
-    [Fact]
-    public async Task SendAsync_WithFiveKnownErrors_AllInFormat()
-    {
-        var live = new LiveOllama();
-        var outOfFormat = new List<string>();
-        var found = 0;
-
-        foreach (var known in LiveClaudeCode.KnownErrors)
-        {
-            try
-            {
-                var reply = await live.Brain.SendAsync(
-                    live.Request(LiveOllama.StudentMessage(known.Sentence)), TestContext.Current.CancellationToken);
-                found += reply.Corrections.Any(c =>
-                    c.Corrected.Contains(known.ExpectedCorrection, StringComparison.OrdinalIgnoreCase)) ? 1 : 0;
-            }
-            catch (BrainException exception) when (exception.IsInvalidOutput)
-            {
-                outOfFormat.Add(
-                    $"sentence: \"{known.Sentence}\"; rejected reply: {exception.RawText}; reason: {exception.Rejection.Message}");
-            }
-        }
-
-        // The number of expected corrections is only recorded (the spec requires the format, not the content).
-        var directory = Path.Combine(AppContext.BaseDirectory, "recorded-fixtures");
-        Directory.CreateDirectory(directory);
-        await File.AppendAllTextAsync(
-            Path.Combine(directory, "ollama-smoke.txt"),
-            "expected corrections found: " + found + "/5; out of format: " + outOfFormat.Count + Environment.NewLine,
-            TestContext.Current.CancellationToken);
-        outOfFormat.Should().BeEmpty(
-            because: "every answer must follow the format (5/5). Rejected: {0}",
-            becauseArgs: string.Join(" | ", outOfFormat));
-    }
-
     // US-006 — Cenário: modelo não baixado (apoio: contrato real) — RN-BRAIN07
     [Fact]
     public async Task SendAsync_WhenModelIsNotDownloaded_ThrowsPullCommand()
