@@ -479,7 +479,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** a tolerância de 1 ou 2 perguntas entrou no validador do Core, mas o gravador `OllamaFixtureRecorderLiveTests` continuou exigindo exatamente 1 pergunta e roda no filtro do D5 (`FullyQualifiedName~Ollama`), chamando o adaptador sem a retentativa. Uma resposta tolerada de 2 perguntas deixaria o D5 vermelho sem regressão. O D5 ficou verde nas 3 rodadas (0 primeiras tentativas inválidas), então foi sorte, não garantia. Resolvido pelo usuário em `d614a4e`: a asserção saiu do gravador e fica só na fixture gravada.
 - **Por que importa:** um teste que oscila por regra que o verificador já tolera torna o critério da DoD instável, fora da camada medida (AP-032, AP-040).
 - **Correção (proposta):** `.claude/skills/checklist-revisao/SKILL.md` §0 e `.claude/skills/bdd-para-testes/SKILL.md`: "ao relaxar uma validação por tolerância, listar todos os testes `LiveBrain` que o filtro da DoD executa e que ainda assertam a regra original (inclusive gravadores de fixture); cada um tem decisão explícita no plano: manter e aceitar o risco, ou mover a asserção para a fixture gravada (determinística)".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-22, ver commit "docs(ai): apply learning 051")
 
 ### AP-052 — D5 `LiveBrain` verde sem exercitar o mecanismo que o critério diz medir
 
