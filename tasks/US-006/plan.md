@@ -1,6 +1,6 @@
 # Plano — US-006 Professor local via Ollama
 
-Status: Aguardando aprovação (revisão de escopo de 2026-10-22: acrescenta T10–T14 para o D5 vermelho; T1–T9 já commitadas)
+Status: Aprovado em 2026-10-21 (escopo novo T10–T14 aprovado em 2026-10-22; T1–T9 já commitadas)
 Branch: feature/US-006_ollama-brain
 Spec: specs/sprints/SPRINT_1.md#us-006
 Regras: RN-BRAIN01–05 (da US), RN-BRAIN07 e RN-BRAIN09 (acrescentadas à US, ver §2.9 e P3), RN-BRAIN04 e RN-BRAIN08 (sem mudança), RN-CONV03, RN-FEED01 (alterada em 2026-10-22, §2.12); ARCHITECTURE §2 (R1–R4), §3, §6.1, §6.2, §6.4, §7, §9, §10; ADR-002, ADR-005, ADR-006, ADR-008, ADR-009 (Aceito, novo)
@@ -883,3 +883,9 @@ O usuário escolheu, para resolver o D5 vermelho (§11/§12 do Executor): **(c)*
   - **S3** (`PromptFilesContentTests` nasce e continua verde sem o reforço da T11, sem teste que falhe antes e passe depois): pendente. A prova do reforço continua sendo o D5 (`LiveBrain`).
   - **S4** (T13: frase "Outra mutação, 'o decorator conta mas não altera' é o estado final" confusa): pendente de decisão do usuário. A frase da T13 foi mantida como estava.
   - **S5** (`CHANGELOG.md:28` registra a RN-FEED01 antiga; o Documentador acrescenta a entrada da tolerância): pendente; o Documentador cuida na fase final.
+
+### 2026-10-22 — aprovação do usuário (escopo novo T10–T14)
+
+- Escopo novo (T10–T14) aprovado com os padrões propostos das perguntas P13 a P17 (nenhuma resposta alterada).
+- Sugestões S1 a S6 da revisão do plano (rodadas 3 e 4): **não incorporadas**, por decisão do usuário.
+- Aplicado o commit `docs(ai): update architecture for US-006` (`ARCHITECTURE.md` §6.2, ADR-005 e ADR-002), conforme §2.12.5, antes da T10. Nenhum ADR novo.
