@@ -645,3 +645,9 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 
 - `OllamaSharp` **5.5.0** (versão estável mais recente no nuget.org; o nuspec declara `Microsoft.Extensions.AI.Abstractions` >= 10.8.0 e o `OllamaApiClient` implementa `IChatClient`, condição de parada do ADR-009 afastada).
 - `Microsoft.Extensions.AI.Abstractions` **10.11.0** (versão estável mais recente, compatível com a exigência de >= 10.8.0 do `OllamaSharp`). Os dois ficam em `Directory.Packages.props`, grupo `Infrastructure`, e só na `EnglishTutor.Infrastructure.csproj` (R1).
+
+### 2026-10-21 — escolhas do Executor (T2, forma)
+
+- Texto do log `OllamaLog.Replied` (EventId 2002, o plano fixa só as propriedades): `Brain {Provider} replied in {ElapsedMs} ms (model {Model}, output mode {OutputMode})`, no mesmo formato do evento 2001 do Claude Code.
+- `ChatResponseFormat.ForJsonSchema(schema)` é chamado sem nome nem descrição de schema (o `format` do Ollama carrega só o JSON Schema).
+- Conferência do fio com o `OllamaSharp` 5.5.0 (testes `OllamaTutorBrainHttpTests`, verdes): `POST /api/chat` no `Endpoint`; `model` e `messages` (`system`, `user`, `assistant`) como esperado; `ResponseFormat` com schema sai como `format` igual ao `TutorReplySchema` (comparação estrutural); `ChatOptions.Temperature` sai em `options.temperature`; sem `ResponseFormat` nenhum `format` no corpo. Nada diferiu do esperado; condição de parada da T2 não ocorreu.
