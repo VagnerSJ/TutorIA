@@ -397,3 +397,10 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 - B1 → §4 (nova linha B5 `Create_WhenFallbackProviderIsUnknown_ThrowsNamingValueAndAcceptedProviders`, cobre `FallbackProvider` desconhecido na fábrica, lacuna real do mapa; condicionais AP-047 citam B5), §5 T4 (Red diz "B1–B6 (inclui B5)"), §9 P10 (cita B5). A faixa B1–B6 de §3 e D5 fica correta; IDs conferidos na §4: B1, B2, B3, B4, B5, B6.
 - B2 → §4 (DI3 descreve o efeito observável: o aviso chega ao notificador registrado antes, com a mutação `TryAdd` → `Add`), §5 T4 (DI3 na lista de falhas, mutação acrescentada, só DI1 nasce verde entre os DI). D5 não muda: o filtro lista B* e F*, e o trecho sobre DI é a S1, pendente.
 - S1–S4 → Não incorporado nesta rodada: ficam para decisão do usuário.
+
+### 2026-10-22 — comentário do usuário
+Plano aprovado. Incorporar as sugestões S1, S2, S3 e S4 da revisão do plano (rodada 2). Respostas padrão P1–P13 aceitas sem mudança.
+- S1: remover do D5 o trecho sobre testes DI (ou dizer que os DI são provados pelo D2).
+- S2: D8 — sem Ollama/modelo, o Executor registra "não reproduzido" na §11 e o C3 vale como prova.
+- S3: §4 DI1 — frase dizendo que o `Name` de cada provedor continua coberto pelos cérebros e pelo DI5.
+- S4: §2.3 — registrar que `BrainSwitchNotice.FromProvider` existe para log e consumidores futuros.
