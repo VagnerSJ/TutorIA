@@ -181,3 +181,35 @@ Nenhum.
 ## Aprendizados para o processo
 - Confirma a regra sugerida na rodada 3: ao renomear um cenário, o inventário deve vir do Grep pelo nome antigo antes de fechar a tabela de conferência. A correção só funcionou porque o Grep foi refeito. Falta transformar isso numa regra ou skill do Planejador (variação de AP-035 e AP-040).
 - Contagens citadas em prosa ("aparece em N arquivos") envelhecem. Preferir a lista nominal, que o D20c confere, a um número solto (S6).
+
+---
+
+## Rodada 5
+
+# Revisão do plano — US-006 Professor local via Ollama (rodada 5)
+
+Data: 2026-10-22
+Escopo revisado: `tasks/US-006/plan.md`, diferença entre `a9cfa3c` e `HEAD` (`a35ddde`). A diferença de `plan.md` tem 80 inserções e 39 remoções. Os outros arquivos do intervalo são `ARCHITECTURE.md` e dois ADRs, do commit `8cc6d28` (arquitetura da revisão de escopo, anterior ao pedido das sugestões; não reavaliado aqui).
+Resultado: APROVADO (0 bloqueantes)
+
+## Sugestões S1–S6 (pedidas pelo usuário)
+| Sugestão | Status | Verificação |
+|---|---|---|
+| S1 (comentário "pedida 1, verificada 1..2" sem casar o D20) | Resolvida | §2.12 registra que as linhas 233 e 306 de `SPRINT_1.md` continuam como regra pedida (conferidas). Comentário novo `...frase com erro gramatical — RN-FEED01 (pedida 1 pergunta, verificada 1..2: tolerância de verificação)`; nenhum dos 6 padrões `-F` do D20 casa com ele. |
+| S2 (exceção da mensagem de correção) | Resolvida | §2.12.2: a única passagem da tolerância ao modelo é `TurnMessageBuilder.BuildFormatCorrection` (usa a `Message` da rejeição); a frase é a primeira candidata a sair se o D5 oscilar, com decisão do usuário. |
+| S3 (`FormatPrompt_Always_ContainsFinalQuestionCountCheck`) | Resolvida | Grep em `prompts/`: nenhum `count the`; o Red do método novo (2 casos) é vermelho pela asserção. Conta: 1+24+30+7+4+1+5 = 72, 101+72 = 173; 138+55+173 = 366. D2 e T14 dizem 366/173; D11 continua 69 (nomes sem `Ollama`). Os 364/171 só restam no histórico da §12, com nota. |
+| S4 (frase do T13) | Resolvida | "O estado final é o decorator que só conta, sem alterar a resposta". |
+| S5 (CHANGELOG) | Resolvida | §2.12.5 item 5 cita o texto antigo (`CHANGELOG.md:28` confere); entrada nova a cargo do Documentador (§3, §8, DoD comum). |
+| S6 (lista nominal) | Resolvida | Grep em `tests/`: 4 arquivos de teste com o nome antigo; com `TutorReplyValidator.cs` e `ClaudeCodeTutorBrainLiveTests.cs` são 6, como no D20c. |
+
+## Verificações do checklist de plano
+Todas ✅: cenários no mapa da §4, P* com teste e tarefa, DoD, R1–R4/RN/ADR, escopo (fora das S1–S6 só mudaram Status, notas "já aplicado" e as frases do T12 e do T13), consistência §3 × §4 × §5 × §10, ordem do Red (o método novo nasce vermelho antes do reforço da T11), D20/D20c inalterados.
+
+## Bloqueantes
+Nenhum.
+
+## Sugestões
+Nenhuma nova.
+
+## Aprendizados para o processo
+- Nenhum erro novo. Conferir por Grep a afirmação "nasce vermelho" antes de escrevê-la (AP-035, AP-036) funcionou.
