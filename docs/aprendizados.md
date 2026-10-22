@@ -165,6 +165,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** a meta de cobertura de linhas não vê transformações de uma linha; a US-003 e a US-009 poderiam mexer no catálogo com regressão silenciosa.
 - **Correção (proposta):** `.claude/agents/revisor.md` (checklist de revisão de plano) e `.claude/agents/planejador.md`: "cada transformação citada nas tabelas de mensagens da §2 (corte, normalização, limite) tem teste na §4, inclusive nos dois lados do limite, como já se exige para as respostas P*".
 - **Status:** Aplicada (2026-10-17, ver commit "docs(ai): apply learnings 15-17 and 21-31")
+- **Ver também:** AP-054 (aplicada em 2026-10-22: um caso por ramo de `<placeholder>`)
 
 ### AP-017 — Red por mutação temporária para testes de caracterização
 
@@ -435,6 +436,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** fake que só termina por cancelamento trava a suíte inteira quando o Red ou a mutação falha; a §7 ou a §5 pode afirmar mais do que o mapa da §4 mostra.
 - **Correção (proposta):** (a) `.claude/skills/tdd-dotnet/SKILL.md`: "todo teste com fake que só termina por cancelamento usa espera limitada, inclusive os de caracterização"; (b) `.claude/skills/checklist-revisao/SKILL.md` §0: "quando a §7 ou a §5 atribui uma propriedade a um grupo de testes ('os N testes que...'), a descrição de cada um na §4 a declara".
 - **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 46")
+- **Ver também:** AP-054 (aplicada em 2026-10-22: Red conferido asserção por asserção contra o `src`)
 
 ### AP-047 — Afirmação condicional da §2 sem teste; "as duas fontes" provadas só numa direção
 
@@ -506,4 +508,4 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** (a) a derivação de `<detalhe>` da mensagem de falha (primeira linha, texto de reserva) entrou no plano só com mensagens de uma linha; o B1 da rodada 1 exigiu um caso por ramo (confirma AP-015, AP-016 e AP-047); (b) o termo isolado de uma conjunção textual ("404 ou texto") ficou sem caso próprio; (c) na rodada 3, uma asserção foi acrescentada a um teste "que nasce verde" depois de desenhar a mensagem nova, e a lista de Red da T10 estava errada (variação de AP-046); (d) o Revisor citou nome de branch sem `git branch`. Todos corrigidos antes da execução.
 - **Por que importa:** os casos felizes passam sem provar a regra; a lista de Red errada leva o Executor a achar que o teste está certo quando nasce verde.
 - **Correção (proposta):** `.claude/agents/planejador.md`: "para cada `<placeholder>` derivado de texto de biblioteca ou de número, um caso por ramo da derivação (e a cultura, para números); ao fechar a lista de Red de uma tarefa, rodar mentalmente cada asserção contra o `src` atual"; `.claude/agents/revisor.md`: "confira nomes de branch com `git branch` antes de citá-los". Pode ser fundida ao AP-016 e AP-046 se o usuário preferir.
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-22, fundida com AP-016 e AP-046, ver commit "docs(ai): apply learning 54")
