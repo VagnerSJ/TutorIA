@@ -1,6 +1,6 @@
 # ADR-010 — Cérebro reserva: decorator na Infrastructure, política no Core e aviso por porta
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 2026-10-22
 - **US relacionadas:** US-007 (e, como consumidoras, US-008, que roda a suíte de contrato sobre os cérebros, e US-009, que cria cada cérebro sem reserva no `eval`)
 
