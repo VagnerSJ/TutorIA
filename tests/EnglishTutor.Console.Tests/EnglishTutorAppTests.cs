@@ -1,8 +1,11 @@
+using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using EnglishTutor.Console.Tests.Support;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Infrastructure.Processes;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -66,16 +69,51 @@ public sealed class EnglishTutorAppTests : IDisposable
         exitCode.Should().Be(0);
     }
 
-    // US-001 — apoio: implementação provisória sem cérebro (D11); US-004 — apoio, P7: Ollama ainda não conectado
+    // US-006 — Cenário: console conversa com o Ollama — RN-BRAIN01
     [Fact]
-    public async Task RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected()
+    public async Task RunAsync_WhenProviderIsOllama_SendsRequestThroughOllamaBrainAndShowsReplyAndFeedback()
     {
-        var options = CreateOptions("Ollama", "hello");
+        var chatClient = new ScriptedChatClient().Returns(OllamaReplyJson("t1"));
+        var options = CreateOllamaOptions(chatClient, "sentence t1", "/quit");
 
-        await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
 
-        _output.ToString().Should().Contain("The tutor is not connected yet.");
-        _brain.Requests.Should().BeEmpty();
+        exitCode.Should().Be(0);
+        var call = chatClient.Calls.Should().ContainSingle().Subject;
+        call[0].Role.Should().Be(ChatRole.System);
+        call[0].Text.Should().Contain("SYSTEM PROMPT for console test").And.Contain("Output format");
+        call[^1].Role.Should().Be(ChatRole.User);
+        call[^1].Text.Should().Contain("sentence t1").And.Contain("Mode: free-conversation");
+        var lines = _output.ToString().Split(Environment.NewLine);
+        lines.Should().Contain(line => line.EndsWith("Tutor: Reply t1?", StringComparison.Ordinal));
+        lines.Should().Contain("Feedback:");
+        lines.Should().Contain("  - orig t1 → fixed t1 (why t1)");
+        _output.ToString().Should().NotContain("The tutor is not connected yet.");
+        _error.ToString().Should().BeEmpty();
+    }
+
+    // US-006 — Cenário: Ollama indisponível / modelo não baixado (de ponta a ponta, console) — RN-BRAIN07
+    [Theory]
+    [InlineData(false, "Ollama is not running at")]
+    [InlineData(true, "ollama pull")]
+    public async Task RunAsync_WhenOllamaFails_ShowsInstructionOnErrorAndContinuesSession(bool modelMissing, string expectedFragment)
+    {
+        var failure = modelMissing
+            ? new HttpRequestException(HttpRequestError.Unknown, "gone t1", inner: null, HttpStatusCode.NotFound)
+            : new HttpRequestException(HttpRequestError.ConnectionError, "refused t1");
+        var chatClient = new ScriptedChatClient().Throws(failure).Returns(OllamaReplyJson("t2"));
+        var options = CreateOllamaOptions(chatClient, "first sentence t1", "second sentence t2", "/quit");
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        _error.ToString().Should().Contain("The tutor could not answer: ").And.Contain(expectedFragment)
+            .And.Contain("You can send a sentence again or type /quit to exit.")
+            .And.NotContain("An unexpected error occurred");
+        _output.ToString().Split(Environment.NewLine).Should().Contain(line => line.EndsWith("Tutor: Reply t2?", StringComparison.Ordinal));
+        chatClient.Calls.Should().HaveCount(2);
+        chatClient.Calls[1].Skip(1).Should().ContainSingle(because: "the turn that failed did not enter the window")
+            .Which.Text.Should().Contain("second sentence t2");
     }
 
     // US-001 — Cenário: logs estruturados
@@ -438,6 +476,34 @@ public sealed class EnglishTutorAppTests : IDisposable
                 services.AddSingleton<ITutorBrain>(_brain);
                 services.AddSingleton<ITutorPromptSource>(new FixedTutorPromptSource());
             });
+
+    // Like CreateOptions, but the ITutorBrain is NOT replaced: the real OllamaTutorBrain runs on a scripted IChatClient.
+    private AppRunOptions CreateOllamaOptions(ScriptedChatClient chatClient, params string[] lines) =>
+        new([],
+            new StringReader(Lines(lines)),
+            _output,
+            _error,
+            TestConfiguration.Create("Ollama"),
+            ConfigureServices: services =>
+            {
+                services.AddKeyedSingleton<IChatClient>("Ollama", chatClient);
+                services.AddSingleton<ITutorPromptSource>(new FixedTutorPromptSource());
+            });
+
+    // The JSON equivalent of ConsoleTutorReplies.Valid(label), as the model would answer.
+    private static string OllamaReplyJson(string label) => new JsonObject
+    {
+        ["reply"] = $"Reply {label}?",
+        ["corrections"] = new JsonArray(new JsonObject
+        {
+            ["original"] = $"orig {label}",
+            ["corrected"] = $"fixed {label}",
+            ["explanation"] = $"why {label}",
+        }),
+        ["pronunciation"] = null,
+        ["vocabulary"] = null,
+        ["praise"] = null,
+    }.ToJsonString();
 
     private List<JsonElement> ReadLogEvents()
     {
