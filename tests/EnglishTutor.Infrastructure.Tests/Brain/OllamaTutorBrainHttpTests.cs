@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.Tests.Fakes;
 using EnglishTutor.Infrastructure.Tests.Support;
@@ -76,6 +77,20 @@ public sealed class OllamaTutorBrainHttpTests : IDisposable
         body.TryGetPropertyValue("format", out var format);
         format.Should().BeNull();
         reply.Reply.Should().Be("Reply t1?");
+    }
+
+    // US-006 — Cenário: saída estruturada (apoio: resposta gravada de verdade; decisão P6)
+    [Fact]
+    public async Task SendAsync_WithRecordedStructuredResponse_ReturnsReplyAndCorrections()
+    {
+        _handler.Returns(HttpStatusCode.OK, Fixture.Read("Ollama/chat-structured.json"));
+        var sut = CreateSut();
+
+        var reply = await sut.SendAsync(OllamaTestKit.SingleMessageRequest("student t1"), TestContext.Current.CancellationToken);
+
+        ReplySentences.Split(reply.Reply).Count(ReplySentences.IsQuestion).Should().Be(1);
+        reply.Corrections.Should().NotBeEmpty();
+        reply.RawText.Should().StartWith("{");
     }
 
     public void Dispose()
