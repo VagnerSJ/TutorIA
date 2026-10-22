@@ -462,3 +462,48 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** afirmação de cobertura sem conferência vira falsa garantia.
 - **Correção (proposta):** `.claude/agents/planejador.md`: "afirmação de cobertura na §12 ('cada X tem Y') é conferida contra a tabela da §4 antes do commit; se não fechar, é restringida ao que os casos provam".
 - **Status:** Aplicada (2026-10-21, ver commit "docs(ai): apply learning 49")
+
+### AP-050 — Inventário de renomeação feito pelos testes que mudam, não pelo nome antigo do cenário
+
+- **Data / US:** 2026-10-22 / US-006 (`plan-review.md` Rodadas 3 e 4, B2 e S6)
+- **Quem errou:** planejador
+- **O que aconteceu:** ao relaxar a RN-FEED01 (cenário "reply com duas perguntas é inválido" deixou de existir), o inventário da tabela de conferência listou os testes que mudam de comportamento e esqueceu `ReplySentencesTests.cs`, cujo comentário só citava o nome antigo do cenário; o D20 ("nenhuma linha") ficaria vermelho. Corrigido refazendo o Grep pelo nome antigo (6 arquivos). Na rodada 4 a prosa dizia "aparece em 5 arquivos", número que envelheceu; foi trocada pela lista nominal.
+- **Por que importa:** busca de "texto antigo" com inventário incompleto dá falsa garantia (variação de AP-035 e AP-040); contagem em prosa envelhece.
+- **Correção (proposta):** `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md` §0: "ao renomear, remover ou substituir um cenário ou texto, o inventário vem do Grep pelo nome antigo (`src`, `tests`, `prompts`, `docs`), rodado antes de fechar a tabela de conferência, e é uma lista nominal de arquivos conferida pelo comando da DoD, não um número em prosa".
+- **Status:** Proposta
+
+### AP-051 — Tolerância relaxada no verificador, mas não no teste `LiveBrain` que ainda assertava a regra original
+
+- **Data / US:** 2026-10-22 / US-006 (`review.md` S1; risco apontado pelo Executor)
+- **Quem errou:** planejador (P17 manteve `Be(1)` no gravador) e revisor do plano (não pediu a lista)
+- **O que aconteceu:** a tolerância de 1 ou 2 perguntas entrou no validador do Core, mas o gravador `OllamaFixtureRecorderLiveTests` continuou exigindo exatamente 1 pergunta e roda no filtro do D5 (`FullyQualifiedName~Ollama`), chamando o adaptador sem a retentativa. Uma resposta tolerada de 2 perguntas deixaria o D5 vermelho sem regressão. O D5 ficou verde nas 3 rodadas (0 primeiras tentativas inválidas), então foi sorte, não garantia. Resolvido pelo usuário em `d614a4e`: a asserção saiu do gravador e fica só na fixture gravada.
+- **Por que importa:** um teste que oscila por regra que o verificador já tolera torna o critério da DoD instável, fora da camada medida (AP-032, AP-040).
+- **Correção (proposta):** `.claude/skills/checklist-revisao/SKILL.md` §0 e `.claude/skills/bdd-para-testes/SKILL.md`: "ao relaxar uma validação por tolerância, listar todos os testes `LiveBrain` que o filtro da DoD executa e que ainda assertam a regra original (inclusive gravadores de fixture); cada um tem decisão explícita no plano: manter e aceitar o risco, ou mover a asserção para a fixture gravada (determinística)".
+- **Status:** Proposta
+
+### AP-052 — D5 `LiveBrain` verde sem exercitar o mecanismo que o critério diz medir
+
+- **Data / US:** 2026-10-22 / US-006 (`review.md` S2 e S3)
+- **Quem errou:** planejador (critério) e executor (leitura da evidência)
+- **O que aconteceu:** o D5 foi redefinido para medir "o adaptador mais a retentativa única do ADR-006". Nas 3 rodadas nenhuma primeira tentativa foi inválida (`retries used: 0`), então o D5 verde mediu o adaptador com os prompts reforçados, não a retentativa. Do mesmo modo, a fumaça registrou 4/5 correções esperadas nas 3 rodadas sem margem, e o critério só exige o formato. Ambos ficaram registrados como limites em `docs/us/US-006.md`.
+- **Por que importa:** a US seguinte pode herdar uma garantia que nunca foi medida ao vivo (a retentativa) e o `eval` da US-009 parte de um valor no limite (AP-032).
+- **Correção (proposta):** `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md`: "o critério de um teste `LiveBrain` diz se o mecanismo medido precisa ter sido exercitado (ex.: pelo menos uma retentativa usada) ou se basta o teste unitário; quando só o unitário prova, a US registra isso como limite, e métricas só registradas (ex.: correções esperadas encontradas) entram como risco para a US que as usará como critério".
+- **Status:** Proposta
+
+### AP-053 — Remover um tipo apagando a declaração antes dos usos gera erro de compilação transitório no hook
+
+- **Data / US:** 2026-10-22 / US-006 (relato do Executor, remoção de `TutorNotConnectedInputHandler` e `ConsoleText.TutorNotConnected`)
+- **Quem errou:** executor (ordem de edição)
+- **O que aconteceu:** variação inversa do AP-044: ao apagar a classe e a constante antes de editar os usos, o hook `post-edit-dotnet` devolveu erro de símbolo inexistente até o último uso ser removido. Removendo os usos primeiro e a declaração por último, o hook não acusou erro intermediário.
+- **Por que importa:** ruído no feedback rápido e risco de "corrigir" um erro que desaparece sozinho.
+- **Correção (proposta):** `.claude/skills/tdd-dotnet/SKILL.md` (junto do AP-044): "para remover um tipo ou membro, remova primeiro os usos e por último a declaração; para criar, declare primeiro e use depois".
+- **Status:** Proposta
+
+### AP-054 — Plano cobre o caminho feliz de `<placeholder>` e de condicionais; Revisor cita nome de branch sem conferir
+
+- **Data / US:** 2026-10-21 e 2026-10-22 / US-006 (`plan-review.md` Rodadas 1 a 4)
+- **Quem errou:** planejador (casos por ramo; asserção acrescentada a teste "que nasce verde") e revisor (nome de branch)
+- **O que aconteceu:** (a) a derivação de `<detalhe>` da mensagem de falha (primeira linha, texto de reserva) entrou no plano só com mensagens de uma linha; o B1 da rodada 1 exigiu um caso por ramo (confirma AP-015, AP-016 e AP-047); (b) o termo isolado de uma conjunção textual ("404 ou texto") ficou sem caso próprio; (c) na rodada 3, uma asserção foi acrescentada a um teste "que nasce verde" depois de desenhar a mensagem nova, e a lista de Red da T10 estava errada (variação de AP-046); (d) o Revisor citou nome de branch sem `git branch`. Todos corrigidos antes da execução.
+- **Por que importa:** os casos felizes passam sem provar a regra; a lista de Red errada leva o Executor a achar que o teste está certo quando nasce verde.
+- **Correção (proposta):** `.claude/agents/planejador.md`: "para cada `<placeholder>` derivado de texto de biblioteca ou de número, um caso por ramo da derivação (e a cultura, para números); ao fechar a lista de Red de uma tarefa, rodar mentalmente cada asserção contra o `src` atual"; `.claude/agents/revisor.md`: "confira nomes de branch com `git branch` antes de citá-los". Pode ser fundida ao AP-016 e AP-046 se o usuário preferir.
+- **Status:** Proposta

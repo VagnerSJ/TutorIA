@@ -32,4 +32,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: ADR-008 (classificação de falhas e tempo máximo por chamada do Claude Code) e fixtures de erro gravadas e sintéticas (US-005).
 - Changed: falha do cérebro no console não encerra mais a sessão: a mensagem vai para a saída de erro, é registrada como aviso (evento 1005) e o prompt volta (US-005).
 - Fixed: `/quit` enviado por pipe no Windows PowerShell 5.1 era lido com BOM UTF-8 e tratado como texto livre (US-001).
+- Added: `OllamaTutorBrain`, professor local sobre `IChatClient` (`OllamaSharp`): histórico completo e `format` com o JSON Schema do `TutorReply` em `/api/chat`; com `Brain:Provider = Ollama` o console conversa pelo `ConversationService` (US-006).
+- Added: falhas do Ollama com mensagem que diz o que houve e o que fazer: "Ollama is not running", "ollama pull <modelo>", tempo esgotado e falha genérica com detalhe (US-006).
+- Added: configuração `Brain:Ollama:*` (`Endpoint`, `Model`, `Temperature`, `TimeoutSeconds` padrão 60 com faixa 1 a 3600, `OutputMode`) validada na inicialização (RN-BRAIN09) (US-006).
+- Added: ADR-009 (provedor Ollama: `IChatClient`, falhas e tempo máximo) e fixtures do Ollama gravadas pelo próprio adaptador (US-006).
+- Changed: RN-FEED01: o validador aceita 1 ou 2 perguntas no `reply` (tolerância de verificação; o prompt continua pedindo exatamente uma); 0 e 3 ou mais continuam recusadas, e a mensagem de recusa diz quantas encontrou e que 1 ou 2 são aceitas (US-006).
+- Changed: prompts `format.json.md` e `format.tags.md` reforçados com a contagem de `?` e um exemplo proibido, para o modelo local de 14B (US-006).
+- Changed: o D5 do Ollama mede o adaptador dentro do `ConversationService`, contando a retentativa única de formato (ADR-006) (US-006).
+- Removed: `TutorNotConnectedInputHandler` e o texto "The tutor is not connected yet." (US-006).
 - Hábitos de trabalho com IA: skill `revisar-contexto`, `docs/aprendizados.md`, `specs/archive/`, Definition of Done verificável por US, seções Evidências e Comentários do usuário no plano, ADR proposto antes do código, hooks `post-edit-dotnet` e `executor-stop-gate`.

@@ -10,7 +10,7 @@
 | US-003 | ConversationService dono do histórico | 1 | US-002 | Concluída |
 | US-004 | Conversar por texto com o professor via Claude Code | 2 | US-003 | Concluída |
 | US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | Concluída |
-| US-006 | Professor local via Ollama | 2b | US-003 | A fazer |
+| US-006 | Professor local via Ollama | 2b | US-003 | Concluída |
 | US-007 | Troca de cérebro por configuração e fallback | 2b | US-005, US-006 | A fazer |
 | US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | A fazer |
 | US-009 | Avaliação comparativa dos cérebros (golden set + `eval`) | 2b | US-007 | A fazer |
