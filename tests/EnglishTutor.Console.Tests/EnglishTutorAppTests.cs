@@ -139,7 +139,7 @@ public sealed class EnglishTutorAppTests : IDisposable
 
         exitCode.Should().Be(0);
         var lines = _output.ToString().Split(Environment.NewLine);
-        var noticeIndex = Array.IndexOf(lines, "Switched to Ollama (usage limit reached)");
+        var noticeIndex = Array.FindIndex(lines, line => line.EndsWith("Switched to Ollama (usage limit reached)", StringComparison.Ordinal));
         var replyIndex = Array.FindIndex(lines, line => line.EndsWith("Tutor: Reply t1?", StringComparison.Ordinal));
         noticeIndex.Should().BeGreaterThanOrEqualTo(0);
         replyIndex.Should().BeGreaterThan(noticeIndex);
@@ -159,7 +159,7 @@ public sealed class EnglishTutorAppTests : IDisposable
 
         exitCode.Should().Be(0);
         var lines = _output.ToString().Split(Environment.NewLine);
-        var noticeIndex = Array.IndexOf(lines, "Switched to Ollama (CLI not found)");
+        var noticeIndex = Array.FindIndex(lines, line => line.EndsWith("Switched to Ollama (CLI not found)", StringComparison.Ordinal));
         var replyIndex = Array.FindIndex(lines, line => line.EndsWith("Tutor: Reply t1?", StringComparison.Ordinal));
         noticeIndex.Should().BeGreaterThanOrEqualTo(0);
         replyIndex.Should().BeGreaterThan(noticeIndex);

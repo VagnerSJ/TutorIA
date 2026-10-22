@@ -8,7 +8,6 @@ public sealed class ConsoleBrainSwitchNotifier(TextWriter output) : IBrainSwitch
     public Task NotifyAsync(BrainSwitchNotice notice, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(notice);
-        _ = (output, ct);
-        return Task.CompletedTask;
+        return output.WriteLineAsync(ConsoleText.BrainSwitched(notice).AsMemory(), ct);
     }
 }

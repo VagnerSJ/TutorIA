@@ -26,7 +26,16 @@ public static class ConsoleText
     public static string BrainSwitched(BrainSwitchNotice notice)
     {
         ArgumentNullException.ThrowIfNull(notice);
-        return string.Empty;
+        var reason = notice.Reason switch
+        {
+            BrainErrorKind.UsageLimitReached => "usage limit reached",
+            BrainErrorKind.Timeout => "timed out",
+            BrainErrorKind.CliNotFound => "CLI not found",
+            BrainErrorKind.NotAuthenticated => "not authenticated",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(notice), notice.Reason, "Expected a kind that BrainFallbackPolicy sends to the fallback brain."),
+        };
+        return $"Switched to {notice.ToProvider} ({reason})";
     }
 
     public const string FeedbackHeader = "Feedback:";
