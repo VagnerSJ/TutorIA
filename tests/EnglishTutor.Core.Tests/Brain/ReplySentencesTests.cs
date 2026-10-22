@@ -25,7 +25,7 @@ public sealed class ReplySentencesTests
         sentences.Should().BeEmpty();
     }
 
-    // US-004 — Cenário: reply com duas perguntas é inválido (apoio, P21: o que é pergunta) — RN-FEED01
+    // US-004 — Cenário: reply com duas perguntas é aceito pela tolerância (apoio, P21: o que é pergunta) — RN-FEED01
     [Theory]
     [InlineData("How are you?", true)]
     [InlineData("Really?!", true)]

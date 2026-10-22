@@ -9,7 +9,7 @@
 | CUDA Toolkit | não instalado (`nvcc` ausente, `CUDA_PATH` vazio) | Necessário para `Whisper.net.Runtime.Cuda` (Fase 4). Alternativa sem instalação: runtime Vulkan |
 | .NET SDK | apenas 9.0.200 (runtimes 6, 8, 9) | **Instalar .NET 10 SDK (LTS)** antes do Executor da US-001 |
 | Claude Code CLI | só o binário embutido no app desktop; não está no PATH; `claude auth status` → não autenticado | Instalar o CLI e autenticar com a assinatura |
-| Ollama | não instalado | Instalar (Fase 2b) |
+| Ollama | 0.40.7 instalado (2026-10-21); modelo `qwen2.5:14b-instruct-q4_K_M` baixado (9,0 GB) | — (US-006) |
 | Python | não instalado | Não necessário se usarmos Piper (Fase 3) |
 | Node.js | 22.16.0 | — |
 | Git | 2.56 | — |

@@ -55,6 +55,7 @@ Código, identificadores, logs e mensagens de commit em **inglês**. Mensagens e
 - Falhas de provedores viram exceções de domínio (`BrainException` com `BrainErrorKind`), traduzidas pelo adaptador; o Core não conhece `Win32Exception` nem `HttpRequestException`.
 - Sem `catch (Exception)` silencioso; se capturar genérico, logue e relance ou converta.
 - `OperationCanceledException` sempre propaga.
+- Validação restrita de frase do modelo (ex.: exatamente 1 `?`): o prompt e a `RN-*` mantêm a regra original, mas o verificador aceita um nível acima (1 ou 2 `?`). Convenção "Tolerância de verificação" em `specs/BUSINESS_RULES.md`; registre "Regra pedida" × "Tolerância" na `RN-*`. Não vale para JSON, tags ou segurança.
 
 ## Console e entrada padrão
 

@@ -2,6 +2,10 @@
 
 Regras numeradas e estáveis. Testes e planos devem citar o ID (ex.: `// RN-FEED02`). Ao mudar uma regra, mantenha o ID e registre a alteração no histórico no fim do arquivo.
 
+## Tolerância de verificação
+
+Quando a regra pedida ao modelo é restrita (ex.: exatamente 1 `?`), a regra **continua escrita e pedida assim no prompt**, mas o **verificador** aceita um nível acima do pedido (ex.: 1 ou 2 `?`) e recusa o que passar disso. Motivo: modelos locais (ex.: 14B) erram o formato de vez em quando, e recusar um erro pequeno e inofensivo custa uma retentativa e deixa o `eval` e o D5 oscilando. Ao criar ou rever uma validação restrita de frase, aplique a folga e registre-a na regra `RN-*` ("Regra pedida" × "Tolerância de verificação") e no histórico. Não vale para segurança, formato estrutural (JSON, tags) nem limites que o usuário vê como erro de conteúdo grave.
+
 ## Conversa (RN-CONV)
 
 - **RN-CONV01** — Uma sessão tem exatamente um modo ativo: `free-conversation`, `job-interview` ou `listening-practice`. O modo padrão é `free-conversation`. Trocar de modo durante a sessão é permitido e vale a partir do turno seguinte.
@@ -19,7 +23,7 @@ Regras numeradas e estáveis. Testes e planos devem citar o ID (ex.: `// RN-FEED
 
 ## Feedback (RN-FEED)
 
-- **RN-FEED01** — O `reply` tem de 1 a 3 frases curtas em inglês, nível B1–B2, e faz **exatamente uma** pergunta ao aluno: uma única frase termina com `?`, em qualquer posição; as outras frases são comentário ou incentivo (ex.: "Was it busy in the morning? Tell me about your commute."). Nunca contém correções.
+- **RN-FEED01** — O `reply` tem de 1 a 3 frases curtas em inglês, nível B1–B2, e faz **exatamente uma** pergunta ao aluno: uma única frase termina com `?`, em qualquer posição; as outras frases são comentário ou incentivo (ex.: "Was it busy in the morning? Tell me about your commute."). Nunca contém correções. **Regra pedida ao modelo:** exatamente uma pergunta (o prompt mantém isto). **Tolerância de verificação (2026-10-22):** o validador aceita 1 ou 2 frases com `?`; 0 ou 3 ou mais é inválido (ver "Tolerância de verificação" no início deste arquivo).
 - **RN-FEED02** — O feedback traz **no máximo 2** correções gramaticais/de vocabulário, cada uma com `original → corrected` e uma explicação curta.
 - **RN-FEED03** — Se não houver erros, o feedback traz um elogio (`praise`) a algo bem feito.
 - **RN-FEED04** — Para cada palavra de baixa confiança informada, o feedback pode trazer uma dica de pronúncia simples (ex.: `beach /biːtʃ/ — long 'ee' sound`).
@@ -57,3 +61,4 @@ Regras numeradas e estáveis. Testes e planos devem citar o ID (ex.: `// RN-FEED
 |---|---|---|
 | 2026-10-17 | todas | Versão inicial |
 | 2026-10-19 | RN-FEED01 | "termina com uma pergunta" → "faz exatamente uma pergunta" (uma única frase termina com `?`, em qualquer posição). Motivo: o modelo fecha o `reply` com uma frase de incentivo depois da pergunta, o que é pedagogicamente válido (US-004, D5, `tasks/US-004/plan.md` §12 E3/E4). |
+| 2026-10-22 | RN-FEED01 | O validador passa a aceitar 1 ou 2 perguntas (0 e 3 ou mais continuam inválidas); o prompt continua pedindo exatamente 1. Motivo: o D5 da US-006 oscilou com o modelo local 14B por reply com 2 perguntas (`tasks/US-006/plan.md` §12). Criada a convenção "Tolerância de verificação" para validações restritas futuras. |

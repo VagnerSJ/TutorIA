@@ -10,7 +10,7 @@
 | US-003 | ConversationService dono do histórico | 1 | US-002 | Concluída |
 | US-004 | Conversar por texto com o professor via Claude Code | 2 | US-003 | Concluída |
 | US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | Concluída |
-| US-006 | Professor local via Ollama | 2b | US-003 | A fazer |
+| US-006 | Professor local via Ollama | 2b | US-003 | Concluída |
 | US-007 | Troca de cérebro por configuração e fallback | 2b | US-005, US-006 | A fazer |
 | US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | A fazer |
 | US-009 | Avaliação comparativa dos cérebros (golden set + `eval`) | 2b | US-007 | A fazer |
@@ -238,8 +238,13 @@ Cenário: pergunta seguida de incentivo é aceita (RN-FEED01, alterada em 2026-1
   Quando o parser processa a resposta
   Então obtenho um TutorReply com esse Reply
 
-Cenário: reply com duas perguntas é inválido (RN-FEED01, alterada em 2026-10-19)
+Cenário: reply com duas perguntas é aceito pela tolerância (RN-FEED01, alterada em 2026-10-22)
   Dado um JSON cujo reply é "Was it busy? How long was the trip?"
+  Quando o parser processa a resposta
+  Então obtenho um TutorReply com esse Reply
+
+Cenário: reply com três perguntas é inválido (RN-FEED01, alterada em 2026-10-22)
+  Dado um JSON cujo reply é "Was it busy? How long was the trip? Did you sit?"
   Quando o parser processa a resposta
   Então o resultado é inválido com o motivo "reply must ask the student exactly one question"
 
@@ -363,7 +368,7 @@ Como aluno,
 quero conversar com um modelo rodando na minha GPU,
 para praticar sem consumir minha assinatura e sem internet.
 
-**Regras:** RN-BRAIN01–05; ARCHITECTURE §6.4.
+**Regras:** RN-BRAIN01–05, RN-BRAIN07, RN-BRAIN09; ARCHITECTURE §6.4.
 
 ```gherkin
 Cenário: chamada com histórico completo
@@ -386,6 +391,12 @@ Cenário: modelo não baixado
   Quando envio uma frase
   Então vejo o comando "ollama pull <modelo>"
 
+Cenário: tempo esgotado
+  Dado TimeoutSeconds igual a 1 e um Ollama que não responde
+  Quando envio uma frase
+  Então a requisição é cancelada
+  E vejo uma mensagem de tempo esgotado
+
 Cenário: console conversa com o Ollama
   Dado "Brain:Provider" igual a "Ollama"
   Quando envio uma frase pelo console
@@ -398,8 +409,9 @@ Cenário: console conversa com o Ollama
 
 | # | Comando | Esperado |
 |---|---|---|
-| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` | verde: 5 frases de fumaça, 5/5 no formato |
+| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` | verde: 5 frases de fumaça, 5/5 no formato, contando a retentativa única do ADR-006 (alterado em 2026-10-22: o D5 vermelho sem retentativa, com o modelo 14B errando 0 a 2 frases de 5, mostrou que o formato do modelo local só é garantido com a retentativa; ver RN-FEED01 e `tasks/US-006/plan.md` §12) |
 | D6 | `nvidia-smi` durante o teste D5 | VRAM do modelo registrada em ARCHITECTURE §7 |
+| D7 | No Windows PowerShell 5.1: `$env:Brain__Provider="Ollama"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__Provider` | uma linha `Tutor: <reply>`; nenhuma linha "The tutor is not connected yet."; `exit=0` |
 
 ---
 
@@ -437,6 +449,7 @@ Cenário: sem fallback configurado
 |---|---|---|
 | D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde |
 | D6 | `$env:Brain__Provider="Ollama"; "/quit" \| dotnet run --project src/EnglishTutor.Console` | cabeçalho mostra "Ollama" |
+| D7 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha: o seletor provisório de `ITutorBrain` por `Brain:Provider` (US-006, em `InfrastructureServiceCollectionExtensions`) foi substituído pela `BrainFactory` |
 
 ---
 

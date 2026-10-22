@@ -3,6 +3,7 @@
 - **Status:** Aceito (2026-10-17)
 - **Data:** 2026-10-17
 - **Revisado:** 2026-10-19 (RN-FEED01 passou a "exatamente uma pergunta"; US-004)
+- **Revisado:** 2026-10-22 (RN-FEED01: o validador aceita 1 ou 2 perguntas; o prompt continua pedindo exatamente uma; US-006)
 - **US relacionadas:** US-002 (e, como consumidoras, US-003, US-004, US-006)
 
 ## Contexto
@@ -16,7 +17,7 @@ A US-002 cria o `TutorReplyParser`, parser único da resposta do professor (RN-B
 
 ## Decisão
 
-1. As regras de conteúdo verificáveis moram no Core, em `EnglishTutor.Core.Brain.TutorReplyValidator` (estático e puro): reply não vazio, reply com exatamente uma pergunta (uma única frase terminada em `?`, em qualquer posição; as frases são separadas por `ReplySentences`, também no Core), no máximo 2 correções (as excedentes são descartadas com aviso), correção sem `original` ou `corrected` descartada com aviso, campos opcionais em branco viram `null`.
+1. As regras de conteúdo verificáveis moram no Core, em `EnglishTutor.Core.Brain.TutorReplyValidator` (estático e puro): reply não vazio, reply com 1 ou 2 perguntas (uma ou duas frases terminadas em `?`, em qualquer posição; o prompt pede exatamente uma, tolerância de verificação da RN-FEED01; as frases são separadas por `ReplySentences`, também no Core), no máximo 2 correções (as excedentes são descartadas com aviso), correção sem `original` ou `corrected` descartada com aviso, campos opcionais em branco viram `null`.
 2. O resultado (`TutorReplyParseResult`), a rejeição (`TutorReplyRejection(Reason, Message)`) e o catálogo de motivos e mensagens (`TutorReplyRejections`) também ficam no Core. Cada mensagem diz o que está errado e o que se espera.
 3. O `TutorReplyParser` continua em `Infrastructure/Brain` e cuida **só do formato**: detecta JSON canônico ou tags, extrai os campos (System.Text.Json / regex), monta um `TutorReply` candidato, delega ao `TutorReplyValidator` e registra no log os avisos devolvidos. O Core não loga nem lê JSON.
 4. O texto de feedback mostrado ao aluno é montado no Core por `FeedbackFormatter` (texto puro, uma linha por item), para que toda UI mostre o mesmo conteúdo sem repetir a regra.

@@ -12,3 +12,9 @@ The spoken part: at most 3 short sentences (never a 4th) with exactly one questi
 </feedback>
 
 If there are no errors, the feedback contains one line starting with "- Praise:".
+
+Before answering, count the "?" in the reply: there must be exactly one.
+
+Good reply: "Was it busy in the morning? Tell me about your commute."
+Forbidden reply (two questions): "Was it busy in the morning? And you?"
+Never write a second question, not even a short follow-up like "And you?".

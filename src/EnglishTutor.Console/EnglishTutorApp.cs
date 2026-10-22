@@ -101,11 +101,8 @@ public static class EnglishTutorApp
         IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
     {
         var provider = CanonicalProvider(services);
-        // P7: only ClaudeCode is connected; Ollama keeps the "not connected" handler until US-006.
-        IChatInputHandler handler = provider == BrainProviders.ClaudeCode
-            ? new ConversationInputHandler(
-                services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger)
-            : new TutorNotConnectedInputHandler(options.Output);
+        var handler = new ConversationInputHandler(
+            services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger);
         logger.ApplicationStarted(provider, handler.Mode.Name);
 
         var session = new ChatSession(options.Input, options.Output, handler, provider);
@@ -138,6 +135,9 @@ public static class EnglishTutorApp
             .ValidateOnStart();
         builder.Services.AddOptions<ClaudeCodeOptions>()
             .Bind(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<OllamaOptions>()
+            .Bind(builder.Configuration.GetSection(OllamaOptions.SectionName))
             .ValidateOnStart();
         builder.Services.AddOptions<ConversationOptions>()
             .Bind(builder.Configuration.GetSection(ConversationOptions.SectionName))

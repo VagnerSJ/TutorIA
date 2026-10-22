@@ -59,7 +59,8 @@ src/
   EnglishTutor.Infrastructure/
     Brain/             ClaudeCodeTutorBrain, ClaudeCodeOptions, ClaudeCodeOptionsValidator, ClaudeCodeOutput, ClaudeCodeFailures,
                        ClaudeCodePromptRenderer, ClaudeCodeLog, BrainOutputModes, TutorReplySchema,
-                       FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain,
+                       FileTutorPromptSource, PromptFiles, ClaudeCodeStreamingBrain, OllamaTutorBrain, OllamaOptions,
+                       OllamaOptionsValidator, OllamaFailures, OllamaChatClients, OllamaLog,
                        TutorReplyParser, BrainFactory, FallbackTutorBrain
     Processes/         IProcessRunner, ProcessRequest, ProcessResult, ProcessRunner
     DependencyInjection/ InfrastructureServiceCollectionExtensions
@@ -174,6 +175,7 @@ classDiagram
     "Endpoint": "http://localhost:11434",
     "Model": "qwen2.5:14b-instruct-q4_K_M",
     "Temperature": 0.6,
+    "TimeoutSeconds": 60,
     "OutputMode": "JsonSchema"
   }
 }
@@ -186,7 +188,7 @@ Validação das Options na inicialização (`ValidateOnStart`).
 - Forma canônica: objeto JSON `{ reply, corrections[{original, corrected, explanation}], pronunciation, vocabulary, praise }`.
 - `ClaudeCode` usa `--json-schema` e lê `structured_output`; `Ollama` usa `format` com o mesmo JSON Schema.
 - `TutorReplyParser` é **único**: aceita o JSON canônico e, como alternativa, o formato com tags `<reply>…</reply><feedback>…</feedback>` (texto cru, modelos menores, `OutputMode: Tags`).
-- As regras de conteúdo verificáveis (reply não vazio e com exatamente uma pergunta, isto é, uma única frase terminada em `?`, em qualquer posição, com as frases separadas por `ReplySentences`; no máximo 2 correções; correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
+- As regras de conteúdo verificáveis (reply não vazio e com 1 ou 2 perguntas, isto é, uma ou duas frases terminadas em `?`, em qualquer posição, com as frases separadas por `ReplySentences` (tolerância de verificação da RN-FEED01: o prompt continua pedindo exatamente uma; 0 e 3 ou mais são rejeitadas); no máximo 2 correções; correção com `original` e `corrected`) moram no Core (`TutorReplyValidator`, R4); o `TutorReplyParser` cuida só do formato e delega a elas (ADR-005). Toda rejeição traz um `Reason` curto e uma `Message` que diz o que faltou e o que se espera, usada na retentativa da RN-BRAIN04.
 
 ### 6.3 Provedor Claude Code (processo)
 
@@ -215,7 +217,9 @@ claude -p
 
 ### 6.4 Provedor Ollama (HTTP)
 
-- Via `Microsoft.Extensions.AI` (`IChatClient`) com o pacote do Ollama; histórico montado pela aplicação a cada chamada (sem estado).
+- Via `Microsoft.Extensions.AI` (`IChatClient`) com o cliente `OllamaSharp` (`OllamaApiClient`, ADR-009); histórico montado pela aplicação a cada chamada (sem estado, RN-BRAIN01).
+- Mensagem `system` = `BrainRequest.SystemPrompt` + instrução de formato do modo (`prompts/format.json.md` ou `format.tags.md`, ADR-002). `OutputMode=JsonSchema` envia `format` com o `TutorReplySchema`; `Tags` não envia `format`. Modelo e temperatura vêm de `Brain:Ollama`.
+- Falhas viram `BrainException` classificada pelo adaptador (ADR-009): servidor sem resposta → `Unknown` com "Ollama is not running ..."; modelo ausente → `Unknown` com `ollama pull <modelo>`; `TimeoutSeconds` estourado → `Timeout`, com a requisição cancelada. O console mostra a mensagem como nas falhas do Claude Code.
 - O mesmo `IChatClient` servirá de base para o futuro provedor `AnthropicApi`.
 
 ## 7. Voz
@@ -233,6 +237,8 @@ claude -p
 | Piper / Kokoro | <0,5 GB |
 | LLM local 14B Q4 | ~9–10 GB |
 | LLM local 7–8B Q4 | ~5–6 GB |
+
+Medido (US-006, 2026-10-21): 10828 MiB de VRAM em uso durante o teste real com `qwen2.5:14b-instruct-q4_K_M` (linha de base 1568 MiB sem o modelo; `nvidia-smi`; `ollama ps`: 9,5 GB, 100% GPU, contexto 4096).
 
 ## 8. Persistência
 

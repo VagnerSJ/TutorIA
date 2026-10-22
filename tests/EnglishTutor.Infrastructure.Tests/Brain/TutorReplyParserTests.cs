@@ -119,17 +119,29 @@ public sealed class TutorReplyParserTests
         result.Reply!.Reply.Should().Be("Was it busy in the morning? Tell me about your commute.");
     }
 
-    // US-004 — Cenário: reply com duas perguntas é inválido — RN-FEED01
+    // US-004 — Cenário: reply com duas perguntas é aceito pela tolerância — RN-FEED01
     [Fact]
-    public void Parse_WhenJsonReplyAsksTwoQuestions_RejectsWithExactlyOneQuestionReason()
+    public void Parse_WhenJsonReplyAsksTwoQuestions_ReturnsReply()
     {
         var raw = """{"reply":"Was it busy? How long was the trip?","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}""";
 
         var result = _sut.Parse(raw);
 
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be("Was it busy? How long was the trip?");
+    }
+
+    // US-004 — Cenário: reply com três perguntas é inválido — RN-FEED01
+    [Fact]
+    public void Parse_WhenJsonReplyAsksThreeQuestions_RejectsWithExactlyOneQuestionReason()
+    {
+        var raw = """{"reply":"Was it busy? How long was the trip? Who drove?","corrections":[],"pronunciation":null,"vocabulary":null,"praise":"Nice sentence."}""";
+
+        var result = _sut.Parse(raw);
+
         result.IsValid.Should().BeFalse();
         result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
-        result.Rejection!.Message.Should().Contain("has 2 questions");
+        result.Rejection!.Message.Should().Contain("has 3 questions");
     }
 
     // US-002 — Cenário: mais de duas correções — RN-FEED02

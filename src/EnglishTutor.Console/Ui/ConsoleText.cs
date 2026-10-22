@@ -8,8 +8,6 @@ public static class ConsoleText
 {
     public const string Prompt = "> ";
 
-    public const string TutorNotConnected = "The tutor is not connected yet.";
-
     public const string UnexpectedError = "An unexpected error occurred. See the log file for details.";
 
     public const string InvalidConfiguration = "Invalid configuration:";

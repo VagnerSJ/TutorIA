@@ -65,19 +65,34 @@ public sealed class TutorReplyValidatorTests
         result.Reply!.Reply.Should().Be(reply);
     }
 
-    // US-004 — Cenário: reply com duas perguntas é inválido (regra no Core, bordas) — RN-FEED01 (P21, P22)
+    // US-004 — Cenário: reply com duas perguntas é aceito pela tolerância (regra no Core, bordas) — RN-FEED01 (P13, P14, P21, P22)
     [Theory]
     [InlineData("Was it busy? How long was the trip?")]
     [InlineData("Really?! What happened next?")]
     [InlineData("Your boss said \"Really?\" Then what did you say?")]
     [InlineData("Was it busy?\nHow long was the trip?")]
-    public void Validate_WhenReplyAsksMoreThanOneQuestion_RejectsWithExactlyOneQuestionReason(string reply)
+    public void Validate_WhenReplyAsksTwoQuestions_ReturnsValidReplyWithoutWarnings(string reply)
+    {
+        var result = TutorReplyValidator.Validate(Candidate(reply, []));
+
+        result.IsValid.Should().BeTrue();
+        result.Reply!.Reply.Should().Be(reply);
+        result.Warnings.Should().BeEmpty();
+    }
+
+    // US-004 — Cenário: reply com três perguntas é inválido (regra no Core, bordas) — RN-FEED01 (P13, P21, P22)
+    [Theory]
+    [InlineData("Why? When? Where?")]
+    [InlineData("Was it busy? How long was the trip? Who drove?")]
+    [InlineData("Really?! What happened next? Then what did you say?")]
+    [InlineData("Was it busy?\nHow long was the trip?\nWho drove?\nWhy?")]
+    public void Validate_WhenReplyAsksMoreThanTwoQuestions_RejectsWithExactlyOneQuestionReason(string reply)
     {
         var result = TutorReplyValidator.Validate(Candidate(reply, []));
 
         result.IsValid.Should().BeFalse();
         result.Rejection!.Reason.Should().Be("reply must ask the student exactly one question");
-        result.Rejection!.Message.Should().Contain("has 2 questions");
+        result.Rejection!.Message.Should().Contain("Replies with 1 or 2 questions are accepted");
     }
 
     // US-002 — Cenário: reply sem pergunta (aceite com espaços finais, apoio, P6)

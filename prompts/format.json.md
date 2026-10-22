@@ -8,4 +8,10 @@ Answer only with a JSON object that matches the provided schema:
 - `vocabulary`: one more natural word or expression, or null.
 - `praise`: one specific compliment when there are no corrections, otherwise null.
 
+Before answering, count the "?" in the reply: there must be exactly one.
+
+Good reply: "Was it busy in the morning? Tell me about your commute."
+Forbidden reply (two questions): "Was it busy in the morning? And you?"
+Never write a second question, not even a short follow-up like "And you?".
+
 Do not add any text outside the JSON object.

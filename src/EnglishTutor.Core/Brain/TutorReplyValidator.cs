@@ -5,6 +5,8 @@ namespace EnglishTutor.Core.Brain;
 public static class TutorReplyValidator
 {
     private const int _maxCorrections = 2;
+    private const int _minQuestions = 1;
+    private const int _maxQuestions = 2;
 
     public static TutorReplyParseResult Validate(TutorReply candidate)
     {
@@ -16,9 +18,10 @@ public static class TutorReplyValidator
             return TutorReplyParseResult.Invalid(TutorReplyRejections.MissingReply());
         }
 
-        // RN-FEED01: exactly one question, in any position; the sentences come from ReplySentences.
+        // RN-FEED01: asked exactly one question; verified 1 or 2 (verification tolerance, BUSINESS_RULES), in any position;
+        // the sentences come from ReplySentences.
         var questionCount = ReplySentences.Split(reply).Count(ReplySentences.IsQuestion);
-        if (questionCount != 1)
+        if (questionCount < _minQuestions || questionCount > _maxQuestions)
         {
             return TutorReplyParseResult.Invalid(TutorReplyRejections.ReplyMustAskExactlyOneQuestion(reply, questionCount));
         }
