@@ -27,7 +27,7 @@ Fatos verificados na documentação do Claude Code v2.1.299:
 2. `ClaudeCode` e `Ollama` usam saída estruturada com esse schema (`OutputMode = JsonSchema`, padrão).
 3. O `TutorReplyParser` é único e aceita **também** o formato com tags (`OutputMode = Tags`), usado como alternativa de compatibilidade e para comparação no `eval`.
 4. As regras de conteúdo ficam em `prompts/tutor.md`; a instrução de formato fica em `prompts/format.json.md` ou `prompts/format.tags.md`, anexada pelo adaptador (RN-BRAIN02).
-5. Regras que o schema não garante (reply com exatamente uma pergunta, RN-FEED01; no máximo 2 correções) continuam validadas pelo parser, com a retentativa da RN-BRAIN04.
+5. Regras que o schema não garante (reply com exatamente uma pergunta pedida, 1 ou 2 verificadas, RN-FEED01; no máximo 2 correções) continuam validadas pelo parser, com a retentativa da RN-BRAIN04.
 
 ## Alternativas consideradas
 
