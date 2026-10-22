@@ -238,8 +238,13 @@ Cenário: pergunta seguida de incentivo é aceita (RN-FEED01, alterada em 2026-1
   Quando o parser processa a resposta
   Então obtenho um TutorReply com esse Reply
 
-Cenário: reply com duas perguntas é inválido (RN-FEED01, alterada em 2026-10-19)
+Cenário: reply com duas perguntas é aceito pela tolerância (RN-FEED01, alterada em 2026-10-22)
   Dado um JSON cujo reply é "Was it busy? How long was the trip?"
+  Quando o parser processa a resposta
+  Então obtenho um TutorReply com esse Reply
+
+Cenário: reply com três perguntas é inválido (RN-FEED01, alterada em 2026-10-22)
+  Dado um JSON cujo reply é "Was it busy? How long was the trip? Did you sit?"
   Quando o parser processa a resposta
   Então o resultado é inválido com o motivo "reply must ask the student exactly one question"
 
@@ -404,7 +409,7 @@ Cenário: console conversa com o Ollama
 
 | # | Comando | Esperado |
 |---|---|---|
-| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` | verde: 5 frases de fumaça, 5/5 no formato |
+| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` | verde: 5 frases de fumaça, 5/5 no formato, contando a retentativa única do ADR-006 (alterado em 2026-10-22: o D5 vermelho sem retentativa, com o modelo 14B errando 0 a 2 frases de 5, mostrou que o formato do modelo local só é garantido com a retentativa; ver RN-FEED01 e `tasks/US-006/plan.md` §12) |
 | D6 | `nvidia-smi` durante o teste D5 | VRAM do modelo registrada em ARCHITECTURE §7 |
 | D7 | No Windows PowerShell 5.1: `$env:Brain__Provider="Ollama"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__Provider` | uma linha `Tutor: <reply>`; nenhuma linha "The tutor is not connected yet."; `exit=0` |
 
