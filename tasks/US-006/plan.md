@@ -444,54 +444,54 @@ Comentários de código com adiamento ou texto que muda com esta US (AP-040; Gre
   Commits: `test(brain): cover Ollama options and validation` + `feat(brain): add Brain:Ollama options with validation`.
   Escolhas de forma: nenhuma
 
-- [ ] T2 — Adaptador: pedido, modos e leitura da resposta (sem falhas e sem tempo máximo).
+- [x] T2 — Adaptador: pedido, modos e leitura da resposta (sem falhas e sem tempo máximo). (feito: test ea4f5a2, feat 5753ead)
   Estado dos ramos até a T4 e a T5: uma `HttpRequestException` ou qualquer outra exceção do cliente propaga sem tradução; não há relógio (`SendAsync` passa o `ct` direto ao `IChatClient`). Os testes desta tarefa usam só respostas e histórico válidos, que ficam nos ramos implementados.
   Red: pacotes `OllamaSharp` e `Microsoft.Extensions.AI.Abstractions` (§6) em `Directory.Packages.props` e no `.csproj` da Infrastructure (o Executor registra as versões na §12 no mesmo commit); esqueletos `OllamaTutorBrain` (`SendAsync` lança `NotImplementedException`), `OllamaChatClients.Create` (lança `NotImplementedException`) e `OllamaLog.Replied` (método parcial do gerador, sem chamada ainda); fakes `FakeChatClient` (`Returns(string)`, `Calls`, `Tokens`, `OnRun`) e `FakeHttpMessageHandler`; testes `OllamaTutorBrainTests.SendAsync_WithTwoPreviousTurns_SendsSystemPromptHistoryAndNewMessageInOrder`, `OllamaTutorBrainTests.SendAsync_WithJsonSchemaMode_AsksForStructuredOutputWithTutorReplySchema`, `OllamaTutorBrainTests.SendAsync_WithTagsMode_AppendsTagsInstructionAndAsksForNoStructuredOutput`, `OllamaTutorBrainTests.SendAsync_WhenOutputModeCaseDiffers_UsesCanonicalMode`, `OllamaTutorBrainTests.SendAsync_Always_PassesConfiguredModelAndTemperature`, `OllamaTutorBrainTests.SendAsync_WhenHistoryHasEmptyAssistantMessage_KeepsItUnchanged`, `OllamaTutorBrainTests.SendAsync_OnSecondCall_DoesNotCarryMessagesFromTheFirst`, `OllamaTutorBrainTests.SendAsync_WithValidJson_ReturnsParsedReplyWithRawText`, `OllamaTutorBrainTests.SendAsync_WhenReplyIsOutOfFormat_ThrowsInvalidOutputWithRejectedText`, `OllamaTutorBrainTests.SendAsync_WhenReplyIsValid_LogsRepliedWithoutStudentTextOrReply`, `OllamaTutorBrainHttpTests.SendAsync_WithTwoPreviousTurns_PostsToApiChatWithSystemHistoryAndNewMessage`, `OllamaTutorBrainHttpTests.SendAsync_WithJsonSchemaMode_PostsFormatWithTutorReplySchema` e `OllamaTutorBrainHttpTests.SendAsync_WithTagsMode_PostsNoFormat`. Todos falham pela `NotImplementedException` do esqueleto.
   Green: §2.2 (leitura do arquivo de formato, mensagens, `ChatOptions`, normalização do modo, `parser`, `InvalidOutput`, log) e `OllamaChatClients.Create` (§2.2); comentário de `TutorReplySchema.cs` (§2.10). O Executor confere nos testes de fio como a versão fixada do `OllamaSharp` mapeia `ChatOptions` para o corpo (`format`, `options.temperature`) e registra na §12 o que diferir do esperado (parar se `format` não sair com o schema: o usuário decide).
   Commits: `test(brain): cover Ollama request composition and reply parsing` + `feat(brain): add OllamaTutorBrain over IChatClient`.
-  Escolhas de forma: nenhuma | §12 em <hash> (versões dos pacotes)
+  Escolhas de forma: §12 em 8c05888 (versões dos pacotes) e d7431b0 (texto do log, schema sem nome)
 
-- [ ] T3 — Gravação das respostas reais do Ollama (sem código de produção).
+- [x] T3 — Gravação das respostas reais do Ollama (sem código de produção). (feito: c8062aa; mutação do Red aplicada e revertida: o parser deixa de receber o conteúdo, o teste falha com InvalidOutput)
   Pré-condição e passos (§2.8): instalar o Ollama e baixar o modelo (`ollama --version` e `ollama list` nas Evidências; `ollama --help` com `serve` e `pull`, §2.5); criar `OllamaFixtureRecorderLiveTests`, `RecordingHttpHandler` e `LiveOllama`; rodar `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~OllamaFixtureRecorderLiveTests"`; copiar de `recorded-fixtures/` para `Fixtures/Ollama/` os 4 arquivos, escrever o `README.md` com a seção "Diferenças em relação à chamada do adaptador" (§2.8); colar `exceptions.txt` nas Evidências e a conclusão na §12 (tipo e status da exceção do modelo ausente e da conexão recusada; se o 404 não casar com a linha a da §2.3, o ajuste); conferir que `chat-structured.json` é JSON puro (P6); rodar o D13. Teste novo: `OllamaTutorBrainHttpTests.SendAsync_WithRecordedStructuredResponse_ReturnsReplyAndCorrections` (nasce verde: caracterização). Red por mutação temporária pelo efeito, escolhida depois da gravação e aplicada no próprio Red (o adaptador já existe): "o adaptador deixa de entregar o conteúdo da resposta ao parser" (o teste falha pela asserção, com `InvalidOutput`), desfeita pela edição inversa.
   Commit: `test(brain): record Ollama responses`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma | §12 em 3264497 (conclusões da gravação; nenhum ajuste na linha a)
 
-- [ ] T4 — Falhas do servidor: "Ollama is not running" e "ollama pull".
+- [x] T4 — Falhas do servidor: "Ollama is not running" e "ollama pull". (feito: test b5e5cf6, feat 7c3c18b)
   Red: `OllamaFailures` com `IsServerFailure` devolvendo `false` e `Translate` lançando `NotImplementedException`; testes `OllamaTutorBrainTests.SendAsync_WhenNothingAnswers_ThrowsNotRunningWithStartInstructionAndKey`, `OllamaTutorBrainTests.SendAsync_WhenModelIsNotDownloaded_ThrowsPullCommandForConfiguredModel`, `OllamaTutorBrainTests.SendAsync_WhenServerCallFails_ClassifiesByStatusAndText` (6 casos), `OllamaTutorBrainTests.SendAsync_WhenServerFailureDetailVaries_UsesFirstNonBlankLineOrFallback` (5 casos), `OllamaTutorBrainHttpTests.SendAsync_WithRecordedModelNotFoundResponse_ThrowsPullCommandForConfiguredModel`, `OllamaTutorBrainHttpTests.SendAsync_WhenConnectionIsRefused_ThrowsNotRunningWithEndpoint` e `OllamaTutorBrainHttpTests.SendAsync_WhenServerFails_ThrowsUnknownWithGenericMessage` (falham: a exceção original propaga em vez de `BrainException`), e `OllamaTutorBrainTests.SendAsync_WhenFailureIsNotFromTheServer_PropagatesIt`, que nasce verde (o esqueleto não traduz nada).
   Green: §2.3 e §2.5 (inclusive a derivação de `<detalhe>`: primeira linha não vazia, sem espaços nas pontas, ou `no error details were provided`); o `catch` do adaptador (`when (OllamaFailures.IsServerFailure(exception))`), com os tipos de exceção que a T3 registrou.
   Mutação depois do Green (para `SendAsync_WhenFailureIsNotFromTheServer_PropagatesIt`): "`IsServerFailure` passa a devolver `true` para qualquer exceção" (o teste recebe `BrainException` em vez de `InvalidOperationException` e falha); depois, para a precedência (caso 6), "a linha b passa a ser avaliada antes da a" (o caso 6 falha). Para o `<detalhe>` (B1; os cinco casos nascem vermelhos no Red pela `NotImplementedException`; as mutações provam que cada ramo é isolado e são aplicadas depois do Green): "o `<detalhe>` passa a ser a mensagem inteira da exceção" (casos 1, 2 e 3 de `SendAsync_WhenServerFailureDetailVaries_UsesFirstNonBlankLineOrFallback` falham); "o `<detalhe>` deixa de pular linhas vazias e usa a primeira linha mesmo em branco" (caso 2 falha); "o `<detalhe>` deixa de remover espaços e `\r` das pontas" (caso 3 falha); "o texto de reserva deixa de existir e a mensagem fica com `()`" (casos 4 e 5 falham). Cada mutação é desfeita pela edição inversa.
   Commits: `test(brain): cover Ollama server failures` + `feat(brain): classify Ollama failures with instructions`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T5 — Tempo máximo por chamada.
+- [x] T5 — Tempo máximo por chamada. (feito: test 6ef78b0, feat ec02909)
   Red: `FakeChatClient.HangsUntilCancelled(Action? onCancelled = null)` (termina só com `OperationCanceledException` quando o token é cancelado; `onCancelled` roda depois de o token ser cancelado e antes de a exceção sair do fake); `OllamaFailures.Timeout(int, OperationCanceledException)` lançando `NotImplementedException`; testes `OllamaTutorBrainTests.SendAsync_WhenOllamaDoesNotAnswerWithinTimeout_CancelsRequestAndThrowsTimeout`, `OllamaTutorBrainTests.SendAsync_OnEachCall_StartsTimeoutAgain` e `OllamaTutorBrainTests.SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation` (falham pelo `WaitAsync` de 10 s: o adaptador ainda não tem relógio) e `OllamaTutorBrainTests.SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout`, que nasce verde (o token do chamador já vai direto ao cliente): Red por mutação temporária pelo efeito, aplicada no próprio Red porque o repasse do token já existe, "o cancelamento do chamador deixa de chegar ao cliente" (falha pelo `WaitAsync` de 10 s, com `TimeoutException`, sem travar a suíte), desfeita pela edição inversa.
   Green: §2.4 (relógio por chamada, token ligado, filtro completo do `Timeout`) e a mensagem de tempo esgotado da §2.5.
   Mutação depois do Green, para `SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation`: "a condição do chamador deixa de contar no filtro do `Timeout`" (o teste recebe `BrainException(Timeout)` e falha), desfeita pela edição inversa.
   Commits: `test(brain): cover Ollama timeout and caller cancellation` + `feat(brain): stop Ollama calls after TimeoutSeconds`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T6 — Seleção do cérebro por `Brain:Provider` (provisória).
+- [x] T6 — Seleção do cérebro por `Brain:Provider` (provisória). (feito: test 4e44616, feat d8c10fb)
   Red: `AddEnglishTutorInfrastructure` sem mudança de seletor (continua fixo no Claude Code); testes `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_WhenProviderIsOllama_ResolvesOllamaBrain` (2 casos; falham: resolve `ClaudeCodeTutorBrain`) e `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_WhenProviderIsClaudeCode_ResolvesClaudeCodeBrain` (nasce verde).
   Green: §2.7 (registros concretos, `IChatClient` com chave `"Ollama"`, seletor com o comentário `Provisional selector until the BrainFactory (US-007).`) e o comentário do cabeçalho do arquivo (§2.10).
   Mutação depois do Green, para `..._WhenProviderIsClaudeCode_ResolvesClaudeCodeBrain`: "o seletor devolve sempre o `OllamaTutorBrain`" (o teste falha), desfeita pela edição inversa.
   Commits: `test(brain): cover brain selection by Brain:Provider` + `feat(brain): select the Ollama brain by Brain:Provider`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T7 — Console conversa com o Ollama.
+- [x] T7 — Console conversa com o Ollama. (feito: test 6a24b4f, feat 8cf1a78)
   Red: `ScriptedChatClient` (Console.Tests/Support) e `CreateOllamaOptions`; sai `EnglishTutorAppTests.RunAsync_WhenProviderIsOllama_ShowsTutorNotConnected` com o comentário (§2.10); testes `EnglishTutorAppTests.RunAsync_WhenProviderIsOllama_SendsRequestThroughOllamaBrainAndShowsReplyAndFeedback` e `EnglishTutorAppTests.RunAsync_WhenOllamaFails_ShowsInstructionOnErrorAndContinuesSession` (2 casos). Falham pela asserção: o console ainda tem o ramo "não conectado" (a saída tem `The tutor is not connected yet.` e o cliente falso não recebe chamada).
   Green: §2.6 (handler único em `RunSessionAsync`; apagar `TutorNotConnectedInputHandler.cs` e `ConsoleText.TutorNotConnected`).
   Commits: `test(console): cover the console talking to Ollama` + `feat(console): connect the Ollama provider to the conversation`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] T8 — `LiveBrain` (D5) e medição de VRAM (D6).
+- [ ] T8 — `LiveBrain` (D5) e medição de VRAM (D6). (testes: 8014832; VRAM: 3744531; D5 VERMELHO, aguardando decisão do usuário, §12)
   Testes `OllamaTutorBrainLiveTests.SendAsync_WithFiveKnownErrors_AllInFormat`, `OllamaTutorBrainLiveTests.SendAsync_WhenModelIsNotDownloaded_ThrowsPullCommand`, `OllamaTutorBrainLiveTests.SendAsync_WhenNothingListensOnEndpoint_ThrowsNotRunning` e `OllamaTutorBrainLiveTests.SendAsync_WhenHistoryHasEmptyAssistantMessage_StillReturnsValidReply`, com `[Trait("Category", "LiveBrain")]`. Nascem verdes (o adaptador existe): Red por mutação temporária pelo efeito, desfeita pela edição inversa: "`IsServerFailure` passa a devolver `false`" (o teste da porta fechada falha com a `HttpRequestException` crua; o do modelo ausente também) e "o adaptador deixa de enviar o `format`" (anotar o efeito na saída da fumaça; sem critério). Rodar o D5 em 3 rodadas, o D6 e atualizar a `ARCHITECTURE.md` §7 com a medição (texto da §2.9).
   Commits: `test(brain): add Ollama LiveBrain smoke tests` + `docs(ai): record Ollama VRAM measurement`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: §12 em 3744531 (posição do parágrafo de VRAM; commit docs único)
 
-- [ ] T9 — DoD e evidências.
+- [ ] T9 — DoD e evidências. (evidências coletadas, D5 pendente)
   Rodar D1–D18 (D15 depois de todo o código), colar nas Evidências com data e hash, atualizar as contagens da §4 e de D2/D11 se algo mudou (AP-031) e conferir cada afirmação de cobertura da §12 contra a §4 (AP-049).
   Commit: `docs(ai): add US-006 evidence`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
 ## 6. Pacotes NuGet
 
@@ -619,6 +619,40 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 - Mutações depois do Green (1acc4a9), cada uma revertida (`git checkout` do arquivo, tudo já commitado; `git status --short` limpo): `MinTimeoutSeconds` 2 → `Validate_WithTimeoutSecondsAtLimits_Succeeds(1)` falha; `MaxTimeoutSeconds` 3599 → caso 3600 falha; `MinTemperature` 0,01 → `Validate_WithTemperatureAtLimits_Succeeds(0)` falha; `MaxTemperature` 1,99 → caso 2 falha; `OutputMode` com caixa → `Validate_WhenOutputModeCaseDiffers_Succeeds` (2 casos) falha; `https` recusado → `Validate_WithHttpAndHttpsEndpoints_Succeeds(https)` falha; `Model` padrão vazio → `Constructor_Always_UsesDocumentedDefaults` e as demais falham.
 - Pós-Green: Core 134, Infrastructure 127 (+26), Console 53 (+2), todos verdes.
 
+**T2 a T8 (2026-10-21)**
+
+- T3: `ollama --version` → `ollama version is 0.40.7`; `ollama list` → `qwen2.5:14b-instruct-q4_K_M` 9,0 GB; `ollama --help` lista `serve` e `pull`. `exceptions.txt` do gravador: modelo ausente = `System.Net.Http.HttpRequestException | StatusCode=NotFound | Response status code does not indicate success: 404 (Not Found).`; conexão recusada = `HttpRequestException | StatusCode=none | <texto do SO>` com `System.Net.Sockets.SocketException` interna. Mutação do Red da T3: "o adaptador deixa de entregar o conteúdo da resposta ao parser" (`var text = string.Empty;`) → `SendAsync_WithRecordedStructuredResponse_ReturnsReplyAndCorrections` falha com `BrainException` (`missing reply`); revertida.
+- T4, mutações depois do Green (revertidas, `git status` limpo): `IsServerFailure` sempre `true` → `SendAsync_WhenFailureIsNotFromTheServer_PropagatesIt` falha; a linha a só vale com status (efeito de "b antes de a") → caso 6 de `SendAsync_WhenServerCallFails_ClassifiesByStatusAndText` falha; `<detalhe>` = mensagem inteira → os 5 casos de `SendAsync_WhenServerFailureDetailVaries_...` falham; primeira linha mesmo em branco (sem pular vazias) → casos 2, 4 e 5 falham; sem `Trim` → caso 3 falha; sem texto de reserva (`First(line => true)`) → casos 2, 4 e 5 falham.
+- T5: Red: 3 testes falham pelo `WaitAsync` de 10 s (`TimeoutException`); `SendAsync_WhenCallerCancels_PropagatesCancellationInsteadOfTimeout` nasceu verde e, com a mutação "o token do chamador deixa de chegar ao cliente" (`CancellationToken.None`), falhou com `TimeoutException` do `WaitAsync` (revertida). Mutação depois do Green: o filtro do `Timeout` sem `!ct.IsCancellationRequested` → `SendAsync_WhenCallerCancelsAfterTimeoutExpires_PropagatesCancellation` recebe `BrainException` e falha (revertida).
+- T6: Red: 2 casos falham (resolve `ClaudeCodeTutorBrain`); `..._WhenProviderIsClaudeCode_ResolvesClaudeCodeBrain` nasceu verde. Mutação depois do Green: seletor sempre `OllamaTutorBrain` → esse teste falha (e `AddEnglishTutorInfrastructure_Always_RegistersClaudeCodeBrainAndFilePromptSource` também); revertida.
+- T7: Red: 3 falhas pela asserção (saída com "not connected", cliente falso sem chamadas, erro vazio).
+- T8, mutações dos testes `LiveBrain` (revertidas): `IsServerFailure` sempre `false` → `SendAsync_WhenNothingListensOnEndpoint_ThrowsNotRunning` e `SendAsync_WhenModelIsNotDownloaded_ThrowsPullCommand` falham com `HttpRequestException` crua; adaptador sem `format` → a fumaça de 5 frases continuou a falhar pelas mesmas regras de conteúdo (2 perguntas), `3/5` correções (sem critério: o `format` não muda a regra de conteúdo, só a forma do JSON).
+
+**D1–D18 (2026-10-21; código em 8cf1a78, testes `LiveBrain` em 8014832, docs em 3744531)**
+
+| # | Comando | Resultado |
+|---|---|---|
+| D1 | `dotnet build` | ✅ 0 warnings, 0 erros |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | ✅ 356 passed, 0 failed (Core 134, Console 55, Infrastructure 167), < 1 s por projeto |
+| D3 | `... --collect:"XPlat Code Coverage" --results-directory TestResults` | ✅ 3 `coverage.cobertura.xml` |
+| D3b | `dotnet reportgenerator ...` | ✅ `EnglishTutor.Core` 100% (linha geral 90%; Infrastructure 86%) |
+| D4 | `dotnet format --verify-no-changes` | ✅ sem diferenças |
+| D5 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~Ollama"` ×3 | ❌ `round 1 exit=0`, `round 2 exit=1`, `round 3 exit=0` (a rodada 2 e outras duas execuções avulsas falharam em `SendAsync_WithFiveKnownErrors_AllInFormat`, só por regra de conteúdo; os outros 4 testes passam sempre); causa e opções na §12 |
+| D6 | comando da spec | ✅ `baseline=1568 peakMiB=10828`; `ollama ps`: `qwen2.5:14b-instruct-q4_K_M` 9,5 GB, 100% GPU, contexto 4096 (testes: 4 de 5, o D5 vermelho acima) |
+| D7 | PowerShell 5.1 com `Brain__Provider=Ollama` | ✅ `Tutor: That's great. C# is a powerful language. How has your experience been working with it for so long?`, `Feedback:`, nenhuma linha "not connected", `exit=0` |
+| D8 | `Brain__Ollama__Endpoint=http://localhost:1` | ✅ 2× `The tutor could not answer: Ollama is not running at "http://localhost:1". Start it ...` com `ollama serve` e `Brain:Ollama:Endpoint`, cada uma seguida de `You can send a sentence again or type /quit to exit.`; `exit=0` |
+| D9 | `Brain__Ollama__Model=nao-existe-us006` | ✅ `Ollama model "nao-existe-us006" is not downloaded. Run "ollama pull nao-existe-us006" ...`; `exit=0` |
+| D10 | `Brain__Ollama__TimeoutSeconds=1` | ✅ `Ollama did not answer in time (limit: 1 s) and the request was cancelled. ...`; `exit=0` (na primeira tentativa) |
+| D11 | `dotnet test --filter "Category!=LiveBrain&FullyQualifiedName~Ollama"` | ✅ 69 casos (Infrastructure 65, Console 4) |
+| D12 | `Select-String ... appsettings.json` | ✅ 5 linhas |
+| D13 | `Select-String ... Fixtures/Ollama/*` | ✅ 0 linhas (inclui o README) |
+| D14 | `git diff develop...HEAD \| grep -c ...` | ✅ `0` (código de saída 1) |
+| D15 | bloco PowerShell | ✅ `scanned=134 named=1`; nenhuma linha |
+| D16 | `git grep -n -F "Provisional selector" -- src tests` | ✅ 1 linha, em `InfrastructureServiceCollectionExtensions.cs:33` |
+| D17 | `git status --short` | ✅ vazio |
+| D18 | `dotnet list package --vulnerable --include-transitive` | ✅ nenhum pacote vulnerável nos 6 projetos |
+| D15c | (T1) | ✅ ver T1 |
+
 ## 12. Comentários do usuário
 
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
@@ -664,4 +698,8 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 ### 2026-10-21 — escolha do Executor (T8, forma) e D5 vermelho
 
 - A medição de VRAM entrou na `ARCHITECTURE.md` §7 **depois da tabela** (e não entre as linhas dela, o que quebraria a tabela do Markdown), com os números do D6: linha de base 1568 MiB, pico 10828 MiB, `ollama ps` 9,5 GB 100% GPU, contexto 4096 (RTX 4070 Ti SUPER, 16 GB).
-- **D5 VERMELHO (condição de parada da §7 e do D5): o usuário decide.** O adaptador responde sempre JSON que obedece ao schema; todas as rejeições são de **regra de conteúdo** ("reply must ask the student exactly one question ... has 2 questions"), nenhuma por JSON inválido. Rodadas com o adaptador correto (3 rodadas do D5 mais a corrida de D6 e a primeira corrida de T8): 2, 0, 1, 0 e 1 frase fora do formato em 5 (rodadas verdes: 2 de 4 em 5/5; frases rejeitadas variam: "Yesterday I go to the office by bus" e "We discussed about the new architecture"). Correções esperadas encontradas (só registro): 3/5, 3/5, 3/5, 4/5 e 3/5. Opções para o usuário, com registro prévio na spec (AP-032): (a) mudar a camada do D5 para incluir a retentativa do ADR-006 (o `ConversationService` já reenvia uma vez com correção de formato); (b) aceitar tolerância (ex.: 4/5) para o modelo local; (c) reforçar o prompt do professor para o modelo 14B (`feat(brain)`, muda o `prompts/` compartilhado com o Claude Code); (d) outro modelo local. Nada foi alterado no código nem na spec por isso.
+- **D5 VERMELHO (condição de parada da §7 e do D5): o usuário decide.** O adaptador responde sempre JSON que obedece ao schema; todas as rejeições são de **regra de conteúdo** ("reply must ask the student exactly one question ... has 2 questions"), nenhuma por JSON inválido. Execuções com o adaptador correto (primeira da T8, 3 rodadas do D5 e a corrida do D6), frases fora do formato em 5: 2, 0, 1, 0 e 1 (de 5 execuções com o adaptador correto, 2 ficaram 5/5; as frases rejeitadas variam: "Yesterday I go to the office by bus" e "We discussed about the new architecture"). Correções esperadas encontradas (só registro; mesma ordem, exceto a do D6, não registrada): 3/5, 3/5, 3/5 e 4/5. Opções para o usuário, com registro prévio na spec (AP-032): (a) mudar a camada do D5 para incluir a retentativa do ADR-006 (o `ConversationService` já reenvia uma vez com correção de formato); (b) aceitar tolerância (ex.: 4/5) para o modelo local; (c) reforçar o prompt do professor para o modelo 14B (`feat(brain)`, muda o `prompts/` compartilhado com o Claude Code); (d) outro modelo local. Nada foi alterado no código nem na spec por isso.
+
+### 2026-10-21 — desvio de ordem do Executor (T2/T5)
+
+- O fake `FakeChatClient.HangsUntilCancelled` foi criado já na T2 (junto do resto do fake), e não na T5; o Red da T5 usou-o como previsto, sem outra mudança.
