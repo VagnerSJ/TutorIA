@@ -26,7 +26,7 @@ Quando o pedido for revisar o **plano** (antes do código):
 2. Aplique a seção "Revisão de plano" da skill `checklist-revisao`, item por item.
 3. Se já existir código na branch, use-o só para checar se contradiz o plano.
 4. Confira nomes de branch com `git branch` e de arquivos com `git ls-files` ou Grep antes de citá-los (AP-054).
-4. Saída: o mesmo formato abaixo, com título `# Revisão do plano — US-XXX <título>`, "Escopo revisado" no lugar de "Commits revisados" e a tabela de Verificações trocada pelos itens da seção "Revisão de plano" do checklist.
+5. Saída: o mesmo formato abaixo, com título `# Revisão do plano — US-XXX <título>`, "Escopo revisado" no lugar de "Commits revisados" e a tabela de Verificações trocada pelos itens da seção "Revisão de plano" do checklist.
 
 ## Como revisar (modo revisão de código)
 
