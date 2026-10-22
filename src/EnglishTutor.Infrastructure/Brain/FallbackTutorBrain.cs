@@ -13,9 +13,18 @@ public sealed class FallbackTutorBrain(
 {
     public string Name => primary.Name;
 
-    public Task<TutorReply> SendAsync(BrainRequest request, CancellationToken ct)
+    public async Task<TutorReply> SendAsync(BrainRequest request, CancellationToken ct)
     {
-        _ = (secondary, notifier, logger);
-        return primary.SendAsync(request, ct);
+        try
+        {
+            return await primary.SendAsync(request, ct);
+        }
+        catch (BrainException exception) when (!exception.IsInvalidOutput && BrainFallbackPolicy.ShouldFallBack(exception.Kind))
+        {
+            FallbackLog.SwitchedToSecondary(logger, primary.Name, secondary.Name, exception.Kind);
+            await notifier.NotifyAsync(new BrainSwitchNotice(primary.Name, secondary.Name, exception.Kind), ct);
+        }
+
+        return await secondary.SendAsync(request, ct);
     }
 }
