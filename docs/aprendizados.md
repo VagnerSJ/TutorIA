@@ -470,7 +470,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** ao relaxar a RN-FEED01 (cenário "reply com duas perguntas é inválido" deixou de existir), o inventário da tabela de conferência listou os testes que mudam de comportamento e esqueceu `ReplySentencesTests.cs`, cujo comentário só citava o nome antigo do cenário; o D20 ("nenhuma linha") ficaria vermelho. Corrigido refazendo o Grep pelo nome antigo (6 arquivos). Na rodada 4 a prosa dizia "aparece em 5 arquivos", número que envelheceu; foi trocada pela lista nominal.
 - **Por que importa:** busca de "texto antigo" com inventário incompleto dá falsa garantia (variação de AP-035 e AP-040); contagem em prosa envelhece.
 - **Correção (proposta):** `.claude/agents/planejador.md` e `.claude/skills/checklist-revisao/SKILL.md` §0: "ao renomear, remover ou substituir um cenário ou texto, o inventário vem do Grep pelo nome antigo (`src`, `tests`, `prompts`, `docs`), rodado antes de fechar a tabela de conferência, e é uma lista nominal de arquivos conferida pelo comando da DoD, não um número em prosa".
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-22, ver commit "docs(ai): apply learning 050")
 
 ### AP-051 — Tolerância relaxada no verificador, mas não no teste `LiveBrain` que ainda assertava a regra original
 
