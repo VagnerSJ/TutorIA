@@ -47,3 +47,40 @@ Resultado: REPROVADO (1 bloqueante)
 
 ## Aprendizados para o processo
 - Comando de DoD que conta linhas de listagem por substring pode casar nomes de método das próprias guardas, não só o nome de classe. A regra seria: antes de fixar o padrão de um `grep -c` sobre `--list-tests`, o Planejador confere se algum método planejado na §4 contém a subcadeia. Pode virar um complemento do AP-035.
+
+---
+
+## Rodada 2
+
+Data: 2026-10-22
+Escopo revisado: `tasks/US-008/plan.md` (§2.6, §4, §5, §7, §9, §10, §12) contra a rodada 1. Branch `feature/US-008_contrato-itutorbrain` limpa e sem código novo; `src/` conferido com Grep.
+Resultado: APROVADO (0 bloqueantes)
+
+### Itens da rodada anterior
+| Item | Status |
+|---|---|
+| **B1** (D7 contava "LiveTests" e casava G3/G4) | Resolvido. O padrão passou a ser `ContractLiveTests` nos dois filtros. Um Grep em `*.cs` por `ContractTests\|ContractLiveTests` não achou nenhuma ocorrência hoje. O padrão só existirá nos nomes das duas classes live (L1, L2). Nenhum método da §4 o contém. O controle negativo é o primeiro filtro (esperado 0); o positivo é o segundo (esperado ≥ 2). O risco de o `--list-tests` não mostrar a classe está na §7 e na P8, com alternativa. |
+| Texto do D7 idêntico em §2.6 e §10 | Conferido, caractere por caractere. |
+| **S1** (mutações do Ollama) | Resolvido. A T4 prescreve K3, K4a/K4b, K9, K13 e K14 para o Ollama. `ArgumentNullException.ThrowIfNull(request)` existe na linha 31 de `OllamaTutorBrain.cs`. |
+| **S2** (K13 citar `RN-BRAIN07`) | Resolvido, na linha K13 da §4 e na linha de comentários. |
+| **S3** (ponto exato do `Skip(1)`) | Resolvido. A linha `messages.AddRange(request.Messages.Select(ToChatMessage));` existe em `src\EnglishTutor.Infrastructure\Brain\OllamaTutorBrain.cs:54`. |
+
+### Verificações
+Todos os itens do checklist de revisão de plano passam (cenários BDD, P*, DoD com cobertura ≥ 80%, R1–R4/RN/ADR, escopo e adiamentos, consistência §3×§4×§5×§6, limites AP-016/AP-047, ordem Red, AP-051, AP-032/052, AP-035 com os dois controles, ARCHITECTURE/skills, viabilidade).
+
+Contagens refeitas: K1–K15 = 23 casos em 16 métodos; T1 12 + T2 5 + T3 6 = 23; duas subclasses = 46; G1–G5 = 6 casos; D5 16 testes/23 casos/46 casos; D6 23 por filtro; D9 6. Nenhum teste existente é arrastado pelo filtro do D5 (`ContractSuiteStructureTests` e `*ContractLiveTests` não contêm a subcadeia `ContractTests`).
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S4** — `plan.md` §2.6, Commit 1, D6: o texto para `SPRINT_1.md` diz "o mesmo número de testes nos dois", enquanto a §10 diz "23 testes". A diferença é intencional (a spec fica genérica). O Executor só registra os 23 na §11. Nenhuma mudança necessária.
+
+### Pontos positivos
+- Correção do B1 mínima, sem renomear G3/G4; D7 idêntico na spec e no plano.
+- Rodada 1 respondida na §12, item por item.
+- Contagens coerentes entre §4, §5 e §10 depois da revisão.
+- Nenhum arquivo de `src/` é alterado; o D12 garante isso depois das mutações.
+
+### Aprendizados para o processo
+- Repete o da rodada 1: antes de fixar o padrão de um `grep -c` sobre `--list-tests`, o Planejador confere se algum método planejado na §4 contém a subcadeia. Aqui a correção funcionou. Vale registrar como complemento do AP-035.
