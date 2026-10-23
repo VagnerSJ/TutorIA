@@ -108,6 +108,8 @@ Nenhuma regra `RN-*` muda. `bdd-para-testes` ("Comportamento comum a todos os c�
 | Criar | `tests/EnglishTutor.Infrastructure.Tests/Support/LiveContractChecks.cs` | Asserções comuns e os dois turnos do live |
 | Alterar | `specs/sprints/SPRINT_1.md`, `ARCHITECTURE.md`, `.claude/skills/tdd-dotnet/SKILL.md` | Só pelo orquestrador, §2.6, antes da T1 |
 
+Estado real: todos os arquivos de `tests/` acima foram criados (94bf924, 96e8302, e802fd0, a5a016d, 000c0d3, 7096af1, 1469a2f, b0239e8); as alterações em `SPRINT_1.md`, `ARCHITECTURE.md` e `tdd-dotnet/SKILL.md` foram feitas pelo orquestrador (0d0193d, b860fcd). A bancada ganhou o parâmetro `EnqueueHang(Action? onCancelled = null)` (§12, e05c753).
+
 Nenhum arquivo de `src/`. Nenhuma fixture nova (os fakes montam as respostas). `CHANGELOG` e `docs/us/US-008.md` são do Documentador.
 
 ## 4. Mapa cenário BDD → testes
@@ -154,32 +156,42 @@ Cada comentário de teste cita a US e o nome exato do cenário: `// US-008 — C
 
 Esta US não escreve código de produção: todo o trabalho é código de teste. Não existe commit `feat`; cada tarefa é um commit `test(brain): ...` (e `refactor(brain): ...` se houver). O "Green" é a suíte passando. Todos os testes caracterizam adaptadores já prontos e **nascem verdes**; cada tarefa prescreve a mutação temporária que os faz falhar pelo efeito (AP-017, AP-029). A mutação é aplicada **depois** do commit do Green, em `src/`, e desfeita pela edição inversa, nunca por `git checkout`/`git restore` (AP-037). Antes de cada commit, o Executor preenche `Escolhas de forma` (AP-055: qualquer decisão de forma da bancada vai à §12 num commit `docs(ai)` **anterior** ao commit da tarefa). A guarda de `src/` intocado é o D12.
 
-- [ ] **T1 — Bancada e suíte para o Claude Code (K1–K5)**
+- [x] **T1 — Bancada e suíte para o Claude Code (K1–K5)**
   Esqueleto: `BrainContractHarness`, `SentToModel`, `ClaudeCodeContractHarness`, `TutorBrainContractTests` com K1–K5, `ClaudeCodeTutorBrainContractTests`. Os membros ainda não usados da bancada (`Sent`, `Advance`, `CallStarted`) lançam `NotImplementedException` até a T2/T3. Nascem verdes: K1–K5 (12 casos no Claude Code). Mutações depois do Green, no `ClaudeCodeTutorBrain` ou no `TutorReplyValidator`: K1 — `Name` devolve outro texto; K2 — o adaptador devolve `parsed.Reply with { Corrections = [] }` (falha nos dois modos); K3 — o adaptador devolve `parsed.Reply with { Praise = "x" }`; K4a — `_maxQuestions` passa a 1; K4b — `_maxQuestions` passa a 3 e `_minQuestions` a 0; K5 — o adaptador lança `InvalidOutput` com `RawText` vazio.
   Commit: `test(brain): add the contract suite for common reply handling (Claude Code)`.
   Escolhas de forma: nenhuma
+  feito: 94bf924
+  Mutações aplicadas depois do commit e desfeitas (K1, K2, K3, K4a, K4b, K5): cada uma fez falhar só os testes esperados (ex.: K2 e K3 nos dois modos; K4a só o caso de 2 perguntas; K4b os dois casos de 0 e 3; K5 as três linhas de K5 e os dois casos de K4b).
 
-- [ ] **T2 — Janela completa e sem estado (K6–K9)**
+- [x] **T2 — Janela completa e sem estado (K6–K9)**
   Esqueleto: implementa `Sent` e `Advance` no `ClaudeCodeContractHarness`; K6–K9 em `TutorBrainContractTests`. Nascem verdes: K6, K7 (2 casos), K8, K9 (5 casos). Mutações: K6 e K7 — o adaptador envia só a última mensagem mesmo sem sessão (`standardInput = request.Messages[^1].Content`); K8 — o adaptador acrescenta ao texto enviado as mensagens da chamada anterior; K9 — a 2ª chamada devolve a resposta da 1ª.
   Commit: `test(brain): cover full-window and stateless calls in the contract suite`.
   Escolhas de forma: nenhuma
+  feito: 96e8302
+  Mutações (K6/K7 última mensagem só; K8 histórico acumulado; K9 resposta da 1ª chamada na 2ª) falharam pelo motivo certo: K6 e os 2 casos de K7; K8; K9 e K8.
 
-- [ ] **T3 — Falhas, cancelamento e retentativa (K10–K15)**
+- [x] **T3 — Falhas, cancelamento e retentativa (K10–K15)**
   Esqueleto: implementa `CallStarted`, `EnqueueHang`, `EnqueueUnavailable` no `ClaudeCodeContractHarness`; K10–K15. Usa espera limitada (`WaitAsync(10 s)`) em todo teste que depende de cancelamento (AP-046). Nascem verdes: K10–K15 (6 casos). Mutações: K10 — remover `&& !ct.IsCancellationRequested` do `catch` do Timeout; K11 — multiplicar `TimeoutSeconds` por 2; K12 — o `catch (Win32Exception)` deixa de existir; K13 — o adaptador guarda a falha e a relança na chamada seguinte; K14 — remover `ArgumentNullException.ThrowIfNull`; K15 — o adaptador lança `Unknown` no lugar de `InvalidOutput`.
   Commit: `test(brain): cover timeout, unavailable, cancellation and retry in the contract suite`.
-  Escolhas de forma: nenhuma
+  Escolhas de forma: §12 em e05c753 (técnica do K10, AP-010)
+  feito: e802fd0, K10 corrigido em a5a016d
+  Mutações K11, K12, K13, K14 e K15 falharam pelo motivo certo. A mutação prescrita do K10 (remover `&& !ct.IsCancellationRequested`) **não** falhou com o teste original; o K10 passou a usar `EnqueueHang(onCancelled)` com avanço do relógio (§12, e05c753; teste em a5a016d) e a mutação passou a falhar só o K10.
 
-- [ ] **T4 — Subclasse do Ollama e guardas da suíte (G1, G2)**
+- [x] **T4 — Subclasse do Ollama e guardas da suíte (G1, G2)**
   Red: primeiro `ContractSuiteStructureTests` (G1, G2). Falha: **G1 para `Ollama`** (não existe `OllamaTutorBrainContractTests`). Nascem verdes: G1 para `ClaudeCode` e G2 (mutação do G2: declarar um `[Fact]` em `ClaudeCodeTutorBrainContractTests`).
   Green: `OllamaContractHarness` e `OllamaTutorBrainContractTests`; os 23 casos do Ollama nascem verdes. Mutações equivalentes às das T1–T3, aplicadas ao `OllamaTutorBrain`: K1 `Name`; K2 perde as correções; K3 acrescenta `Praise = "x"`; K4a `_maxQuestions` do validador a 1; K4b `_maxQuestions` a 3 e `_minQuestions` a 0; K5 `RawText` vazio; K6/K7 `Skip(1)` na linha `messages.AddRange(request.Messages.Select(ToChatMessage));` de `OllamaTutorBrain.SendAsync` (passa a `request.Messages.Skip(1).Select(...)`); K8 histórico acumulado em campo; K9 a 2ª chamada devolve a resposta da 1ª; K10 sem `&& !ct.IsCancellationRequested` no `catch` do Timeout; K11 `TimeoutSeconds` ×2; K12 `IsServerFailure` devolve falso (a `HttpRequestException` vaza); K13 o adaptador guarda a falha e a relança na chamada seguinte; K14 remover `ArgumentNullException.ThrowIfNull(request)`; K15 `Unknown` no lugar de `InvalidOutput`.
   Commit: dois commits em ordem: `test(brain): add contract suite structure guards` (G1 vermelho para o Ollama) e `test(brain): run the contract suite for Ollama` (subclasse e bancada; G1 verde).
   Escolhas de forma: nenhuma
+  feito: 000c0d3 (guardas, G1 vermelho para Ollama), 7096af1 (Ollama)
+  Red do G1: falhou só para `Ollama`. Mutações K1 a K15 no Ollama (e a do G2: `[Fact]` extra numa subclasse) falharam pelo motivo certo; `OllamaFailures.IsServerFailure` devolvendo falso (K12) derrubou K12 e K13. Árvore de `src/` limpa depois de cada uma.
 
-- [ ] **T5 — Guarda do trait `LiveBrain` e variante live (G3–G5, L1, L2)**
+- [x] **T5 — Guarda do trait `LiveBrain` e variante live (G3–G5, L1, L2)**
   Esqueleto: `LiveBrainTraitTests` (G3–G5). Nascem verdes todos (as classes `LiveTests` existentes já têm o trait). Mutações: G3 — remover o trait de `ProcessRunnerLiveTests`; G4 — acrescentar o trait a uma classe de teste comum sem o sufixo (ex.: `TutorReplyParserTests`); G5 — acrescentar o trait a `ClaudeCodeTutorBrainContractTests`.
   Green: `LiveContractChecks`, `ClaudeCodeContractLiveTests`, `OllamaContractLiveTests` (L1 e L2 não rodam na suíte rápida; G3 passa a cobri-las e continua verde). O Executor roda o D8 (3 rodadas) e o D7 (controles positivo e negativo).
   Commit: `test(brain): guard the LiveBrain trait` e `test(brain): add live conformance tests for both providers`.
   Escolhas de forma: nenhuma
+  feito: 1469a2f (G3-G5), b0239e8 (live)
+  Mutações G3 (sem trait em `ProcessRunnerLiveTests`), G4 (trait em `TutorReplyParserTests`) e G5 (trait em `ClaudeCodeTutorBrainContractTests`) falharam só o teste correspondente. D8 rodado: 3 rodadas verdes (2 testes).
 
 ## 6. Pacotes NuGet
 
@@ -241,6 +253,22 @@ Notas: a US não mexe no console, então não há comando com pipe no Windows Po
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+Commit de código final: b0239e8 (2026-10-23). Contagens: Core.Tests 155, Infrastructure.Tests 261, Console.Tests 71 (487 no total, 0 falhas).
+
+- D1 — `dotnet build` → 0 avisos, 0 erros (2026-10-23, b0239e8)
+- D2 — `dotnet test --filter "Category!=LiveBrain"` → 155 + 261 + 71 passed, 0 failed; Infrastructure.Tests em 0,4 s (2026-10-23, b0239e8)
+- D3 — `--collect:"XPlat Code Coverage"` + `reportgenerator` sobre os três `coverage.cobertura.xml` → assembly `EnglishTutor.Core` 100% de linhas (mesclado); solução 90,5%; Infrastructure 86,6%; Console 95,4%. `src/` não mudou (2026-10-23, b0239e8)
+- D4 — `dotnet format --verify-no-changes` → código de saída 0, sem diferenças (2026-10-23, b0239e8)
+- D5 — `--filter "FullyQualifiedName~ContractTests"` → 46 passed, 0 failed (23 por subclasse) (2026-10-23, b0239e8)
+- D6 — `ClaudeCodeTutorBrainContractTests` → 23 passed; `OllamaTutorBrainContractTests` → 23 passed (2026-10-23, b0239e8)
+- D7 — `--list-tests | grep -c "ContractLiveTests"`: `Category!=LiveBrain` → 0 (saída 1, esperado); `Category=LiveBrain` → 2 (2026-10-23, b0239e8)
+- D8 — `Category=LiveBrain&FullyQualifiedName~ContractLiveTests`, `claude` autenticado e Ollama com `qwen2.5:14b-instruct-q4_K_M` → 2 passed em cada uma de 3 rodadas seguidas (14 s, 11 s, 10 s) (2026-10-23, b0239e8)
+- D9 — `ContractSuiteStructureTests` + `LiveBrainTraitTests` → 6 passed (G1 2 casos, G2, G3, G4, G5) (2026-10-23, b0239e8)
+- D10 — `git grep -n -F "Provisional selector" -- src tests` → nenhuma linha, código de saída 1 (2026-10-23, b0239e8)
+- D11 — `git diff develop...HEAD | LC_ALL=C grep -c ...` → 0 (2026-10-23, b0239e8)
+- D12 — `git diff --name-only develop...HEAD -- src` → nenhuma linha (2026-10-23, b0239e8)
+- D13 — `git status --short` depois de D2–D9 → vazio (2026-10-23, b0239e8)
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
