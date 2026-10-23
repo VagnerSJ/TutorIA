@@ -16,7 +16,7 @@ Decisão técnica relevante nova: **ADR-011** (`docs/adr/ADR-011-avaliacao-compa
 ### 2.1 Onde mora cada coisa
 
 - `EnglishTutor.Core/Evaluation` (novo, BCL apenas, `System.Text.Json` incluído): golden set e seu leitor, normalização de palavras, comparação de correções, `EvalRunner`, métricas, nota mínima, montagem do relatório. É regra de negócio (R4), testada com fakes, e entra na meta de cobertura do Core.
-- `EnglishTutor.Console/Commands` (novo): `EvalCommandLine` + `EvalCommandLineParser` (argumentos) e `EvalCommand` (lê o arquivo, resolve os cérebros por chave, grava o relatório, escreve na tela). `EnglishTutorApp` passa a escolher entre o chat e o `eval` depois de a partida validar a configuração.
+- `EnglishTutor.Console/Commands` (novo): `EvalCommandLine` + `EvalCommandLineParser` (argumentos; o `EvalCommandLineParseResult` mora no mesmo arquivo do parser) e `EvalCommand` (lê o arquivo, resolve os cérebros por chave, grava o relatório, escreve na tela). `EnglishTutorApp` passa a escolher entre o chat e o `eval` depois de a partida validar a configuração.
 - `EnglishTutor.Infrastructure`: **não muda** (as chaves de `ITutorBrain` por provedor já existem, ADR-010). Guarda: D12.
 - `eval/golden-set.json` (dados, rascunho em §2.9, revisado pelo usuário) e `eval/README.md` (formato do arquivo, como o critério casa, como ampliar `accepted`, como rodar).
 
@@ -34,30 +34,30 @@ Alternativas descartadas (detalhe no ADR-011): juiz por outro modelo; casar pelo
 }
 ```
 
-Tipos do Core: `ExpectedCorrection(string Original, IReadOnlyList<string> Accepted)`, `GoldenSentence(string Id, string Text, IReadOnlyList<ExpectedCorrection> Expected)`, `GoldenSet(string ReviewedBy, IReadOnlyList<GoldenSentence> Sentences)` (com `ExpectedTotal`), `GoldenSetParseResult(GoldenSet? Set, IReadOnlyList<string> Errors)` (`IsValid` = sem erros). `GoldenSetParser.Parse(string json)` coleta **todos** os erros (não só o primeiro), em inglês, cada um dizendo o que está errado e o que se espera. Nomes de propriedade em camelCase e sensíveis a maiúsculas; propriedade desconhecida é ignorada (o erro aparece como "missing" na propriedade que faltou). `reviewedBy` ausente ou `null` vale `""` (revisão pendente).
+Tipos do Core: `ExpectedCorrection(string Original, IReadOnlyList<string> Accepted)`, `GoldenSentence(string Id, string Text, IReadOnlyList<ExpectedCorrection> Expected)`, `GoldenSet(string ReviewedBy, IReadOnlyList<GoldenSentence> Sentences)` (com `ExpectedTotal`), `GoldenSetParseResult(GoldenSet? Set, IReadOnlyList<string> Errors)` (`IsValid` = sem erros). `GoldenSetParser.Parse(string json)` coleta **todos** os erros (não só o primeiro), em inglês, cada um dizendo o que está errado e o que se espera. Nomes de propriedade em camelCase e sensíveis a maiúsculas (`Sentences` não vale como `sentences`: o erro aparece como "missing"); propriedade desconhecida é ignorada (P15). `reviewedBy` ausente ou `null` vale `""` (revisão pendente).
 
-| # | Condição | Mensagem (`{x}` é derivado; um caso de teste por ramo, §4) |
-|---|---|---|
-| G1 | JSON malformado | `The golden set is not valid JSON: {detail}. Expected an object like {"reviewedBy": "<name>", "sentences": [...]}.` (`{detail}` vem da `JsonException`; o teste confere só o trecho `Expected an object like`, AP-015) |
-| G2 | Raiz não é objeto | `The golden set must be a JSON object (found {kind}). Expected {"reviewedBy": "<name>", "sentences": [...]}.` |
-| G3 | `sentences` ausente, vazio ou de outro tipo | `"sentences" must be a non-empty array (found: {missing \| 0 items \| kind}). Expected at least one sentence.` |
-| G4 | `id` ausente, em branco ou de outro tipo | `Sentence {ref}: "id" must be a non-empty string (found: {missing \| blank \| kind}).` com `{ref}` = `'gs-001'` quando há id, ou `#3` (posição, base 1) quando não há |
-| G5 | `id` repetido (sem diferenciar maiúsculas) | `Sentence '{id}': "id" is repeated (first used by sentence #{n}). Expected unique ids.` |
-| G6 | `text` ausente, em branco ou de outro tipo | `Sentence '{id}': "text" must be a non-empty string (found: {missing \| blank \| kind}).` |
-| G7 | `expected` fora de 1 a 2 itens, ou de outro tipo | `Sentence '{id}': "expected" must be an array of 1 or 2 items (found: {kind \| n items}). Expected one entry per correction, at most 2 (RN-FEED02).` |
-| G8 | `original` ausente, em branco ou de outro tipo | `Sentence '{id}': expected[{i}].original must be a non-empty string (found: {missing \| blank \| kind}).` |
-| G9 | `original` não está no texto | `Sentence '{id}': expected[{i}].original "{original}" is not in the sentence text. Expected a fragment of the text.` |
-| G10 | `accepted` ausente, vazio ou de outro tipo | `Sentence '{id}': expected[{i}].accepted must be an array of non-empty strings (found: {missing \| 0 items \| kind}).` |
-| G11 | item de `accepted` em branco ou sem palavras | `Sentence '{id}': expected[{i}].accepted[{j}] "{item}" has no words. Expected a corrected fragment.` |
-| G12 | item de `accepted` já está no texto | `Sentence '{id}': expected[{i}].accepted[{j}] "{item}" is already in the sentence text. Expected a fix that the student did not say.` |
+| # | Condição | Mensagem (`{x}` é derivado) | Teste (§4), um por ramo |
+|---|---|---|---|
+| G1 | JSON malformado | `The golden set is not valid JSON: {detail}. Expected an object like {"reviewedBy": "<name>", "sentences": [...]}.` (`{detail}` vem da `JsonException`; o teste confere só o trecho `Expected an object like`, AP-015) | P3 |
+| G2 | Raiz não é objeto | `The golden set must be a JSON object (found {kind}). Expected {"reviewedBy": "<name>", "sentences": [...]}.` | P4 (array) |
+| G3 | `sentences` ausente, vazio ou de outro tipo | `"sentences" must be a non-empty array (found: {missing \| 0 items \| kind}). Expected at least one sentence.` | P4 (ausente, `[]`, string), P15 (`Sentences`) |
+| G4 | `id` ausente, em branco ou de outro tipo | `Sentence {ref}: "id" must be a non-empty string (found: {missing \| blank \| kind}).` com `{ref}` = `'gs-001'` quando há id, ou `#3` (posição, base 1) quando não há | P5 (ausente, em branco), P13 (número) |
+| G5 | `id` repetido (sem diferenciar maiúsculas) | `Sentence '{id}': "id" is repeated (first used by sentence #{n}). Expected unique ids.` | P6 |
+| G6 | `text` ausente, em branco ou de outro tipo | `Sentence '{id}': "text" must be a non-empty string (found: {missing \| blank \| kind}).` | P7 (ausente, em branco), P13 (booleano) |
+| G7 | `expected` fora de 1 a 2 itens, ou de outro tipo | `Sentence '{id}': "expected" must be an array of 1 or 2 items (found: {kind \| n items}). Expected one entry per correction, at most 2 (RN-FEED02).` | P8 (0 e 3 itens), P13 (objeto) |
+| G8 | `original` ausente, em branco ou de outro tipo | `Sentence '{id}': expected[{i}].original must be a non-empty string (found: {missing \| blank \| kind}).` | P14 (ausente, em branco), P13 (`null`, array) |
+| G9 | `original` não está no texto | `Sentence '{id}': expected[{i}].original "{original}" is not in the sentence text. Expected a fragment of the text.` | P9 |
+| G10 | `accepted` ausente, vazio ou de outro tipo | `Sentence '{id}': expected[{i}].accepted must be an array of non-empty strings (found: {missing \| 0 items \| kind}).` | P11 (ausente, `[]`), P13 (texto) |
+| G11 | item de `accepted` em branco ou sem palavras | `Sentence '{id}': expected[{i}].accepted[{j}] "{item}" has no words. Expected a corrected fragment.` | P11 (`"  "`, `"..."`) |
+| G12 | item de `accepted` já está no texto | `Sentence '{id}': expected[{i}].accepted[{j}] "{item}" is already in the sentence text. Expected a fix that the student did not say.` | P10 |
 
 `{kind}` ∈ `a string`, `a number`, `a boolean`, `null`, `an object`, `an array`. "Está no texto" = sequência contígua de palavras normalizadas (§2.3). O parser não exige 30 frases (testes e usuários podem ter arquivos menores); o mínimo de 30 é guardado por `GoldenSetFileTests` (D7).
 
 ### 2.3 Critério de "correção esperada encontrada" (ADR-011 §3)
 
-Normalização de palavras (`EvalText.Tokens`): (1) `‘` e `’` viram `'`; `“` e `”` viram `"`; (2) divide em qualquer espaço em branco (espaço, tab, quebra de linha); (3) tira de cada borda do pedaço os caracteres `. , ; : ! ? " ' ( ) [ ] { }`; (4) descarta pedaços que ficaram vazios; (5) `ToLowerInvariant`. Símbolos internos (`c#`, `don't`, `e-mail`) ficam. `EvalText.ContainsWords(text, fragment)` = as palavras do fragmento (ao menos uma) aparecem na mesma ordem e **lado a lado** nas palavras do texto; fragmento sem palavras devolve falso.
+Normalização de palavras (`EvalText.Tokens`): (1) `‘` e `’` viram `'`; `“` e `”` viram `"`; (2) divide em qualquer espaço em branco (espaço, tab, quebra de linha); (3) tira de cada borda do pedaço os caracteres `. , ; : ! ? " ' ( ) [ ] { }`; (4) descarta pedaços que ficaram vazios; (5) `ToLowerInvariant`. Símbolos internos (`c#`, `don't`, `e-mail`) ficam. `EvalText.ContainsWords(text, fragment)` = as palavras do fragmento (ao menos uma) aparecem na mesma ordem e **lado a lado** nas palavras do texto; fragmento sem palavras devolve falso (E6).
 
-`CorrectionMatcher.IsFound(expected, actual)`: verdadeiro se alguma `Correction` de `actual` tem `Corrected` que contém (`ContainsWords`) alguma alternativa de `expected.Accepted`. `Original` e `Explanation` **não** entram. `CountFound(expectedList, actual)` conta cada esperada de forma independente (uma correção da resposta pode satisfazer as duas).
+`CorrectionMatcher.IsFound(expected, actual)`: verdadeiro se alguma `Correction` de `actual` tem `Corrected` que contém (`ContainsWords`) alguma alternativa de `expected.Accepted`. `Original` e `Explanation` **não** entram. `CountFound(expectedList, actual)` conta cada esperada de forma independente: uma única `Correction` da resposta pode satisfazer as duas esperadas (M8, caso 4).
 
 Caracteres especiais (`’` etc.) aparecem sempre como escape no código e nos testes (AP-007).
 
@@ -125,7 +125,7 @@ Mensagens do console (saída de erro, em inglês), em `ConsoleText`: `Invalid ev
 
 ### 2.7 Linha de comando e despacho
 
-`EvalCommandLineParser.IsEvalCommand(args)`: o **primeiro** argumento é `eval` (sem diferenciar maiúsculas). `Parse(args)` devolve `EvalCommandLineParseResult(EvalCommandLine? Value, string? Error)` e para no **primeiro** erro:
+`EvalCommandLineParser.IsEvalCommand(args)`: o **primeiro** argumento é `eval` (sem diferenciar maiúsculas). `Parse(args)` devolve `EvalCommandLineParseResult(EvalCommandLine? Value, string? Error)` (declarado em `EvalCommandLineParser.cs`) e para no **primeiro** erro:
 
 - `--providers`: consome os tokens seguintes até o próximo que comece com `--`; cada token é dividido por `,`; vazios descartados; nomes normalizados por `BrainProviders.TryGetCanonical`; duplicados mantidos uma vez, na ordem; sem nenhum nome: erro. Aceita as duas formas porque o **Windows PowerShell passa `ClaudeCode,Ollama` sem aspas como dois argumentos** (`ClaudeCode` e `Ollama`), enquanto o Bash passa um só.
 - `--golden-set <arquivo>` e `--reports-dir <pasta>`: exatamente um valor (que não comece com `--`).
@@ -172,9 +172,9 @@ Cenário: golden set inválido
   E nenhum relatório é gravado
 ```
 
-(e) DoD extra. Antigo D6: `| D6 | Nota do provedor principal (ClaudeCode) no relatório | correções esperadas encontradas ≥ 80%; formato válido ≥ 90% |`. Novo: `| D6 | Nota do provedor principal (ClaudeCode) nos relatórios de 3 execuções seguidas do D5 | em cada uma: a linha do ClaudeCode diz `met` (correções esperadas encontradas ≥ 80%; formato válido sem retentativa ≥ 90%) |`.
+(e) DoD extra. Antigo D6: `| D6 | Nota do provedor principal (ClaudeCode) no relatório | correções esperadas encontradas ≥ 80%; formato válido ≥ 90% |`. Novo: `| D6 | Nota do provedor principal (ClaudeCode) nos relatórios de 3 execuções seguidas do comando completo do D5 (com os dois provedores) | em cada uma: a linha do ClaudeCode diz `met` (correções esperadas encontradas ≥ 80%; formato válido sem retentativa ≥ 90%) |`.
 
-Antigo D7: `| D7 | `eval/golden-set.json` | ≥ 30 frases, cada uma com erro e correção esperada revisados pelo usuário |`. Novo: `| D7 | `dotnet test --filter "FullyQualifiedName~GoldenSetFileTests"` e `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` | verde (o arquivo tem ≥ 30 frases, cada uma com erro e correção esperada); o `git grep` não acha linha (código de saída 1): o usuário preencheu `reviewedBy` depois de revisar as frases |`.
+Antigo D7: `| D7 | `eval/golden-set.json` | ≥ 30 frases, cada uma com erro e correção esperada revisados pelo usuário |`. Novo: `| D7 | `dotnet test --filter "FullyQualifiedName~GoldenSetFileTests"` e `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` | verde (o arquivo tem ≥ 30 frases, cada uma com erro e correção esperada); enquanto o usuário não revisa, o `git grep` acha a linha `"reviewedBy": ""` (código de saída 0); depois que o usuário preenche `reviewedBy` ao revisar as frases, não acha linha (código de saída 1) |`.
 
 Acrescentar depois do D7 (critérios reutilizados da US-007: `exit=` e mensagem na saída de erro):
 
@@ -194,7 +194,7 @@ Acrescentar depois do D7 (critérios reutilizados da US-007: `exit=` e mensagem 
                           CorrectionMatcher, EvalRunner, SentenceResult, ProviderEvaluation, ProviderStatus, EvalMetrics,
                           EvalThresholds, EvalReportBuilder
    ```
-2. §3, árvore do Console. Antigo: `Commands/ (chat, eval), Ui/`. Novo: `Commands/ (EvalCommand, EvalCommandLine, EvalCommandLineParser; o chat continua em Ui/), Ui/`.
+2. §3, árvore do Console. Antigo: `Commands/ (chat, eval), Ui/`. Novo: `Commands/ (EvalCommand, EvalCommandLine, EvalCommandLineParser com EvalCommandLineParseResult; o chat continua em Ui/), Ui/`.
 3. §3, pasta `eval/`. Antigo: `eval/` seguido de `  golden-set.json`. Novo: depois de `  golden-set.json` acrescentar `  README.md` e `  reports/             relatórios gerados (ignorados pelo Git)`.
 4. §6, depois da última linha da §6.5 (`- O console implementa o aviso (`Switched to <reserva> (<motivo>)`, saída padrão, antes da linha `Tutor:`) (ADR-010).`), nova seção:
    ```
@@ -263,7 +263,8 @@ Com 32 frases e 32 correções esperadas, a nota mínima pede 26 (D6). Limite co
 | Criar | `src/EnglishTutor.Core/Evaluation/EvalRunner.cs` (com o contador de chamadas privado) | Execução por provedor |
 | Criar | `src/EnglishTutor.Core/Evaluation/EvalReportBuilder.cs` | Relatório markdown e tabela de resumo |
 | Alterar | `src/EnglishTutor.Core/DependencyInjection/CoreServiceCollectionExtensions.cs` | `TryAddSingleton<EvalRunner>()` |
-| Criar | `src/EnglishTutor.Console/Commands/EvalCommandLine.cs`, `EvalCommandLineParser.cs` | Argumentos do `eval` |
+| Criar | `src/EnglishTutor.Console/Commands/EvalCommandLine.cs` | Argumentos já lidos do `eval` (`Providers`, `GoldenSetPath`, `ReportsDirectory`) |
+| Criar | `src/EnglishTutor.Console/Commands/EvalCommandLineParser.cs` (com `EvalCommandLineParseResult`) | `IsEvalCommand`, `Parse` e o resultado do parse |
 | Criar | `src/EnglishTutor.Console/Commands/EvalCommand.cs` | Orquestra arquivo, cérebros, relatório e tela |
 | Alterar | `src/EnglishTutor.Console/EnglishTutorApp.cs` | Despacho chat × `eval` |
 | Alterar | `src/EnglishTutor.Console/Ui/ConsoleText.cs`, `Logging/AppLog.cs` | Textos do `eval`; eventos 1006 e 1007 |
@@ -289,6 +290,7 @@ Cenários (spec após §2.8): **S1** rodar o golden set; **S2** provedor indispo
 | S1 (apoio) | `EvalTextTests` | E3 `Tokens_WithInnerSymbols_KeepsThemInsideTheWord` (3: `C#`, `don't`, `e-mail`) | Unidade |
 | S1 (apoio) | `EvalTextTests` | E4 `Tokens_WithBlankOrPunctuationOnlyText_ReturnsNoWords` (3: `""`, `"   "`, `"..."`) | Unidade |
 | S1 (apoio) | `EvalTextTests` | E5 `Tokens_WithTabsAndLineBreaks_SplitsOnAnyWhitespace` (1) | Unidade |
+| S1 (apoio) | `EvalTextTests` | E6 `ContainsWords_WithFragmentWithoutWords_ReturnsFalse` (3: fragmento `""`, `"   "`, `"..."` sobre o texto `for five years`) | Unidade |
 | S1 | `CorrectionMatcherTests` | M1 `IsFound_WhenCorrectedContainsAcceptedFragment_ReturnsTrue` (3: igual; dentro de frase maior; maiúsculas e pontuação diferentes) | Unidade |
 | S1 | `CorrectionMatcherTests` | M2 `IsFound_WhenFragmentWordsAreNotContiguous_ReturnsFalse` (2: palavra no meio `for the five years`; ordem trocada `five years for`) | Unidade |
 | S1 | `CorrectionMatcherTests` | M3 `IsFound_WhenFragmentIsOnlyPartOfAWord_ReturnsFalse` (2: aceita `has` × corrigido `hash`; aceita `for five years` × corrigido `for five yearsold`) | Unidade |
@@ -296,7 +298,7 @@ Cenários (spec após §2.8): **S1** rodar o golden set; **S2** provedor indispo
 | S1 | `CorrectionMatcherTests` | M5 `IsFound_WithFragmentInDifferentFields_CountsOnlyTheCorrectedField` (3: só em `Corrected` → verdadeiro; só em `Original` → falso; só em `Explanation` → falso; as três fontes sempre examinadas, AP-047) | Unidade |
 | S1 | `CorrectionMatcherTests` | M6 `IsFound_WhenAnyOfSeveralCorrectionsMatches_ReturnsTrue` (2: casa a primeira; casa a segunda) | Unidade |
 | S1 | `CorrectionMatcherTests` | M7 `IsFound_WithNoCorrections_ReturnsFalse` (1) | Unidade |
-| S1 | `CorrectionMatcherTests` | M8 `CountFound_WithTwoExpectedCorrections_CountsEachOneMatchedIndependently` (3: nenhuma → 0; só a segunda → 1; as duas → 2) | Unidade |
+| S1 | `CorrectionMatcherTests` | M8 `CountFound_WithTwoExpectedCorrections_CountsEachOneMatchedIndependently` (4: nenhuma → 0; só a segunda → 1; as duas, cada uma em sua própria `Correction` → 2; uma única `Correction` cujo `Corrected` contém as formas aceitas das duas → 2) | Unidade |
 | S5 | `GoldenSetParserTests` | P1 `Parse_WithValidJson_ReturnsSentencesAndExpectedCorrections` (1: 2 frases; campos e alternativas) | Unidade |
 | S5 | `GoldenSetParserTests` | P2 `Parse_WithReviewedByAbsentNullOrFilled_ReturnsTheReviewerOrEmpty` (3; cada caso também exige 1 frase lida) | Unidade |
 | S5 | `GoldenSetParserTests` | P3 `Parse_WithMalformedJson_ReturnsErrorWithExpectedShape` (1; G1, confere `Expected an object like`) | Unidade |
@@ -310,6 +312,8 @@ Cenários (spec após §2.8): **S1** rodar o golden set; **S2** provedor indispo
 | S5 | `GoldenSetParserTests` | P11 `Parse_WithMissingEmptyOrWordlessAcceptedItems_ReturnsError` (4: `accepted` ausente; `[]`; item `"  "`; item `"..."`) | Unidade |
 | S5 | `GoldenSetParserTests` | P12 `Parse_WithSeveralProblems_ReturnsEveryError` (1: 2 frases, 3 problemas, 3 mensagens) | Unidade |
 | S5 | `GoldenSetParserTests` | P13 `Parse_WithWrongJsonTypes_ReturnsTypeError` (6, um por ramo de `{kind}`: `id` número → `a number`; `text` booleano → `a boolean`; `original` `null` → `null`; `original` array → `an array`; `expected` objeto → `an object`; `accepted` texto → `a string`) | Unidade |
+| S5 | `GoldenSetParserTests` | P14 `Parse_WithMissingOrBlankOriginal_ReturnsErrorNamingTheExpectedItem` (2: `original` ausente → `expected[0].original` e `found: missing`; `original` `"  "` → `found: blank`) | Unidade |
+| S5 | `GoldenSetParserTests` | P15 `Parse_WithPropertyNamesInOtherCaseOrUnknownProperties_ReadsOnlyTheExactNames` (2: `Sentences` com maiúscula no lugar de `sentences` → erro `"sentences" ... found: missing`; propriedade desconhecida `extra` na raiz e na frase, com o resto válido → válido e 1 frase lida) | Unidade |
 | S3 | `EvalMetricsTests` | X1 `From_WithMixedResults_CountsFoundAndValidFormats` (1: 4 frases, uma com retentativa, uma crua) | Unidade |
 | S1 | `EvalMetricsTests` | X2 `From_WithLatencies_ComputesMeanAndNearestRankP95` (4: n=1 → p95 = o valor; n=2 [1 s, 3 s] → 3 s; n=20 [1 s a 20 s] → 19 s; n=21 [1 s a 21 s] → 20 s; médias 5 s, 2 s, 10,5 s, 11 s) | Unidade |
 | S2 | `EvalMetricsTests` | X3 `From_WithFailedSentences_ExcludesThemFromLatencyButNotFromRates` (1) | Unidade |
@@ -359,11 +363,11 @@ Cenários (spec após §2.8): **S1** rodar o golden set; **S2** provedor indispo
 | S1 (apoio, despacho) | `EvalCommandTests` | A10 `RunAsync_WhenFirstArgumentIsNotEval_StartsTheChatSession` (1: `Args` = `--unrelated value`, entrada `/quit`; cabeçalho do chat; saída 0; nenhum relatório) | Integração |
 | S1 (apoio, RN-BRAIN09) | `EvalCommandTests` | A11 `RunAsync_WhenCancelledDuringEval_ReturnsZeroWithoutSavingTheReport` (1: o cérebro cancela o token e lança `OperationCanceledException` na 1ª frase; saída 0; 1 chamada ao cérebro; sem relatório) | Integração |
 
-**Totais (AP-049, conferidos contra as tabelas acima).** Core.Tests: E 3+2+3+3+1 = 12; M 3+2+2+1+3+2+1+3 = 17; P 1+3+1+4+2+1+2+4+1+3+4+1+6 = 33; X 1+4+1+6 = 12; R 1+1+1+1+1+5+1+1 = 12; B 1+1+2+2+2+1+2+1+1 = 13; F 1 → **100 casos**. Console.Tests: C 1+2+1+1+1+1+1+3+3+4 = 18; A 11 → **29 casos**. Total **129 casos** novos na suíte rápida. Nenhum teste `LiveBrain` novo (as medições reais são os comandos D5–D8).
+**Totais (AP-049, conferidos contra as tabelas acima).** Core.Tests: E 3+2+3+3+1+3 = 15; M 3+2+2+1+3+2+1+4 = 18; P 1+3+1+4+2+1+2+4+1+3+4+1+6+2+2 = 37; X 1+4+1+6 = 12; R 1+1+1+1+1+5+1+1 = 12; B 1+1+2+2+2+1+2+1+1 = 13; F 1 → **108 casos** (15+18+37+12+12+13+1). Console.Tests: C 1+2+1+1+1+1+1+3+3+4 = 18; A 11 → **29 casos**. Total **137 casos** novos na suíte rápida. Nenhum teste `LiveBrain` novo (as medições reais são os comandos D5–D8).
 
-**Condicionais da §2 (AP-047).** "Só `Corrected` conta; as três fontes são examinadas": M5 (só `Corrected`, só `Original`, só `Explanation`). "Palavras lado a lado": M2 (buraco e ordem trocada) e M1; "palavra inteira": M3. "Primeira frase falha → `unavailable`; frase posterior → erro da frase": R6 e R7 (papéis trocados). "Cancelamento propaga": R8 e A11. "Despacho só com `eval` primeiro": C10 e A10. "`--providers` aceita um token ou vários": C2 e C3. "Eval sem reserva": A9. "Código de saída independe da nota": A6 (`not met` com saída 0) e A1 (`met` com saída 0). "Sem latência: `-`": B6 e B9. "Retentativa conta no formato final, não no primeiro": R2 (primeira inválida, final válida) e R3 (as duas inválidas). "Rejeita `original` fora do texto e aceita já no texto": P9 e P10 (com o caso válido de palavras não contíguas).
+**Condicionais da §2 (AP-047).** "Só `Corrected` conta; as três fontes são examinadas": M5 (só `Corrected`, só `Original`, só `Explanation`). "Palavras lado a lado": M2 (buraco e ordem trocada) e M1; "palavra inteira": M3. "Fragmento sem palavras devolve falso": E6. "Uma `Correction` pode satisfazer as duas esperadas": M8 (caso 4, contra o caso 3 com uma correção para cada). "Primeira frase falha → `unavailable`; frase posterior → erro da frase": R6 e R7 (papéis trocados). "Cancelamento propaga": R8 e A11. "Despacho só com `eval` primeiro": C10 e A10. "`--providers` aceita um token ou vários": C2 e C3. "Eval sem reserva": A9. "Código de saída independe da nota": A6 (`not met` com saída 0) e A1 (`met` com saída 0). "Sem latência: `-`": B6 e B9. "Retentativa conta no formato final, não no primeiro": R2 (primeira inválida, final válida) e R3 (as duas inválidas). "Rejeita `original` fora do texto e aceita já no texto": P9 e P10 (com o caso válido de palavras não contíguas). "Nomes de propriedade sensíveis a maiúsculas; propriedade desconhecida ignorada": P15 (um caso para cada metade).
 
-**Placeholders (AP-054).** `{kind}` (seis ramos): P13 e P4; `{missing | blank | kind}`: P5 e P7; `{missing | 0 items | kind}`: P4 e P11; `found: n items` (0 e 3): P8; `{ref}` com id e com posição: P5 (posição) e P6 (id); `Unknown provider '<x>'` e a lista de provedores: C5 e A3; percentuais e milissegundos: B3 e B4; cultura: B2. Nenhuma mensagem embute texto de biblioteca além do `{detail}` da G1 (P3 confere o trecho do projeto).
+**Placeholders (AP-054).** `{kind}` (seis ramos): P13 e P4; `{missing | blank | kind}`: P5 (`id`), P7 (`text`), P14 (`original`) e P13 (`kind`); `{missing | 0 items | kind}`: P4 (`sentences`) e P11 (`accepted`); `found: n items` (0 e 3): P8; `{ref}` com id e com posição: P5 (posição) e P6 (id); `Unknown provider '<x>'` e a lista de provedores: C5 e A3; percentuais e milissegundos: B3 e B4; cultura: B2. A coluna "Teste" da tabela G1–G12 (§2.2) repete essa conferência por condição. Nenhuma mensagem embute texto de biblioteca além do `{detail}` da G1 (P3 confere o trecho do projeto).
 
 **Tolerância de verificação (AP-051).** Esta US não relaxa nenhuma validação. O "formato válido" do eval é o que o parser e o `TutorReplyValidator` aceitam, inclusive 1 ou 2 perguntas (RN-FEED01). Nenhum teste `LiveBrain` existente muda, e nenhum novo asserta a regra original.
 
@@ -371,16 +375,16 @@ Cenários (spec após §2.8): **S1** rodar o golden set; **S2** provedor indispo
 
 Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor neutro indicado; depois do commit do Green, cada teste que **nasce verde** recebe a mutação prescrita, aplicada no `src/`, rodada, vista falhar pelo motivo certo e desfeita pela edição inversa, nunca por `git checkout`/`git restore` (AP-037). Cada mutação foi conferida mentalmente contra a asserção. Crie primeiro o arquivo que declara e depois o que usa (AP-044). Antes de cada commit `feat`, o Executor preenche `Escolhas de forma` (decisão de forma vai à §12 num commit `docs(ai)` anterior; AP-055).
 
-- [ ] **T1 — Palavras e comparação de correções (E1–E5, M1–M8)**
-  Red: `EvalText.Tokens` devolve lista vazia; `EvalText.ContainsWords` devolve `false`; `CorrectionMatcher.IsFound` devolve `false`; `CountFound` devolve `0`; `ExpectedCorrection` só como tipo. Falham: E1 (3), E2 (2), E3 (3), E5, M1 (3), M4, M5 caso "só em `Corrected`", M6 (2), M8 casos 1 e 2. **Nascem verdes** (conferido asserção por asserção contra o esqueleto): E4 (3), M2 (2), M3 (2), M5 casos "só em `Original`" e "só em `Explanation`", M7, M8 caso "nenhuma → 0". Mutações depois do Green: E4 — não descartar pedaços vazios (falha os 3 casos: `""` vira `[""]`, `"   "` vira lista de vazios, `"..."` vira `[""]`); M2 — `ContainsWords` testa só se todas as palavras do fragmento existem em qualquer posição (falha os 2 casos: `for the five years` e `five years for` passam a casar); M3 — `ContainsWords` compara como texto (`corrected.Contains(fragment)` sem diferenciar maiúsculas; `hash` contém `has` e `for five yearsold` contém `for five years`: falha os 2 casos); M5 — `IsFound` examina também `Original` e `Explanation` (falha os 2 casos de fonte errada); M7 — `IsFound` devolve verdadeiro com lista vazia; M8 caso 0 — `CountFound` devolve `expected.Count`.
+- [ ] **T1 — Palavras e comparação de correções (E1–E6, M1–M8)**
+  Red: `EvalText.Tokens` devolve lista vazia; `EvalText.ContainsWords` devolve `false`; `CorrectionMatcher.IsFound` devolve `false`; `CountFound` devolve `0`; `ExpectedCorrection` só como tipo. Falham: E1 (3), E2 (2), E3 (3), E5, M1 (3), M4, M5 caso "só em `Corrected`", M6 (2), M8 casos 2, 3 e 4 (o esqueleto devolve 0, e eles esperam 1, 2 e 2). **Nascem verdes** (conferido asserção por asserção contra o esqueleto): E4 (3), E6 (3), M2 (2), M3 (2), M5 casos "só em `Original`" e "só em `Explanation`", M7, M8 caso 1 ("nenhuma → 0"). Mutações depois do Green: E4 — não descartar pedaços vazios (falha os 3 casos: `""` vira `[""]`, `"   "` vira lista de vazios, `"..."` vira `[""]`); E6 — `ContainsWords` perde a guarda "ao menos uma palavra" e trata a lista vazia de palavras do fragmento como contida (falha os 3 casos, que passam a devolver `true`); M2 — `ContainsWords` testa só se todas as palavras do fragmento existem em qualquer posição (falha os 2 casos: `for the five years` e `five years for` passam a casar); M3 — `ContainsWords` compara como texto (`corrected.Contains(fragment)` sem diferenciar maiúsculas; `hash` contém `has` e `for five yearsold` contém `for five years`: falha os 2 casos); M5 — `IsFound` examina também `Original` e `Explanation` (falha os 2 casos de fonte errada); M7 — `IsFound` devolve verdadeiro com lista vazia; M8 caso 1 — `CountFound` devolve `expected.Count`.
   Green: §2.3.
   Refactor: constantes dos caracteres de borda agrupadas.
   Commit: `test(eval): cover word normalization and correction matching` + `feat(eval): add word normalization and correction matching`.
   Escolhas de forma: nenhuma | §12 em <hash>
 
-- [ ] **T2 — Leitura e validação do golden set (P1–P13)**
-  Red: `GoldenSetParser.Parse` devolve `GoldenSetParseResult` válido com `GoldenSet("", [])`; tipos `GoldenSet`, `GoldenSentence`, `GoldenSetParseResult`. Falham todos os 33 casos (cada caso de valor aceito também exige a frase lida, e cada caso de erro exige a mensagem). Nenhum nasce verde.
-  Green: §2.2 (G1–G12), usando `EvalText.ContainsWords` para G9 e G12; coleta todos os erros; `JsonDocument` com checagem explícita de tipo.
+- [ ] **T2 — Leitura e validação do golden set (P1–P15)**
+  Red: `GoldenSetParser.Parse` devolve `GoldenSetParseResult` válido com `GoldenSet("", [])`; tipos `GoldenSet`, `GoldenSentence`, `GoldenSetParseResult`. Falham todos os 37 casos (cada caso de valor aceito também exige a frase lida, e cada caso de erro exige a mensagem; P15 caso "propriedade desconhecida" exige 1 frase lida e o esqueleto devolve 0). Nenhum nasce verde.
+  Green: §2.2 (G1–G12), usando `EvalText.ContainsWords` para G9 e G12; coleta todos os erros; `JsonDocument` com checagem explícita de tipo e nomes de propriedade comparados com diferenciação de maiúsculas.
   Refactor: modelos de mensagem agrupados; `{kind}` num único método.
   Commit: `test(eval): cover golden set parsing and validation` + `feat(eval): parse and validate the golden set`.
   Escolhas de forma: nenhuma | §12 em <hash>
@@ -407,7 +411,7 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Escolhas de forma: nenhuma | §12 em <hash>
 
 - [ ] **T6 — Argumentos do `eval` (C1–C10)**
-  Red: `EvalCommandLine(IReadOnlyList<string> Providers, string GoldenSetPath, string ReportsDirectory)`, `EvalCommandLineParseResult`; `IsEvalCommand` devolve `false`; `Parse` devolve resultado válido com `EvalCommandLine([], "", "")`. Falham: C1 a C9 (14 casos) e os 2 casos verdadeiros de C10 (16 dos 18). **Nascem verdes**: C10 `[]` e `--Brain:Provider Ollama` (devolvem `false`). Mutações depois do Green: C10 `[]` — `IsEvalCommand` devolve `true` para lista vazia; C10 `--Brain:Provider Ollama` — `IsEvalCommand` devolve `true` para qualquer lista não vazia.
+  Red: `EvalCommandLine(IReadOnlyList<string> Providers, string GoldenSetPath, string ReportsDirectory)` (em `EvalCommandLine.cs`), `EvalCommandLineParseResult` (em `EvalCommandLineParser.cs`, criado primeiro o `EvalCommandLine.cs`); `IsEvalCommand` devolve `false`; `Parse` devolve resultado válido com `EvalCommandLine([], "", "")`. Falham: C1 a C9 (14 casos) e os 2 casos verdadeiros de C10 (16 dos 18). **Nascem verdes**: C10 `[]` e `--Brain:Provider Ollama` (devolvem `false`). Mutações depois do Green: C10 `[]` — `IsEvalCommand` devolve `true` para lista vazia; C10 `--Brain:Provider Ollama` — `IsEvalCommand` devolve `true` para qualquer lista não vazia.
   Green: §2.7 (parser).
   Refactor: nenhum previsto.
   Commit: `test(eval): cover eval command-line parsing` + `feat(eval): parse the eval command line`.
@@ -422,13 +426,13 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
 
 - [ ] **T8 — Golden set e guia (F1)**
   Red: `GoldenSetFileTests.GoldenSetFile_InRepository_IsValidWithAtLeastThirtySentences`, que falha (`eval/` só tem `.gitkeep`; o teste reporta "arquivo não encontrado").
-  Green: `eval/golden-set.json` com as 32 frases da §2.9 (sem alterar texto; `reviewedBy` vazio) e `eval/README.md` (formato, como o critério casa, como ampliar `accepted`, comando de execução em Windows PowerShell 5.1 e Bash, aviso de que `reviewedBy` é do usuário).
+  Green: `eval/golden-set.json` com as 32 frases da §2.9 (sem alterar texto) e `reviewedBy` gravado **exatamente** como a linha `  "reviewedBy": "",` (aspas, dois-pontos, **um** espaço, duas aspas, em linha própria), a grafia que o `git grep -n -F '"reviewedBy": ""'` do D7 procura; e `eval/README.md` (formato, como o critério casa, como ampliar `accepted`, comando de execução em Windows PowerShell 5.1 e Bash, aviso de que `reviewedBy` é do usuário). Antes do commit, o Executor roda o `git grep` do D7 e confere que acha essa linha (código 0); a saída vai à §11 na T9.
   Refactor: nenhum previsto.
   Commit: `test(eval): guard the golden set file` + `feat(eval): add the golden set draft and the eval guide`.
   Escolhas de forma: nenhuma | §12 em <hash>
 
 - [ ] **T9 — Execuções reais e evidências (D5–D14)**
-  Sem código. O Executor aquece o modelo do Ollama (uma chamada antes, para a 1ª frase não estourar `TimeoutSeconds`, L3), roda o D5 uma vez e o D6 em 3 execuções seguidas (as mesmas do D5), o D8 a D11 e cola a saída resumida e as linhas dos provedores do relatório na §11. O `reviewedBy` é do usuário: enquanto vazio, o Executor registra "D7: pendente de revisão do usuário" e o D6 vale como provisório. Se qualquer rodada do D6 ficar `not met`, o Executor **não** altera o golden set, o critério nem os limiares: registra os números e para; quem decide é o usuário, com registro prévio na spec (AP-032).
+  Sem código. O Executor aquece o modelo do Ollama (uma chamada antes, para a 1ª frase não estourar `TimeoutSeconds`, L3) e roda o **comando completo do D5 (com `ClaudeCode,Ollama`) 3 vezes seguidas**: as três rodadas são, ao mesmo tempo, o D5 e o D6 (a 1ª prova o D5; as 3 provam o D6; nenhuma rodada é só do ClaudeCode). Depois roda o D8 a D11 e cola na §11 a saída resumida, as linhas dos provedores de cada relatório e, para o D7, a linha que o `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` acha **antes** de o usuário preencher `reviewedBy` (código 0, lado positivo da verificação, AP-035). O `reviewedBy` é do usuário: enquanto vazio, o Executor registra "D7: pendente de revisão do usuário" e o D6 vale como provisório. Se qualquer rodada do D6 ficar `not met`, o Executor **não** altera o golden set, o critério nem os limiares: registra os números e para; quem decide é o usuário, com registro prévio na spec (AP-032).
   Commit: `docs(ai): add DoD evidence for US-009` (feito pelo Executor ao fim).
   Escolhas de forma: nenhuma | §12 em <hash>
 
@@ -444,15 +448,15 @@ Nenhum pacote novo em `src/`. O Core usa só BCL (`System.Text.Json`) e as abstr
 
 | Risco | Mitigação |
 |---|---|
-| **Oscilação do D6 (AP-032).** Camada: o comando real `eval`, medindo a **primeira** chamada ao adaptador (parser e validador incluídos) e as correções da resposta final. Tolerância: limiares do PRODUCT (≥ 80% das correções, ≥ 90% no formato sem retentativa; com 32 frases, 26 e 29). Rodadas: **3 seguidas**. A retentativa **não** precisa ter sido usada (a taxa com retentativa é informativa). A fumaça da US-006 achou 4/5 (80%) no Claude Code, sem margem | Se alguma rodada ficar `not met`, o Executor registra os números e para (T9); **quem decide é o usuário**, com registro prévio na spec (ampliar `accepted`, trocar frases, mudar o modelo ou o limiar). O relatório detalhado por frase mostra onde perdeu |
+| **Oscilação do D6 (AP-032).** Camada: o comando real `eval`, medindo a **primeira** chamada ao adaptador (parser e validador incluídos) e as correções da resposta final. Tolerância: limiares do PRODUCT (≥ 80% das correções, ≥ 90% no formato sem retentativa; com 32 frases, 26 e 29). Rodadas: **3 seguidas do comando completo do D5**. A retentativa **não** precisa ter sido usada (a taxa com retentativa é informativa). Não há medição anterior do ClaudeCode com margem: a US-004 fixou só o **mínimo** de 4/5 correções na fumaça do Claude Code. O 4/5 (80%) **medido** é do **Ollama** (`tasks/US-006/plan.md`, D5, 3 rodadas iguais, `expected corrections found: 4/5`), também sem margem; como o D6 é só do ClaudeCode, serve de referência de ordem de grandeza, não de previsão. Para ler a taxa "sem retentativa" do Ollama: antes do reforço do prompt, a US-006 observou de 0 a 2 frases de 5 fora do formato por execução (sequência 2, 0, 1, 0, 1), todas por contagem de perguntas e nenhuma por JSON inválido; depois do reforço, 0 em 3 rodadas | Se alguma rodada ficar `not met`, o Executor registra os números e para (T9); **quem decide é o usuário**, com registro prévio na spec (ampliar `accepted`, trocar frases, mudar o modelo ou o limiar). O relatório detalhado por frase mostra onde perdeu |
 | **Métricas só registradas (AP-052).** Latência média e p95, taxa com retentativa e tudo do Ollama não têm limiar nesta US | Risco para a US que as usar como critério (por exemplo, decidir o modelo local padrão ou fixar a meta de latência do PRODUCT, que é fim a fim e inclui STT e TTS): essa US precisa registrar o limiar na spec antes. Nada a registrar na spec desta US |
 | **L1 (limite aceito): o critério mede só cobertura.** Correção errada ou a mais não é penalizada | Consumidores: `CorrectionMatcher` (conta só acertos); relatório (mostra a porcentagem sem falsos positivos); D6 e a nota mínima das US de cérebro futuras (um modelo que "corrige demais" passa). RN-FEED02 limita a 2 correções por resposta, o que limita o efeito |
 | **L2 (limite aceito): paráfrase fora de `accepted` conta como não encontrada** | Consumidores: matcher, relatório (a tabela de detalhes mostra cada frase), D6 e as US futuras (a régua é o arquivo, e mudar o arquivo muda a régua). O usuário amplia `accepted` depois de ver o relatório; a mudança é de dados, e o `reviewedBy` registra quem revisou |
-| **L3 (limite aceito): a indisponibilidade é decidida pela primeira frase** (um `Timeout` na primeira, por exemplo o Ollama carregando o modelo, marca o provedor inteiro como `unavailable`) | Consumidores: `EvalRunner` (R6 cobre os cinco tipos), relatório (traz o motivo), D5 e D8 (o Executor aquece o modelo; no D8 o `unavailable` é o resultado esperado), D6 (só o ClaudeCode). Falha em frase posterior não derruba o provedor (R7) |
+| **L3 (limite aceito): a indisponibilidade é decidida pela primeira frase** (um `Timeout` na primeira, por exemplo o Ollama carregando o modelo, marca o provedor inteiro como `unavailable`) | Consumidores: `EvalRunner` (R6 cobre os cinco tipos), relatório (traz o motivo), D5 e D8 (o Executor aquece o modelo; no D8 o `unavailable` é o resultado esperado), D6 (só o ClaudeCode é nota; o Ollama das mesmas rodadas é informativo). Falha em frase posterior não derruba o provedor (R7) |
 | **L4 (limite aceito): "formato válido" herda a tolerância de 1 a 2 perguntas (RN-FEED01)** | Consumidores: validador (sem mudança), relatório e D6 (a taxa conta como válida uma resposta com 2 perguntas, que o prompt não pede); o PRODUCT mede "formato válido" e o validador é a definição do projeto |
 | **L5 (limite aceito): relatório de duas rodadas no mesmo segundo se sobrescreve** | Consumidores: relatório (nome por segundo) e D6 (rodadas levam minutos). Sem mitigação além do nome por segundo |
 | **L6 (limite aceito): o p95 de 32 frases é a 31ª medida** (a segunda pior) | Consumidores: relatório (informativo) e as US futuras que fixarem meta de latência (precisam de amostra maior). Só registrado nesta US |
-| Consumo da assinatura: uma rodada do Claude Code faz 32 a 64 chamadas; o D6 faz 3 rodadas (e o D5 conta como a 1ª) | Rodadas em sequência; se o limite de uso bater no meio, as frases seguintes viram erro de frase e a taxa cai: o Executor espera o limite voltar e repete a rodada inteira, registrando |
+| Consumo da assinatura: uma rodada do Claude Code faz 32 a 64 chamadas; o D5/D6 faz 3 rodadas completas (as mesmas), ou seja, 96 a 192 chamadas | Rodadas em sequência; se o limite de uso bater no meio, as frases seguintes viram erro de frase e a taxa cai: o Executor espera o limite voltar e repete a rodada inteira, registrando |
 | `AddCommandLine` do host lê `eval` e `--providers ...` como configuração (efeito esperado: nenhum) e os testes não passam por ele (`Configuration` em memória) | O D5 real (Windows PowerShell 5.1, `Configuration` nula) prova; se o provedor de linha de comando lançar para algum formato de argumento, o Executor registra e propõe o ajuste na §12 |
 | Windows PowerShell passa `ClaudeCode,Ollama` como dois argumentos | O parser aceita os dois formatos (C2, C3); o D5 roda no PowerShell 5.1 e o D11 confere os dois formatos sem chamar modelo |
 | Hook de edição acusa símbolo inexistente ao criar tipo e teste juntos (AP-044) | Criar primeiro o arquivo que declara e depois o que usa; se o hook falhar logo após a primeira edição, editar o outro arquivo antes de investigar |
@@ -480,7 +484,7 @@ Adiamentos procurados nas P*, nos comentários de teste e nos ADRs (AP-040): a p
 - **P4 — Código de saída e nota.** Resposta padrão: 0 sempre que o relatório é gravado (mesmo com todos `unavailable` ou `not met`); 2 para argumentos ou golden set inválidos; 1 para falha ao gravar o relatório. A nota mínima fica só no relatório. Teste: `EvalCommandTests.RunAsync_WhenCorrectionsAreMissed_ShowsNotMetInSummaryAndReport`
 - **P5 — Opções além de `--providers`.** Resposta padrão: `--golden-set` e `--reports-dir`, com os padrões `eval/golden-set.json` e `eval/reports` (também servem aos testes, que usam pastas temporárias). Teste: `EvalCommandLineParserTests.Parse_WithGoldenSetAndReportsDir_UsesTheGivenPaths`
 - **P6 — Quem fornece o golden set.** Resposta padrão: o rascunho da §2.9 (32 frases) é revisado pelo usuário na aprovação do plano; o Executor o grava na T8 com `reviewedBy` vazio; o usuário preenche `reviewedBy` depois de revisar o arquivo (D7). Teste: `GoldenSetFileTests.GoldenSetFile_InRepository_IsValidWithAtLeastThirtySentences`
-- **P7 — D6 em 3 execuções seguidas.** Resposta padrão: sim (a spec passa a dizer isso no commit de spec, §2.8 (e)); o D5 conta como a primeira. Sem efeito observável (só o comando da DoD).
+- **P7 — D6 em 3 execuções seguidas.** Resposta padrão: sim, do comando completo do D5 (com os dois provedores); as 3 rodadas são o D5 e o D6 ao mesmo tempo (a spec passa a dizer isso no commit de spec, §2.8 (e)). Sem efeito observável (só o comando da DoD).
 - **P8 — Frases independentes, sem histórico.** Resposta padrão: cada frase vai sozinha, com `ConversationService` novo (como no D5 das US-004 e US-006), para uma frase ruim não contaminar a seguinte. Teste: `EvalRunnerTests.EvaluateAsync_Always_SendsEachSentenceAloneWithTheSystemPrompt`
 - **P9 — Latência inclui a retentativa; frases com erro ficam fora.** Resposta padrão: sim (é o tempo que o aluno espera; frase sem resposta não tem latência). Teste: `EvalRunnerTests.EvaluateAsync_Always_MeasuresTheLatencyOfEachSentenceIncludingTheRetry`
 - **P10 — Despacho pelo primeiro argumento `eval`.** Resposta padrão: só o primeiro argumento decide; qualquer outro caso abre o chat como hoje. Teste: `EvalCommandLineParserTests.IsEvalCommand_WithDifferentFirstArguments_OnlyAcceptsEval`
@@ -493,12 +497,12 @@ Adiamentos procurados nas P*, nos comentários de teste e nos ADRs (AP-040): a p
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s; 129 casos novos (100 no Core, 29 no Console) |
+| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s; 137 casos novos (108 no Core, 29 no Console) |
 | D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas; o Executor registra o line-rate **mesclado** do assembly `EnglishTutor.Core` (`reportgenerator` sobre os três `coverage.cobertura.xml`, AP-056) e o de `Evaluation/` |
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
-| D5 | (da spec) No Windows PowerShell 5.1, na raiz do repositório, com a CLI `claude` autenticada e o Ollama rodando com `qwen2.5:14b-instruct-q4_K_M` baixado e aquecido: `dotnet run --project src/EnglishTutor.Console -- eval --providers ClaudeCode,Ollama; "exit=$LASTEXITCODE"` | `Evaluating ClaudeCode (32 sentences)...`, `Evaluating Ollama (32 sentences)...`, a tabela de resumo com as duas linhas, `Report saved to <caminho>` e `exit=0`; um arquivo `eval-*.md` novo em `eval/reports/` com a seção `Details` de cada provedor |
-| D6 | (da spec, §2.8 (e)) Linha do ClaudeCode no resumo dos relatórios de **3 execuções seguidas** do D5 (ou de `eval --providers ClaudeCode`) | em cada uma: `Minimum grade` = `met` (correções ≥ 80%, formato sem retentativa ≥ 90%); o Executor cola as três linhas na §11 (T9, critério e dono da decisão em §7) |
-| D7 | (da spec, §2.8 (e)) `dotnet test --filter "FullyQualifiedName~GoldenSetFileTests"` e `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` | verde; o `git grep` não acha linha (código de saída 1) quando o usuário tiver preenchido `reviewedBy`; antes disso o Executor registra "pendente de revisão do usuário" |
+| D5 | (da spec) No Windows PowerShell 5.1, na raiz do repositório, com a CLI `claude` autenticada e o Ollama rodando com `qwen2.5:14b-instruct-q4_K_M` baixado e aquecido: `dotnet run --project src/EnglishTutor.Console -- eval --providers ClaudeCode,Ollama; "exit=$LASTEXITCODE"`, **rodado 3 vezes seguidas** (as 3 rodadas também são o D6) | em cada rodada: `Evaluating ClaudeCode (32 sentences)...`, `Evaluating Ollama (32 sentences)...`, a tabela de resumo com as duas linhas, `Report saved to <caminho>` e `exit=0`; um arquivo `eval-*.md` novo em `eval/reports/` com a seção `Details` de cada provedor |
+| D6 | (da spec, §2.8 (e)) Linha do ClaudeCode no resumo dos relatórios das **3 execuções seguidas do comando completo do D5** (com os dois provedores; nenhuma rodada só do ClaudeCode) | em cada uma: `Minimum grade` = `met` (correções ≥ 80%, formato sem retentativa ≥ 90%); o Executor cola as três linhas na §11 (T9, critério e dono da decisão em §7) |
+| D7 | (da spec, §2.8 (e)) `dotnet test --filter "FullyQualifiedName~GoldenSetFileTests"` e `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` | verde. Lado positivo (T8/T9, antes de o usuário revisar): o `git grep` acha a linha `"reviewedBy": ""` (código 0), colada na §11. Lado final: depois de o usuário preencher `reviewedBy`, não acha linha (código 1); até lá o Executor registra "pendente de revisão do usuário" |
 | D8 | (da spec) No Windows PowerShell 5.1: `$env:Brain__Ollama__Endpoint="http://localhost:1"; dotnet run --project src/EnglishTutor.Console -- eval --providers Ollama; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__Ollama__Endpoint` | a linha do Ollama diz `unavailable`, o relatório lista o motivo (`Ollama is not running at ...`) em `Unavailable providers` e não tem `Details: Ollama`; `exit=0` |
 | D9 | (da spec) No Windows PowerShell 5.1: `"/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` | o cabeçalho do chat (`Brain: ... \| Mode: free-conversation`); `exit=0` |
 | D10 | (da spec) No Windows PowerShell 5.1: `dotnet run --project src/EnglishTutor.Console -- eval --providers Inexistente 2>&1; "exit=$LASTEXITCODE"` | `Unknown provider 'Inexistente'. Accepted values: ClaudeCode, Ollama.`; `exit=2`; nenhum arquivo novo em `eval/reports/` |
@@ -507,10 +511,38 @@ Adiamentos procurados nas P*, nos comentários de teste e nos ADRs (AP-040): a p
 | D13 | (Git Bash) `git diff develop...HEAD \| LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'`, com todo o código da US commitado | imprime `0` (código de saída 1 com contagem 0 é o esperado) |
 | D14 | `git status --short` depois de D2–D11 | nenhum arquivo de `TestResults/`, `coverage/`, `bin/`, `obj/`, `logs/` nem de `eval/reports/` |
 
-Notas: a US mexe no console, então D8 a D11 rodam no Windows PowerShell 5.1 e o D9 usa pipe (BOM na entrada, AP-006); o `eval` não lê a entrada padrão. Critério `LiveBrain` do D6 (AP-032, AP-052): camada = comando real, primeira chamada ao adaptador (parser e validador) mais as correções da resposta final; tolerância = limiares do PRODUCT; 3 rodadas seguidas; a retentativa não precisa ter sido exercitada; risco de oscilação e dono da decisão (o usuário, com registro prévio na spec) em §7. D5 e D6 consomem a assinatura do Claude Code e dependem do Ollama local; sem eles o Executor registra "não reproduzido" na §11 e o usuário decide.
+Notas: a US mexe no console, então D8 a D11 rodam no Windows PowerShell 5.1 e o D9 usa pipe (BOM na entrada, AP-006); o `eval` não lê a entrada padrão. Critério `LiveBrain` do D6 (AP-032, AP-052): camada = comando real, primeira chamada ao adaptador (parser e validador) mais as correções da resposta final; tolerância = limiares do PRODUCT; 3 rodadas seguidas do comando completo; a retentativa não precisa ter sido exercitada; risco de oscilação e dono da decisão (o usuário, com registro prévio na spec) em §7. D5 e D6 consomem a assinatura do Claude Code e dependem do Ollama local; sem eles o Executor registra "não reproduzido" na §11 e o usuário decide.
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-23 — pedido do usuário
+
+Incorporar as sugestões S1 a S7 da revisão do plano (`tasks/US-009/plan-review.md`, rodada 1):
+
+- S1: caso de teste para `original` ausente e para `original` em branco (G8); atualizar "Placeholders" e totais (AP-049).
+- S2: testes para `ContainsWords` com fragmento sem palavras, para nomes de propriedade sensíveis a maiúsculas/propriedade desconhecida (ou remover a frase), e explicitar em M8 que uma única `Correction` satisfaz as duas esperadas.
+- S3: corrigir em §7 a atribuição do 4/5 (Ollama na US-006; Claude Code só tem o mínimo de 4/5 da US-004) e citar as 2 de 5 respostas fora do formato do Ollama antes do reforço do prompt.
+- S4: T8 fixa a grafia `"reviewedBy": ""`; o Executor cola na §11 a linha achada pelo `git grep` (código 0) antes de o usuário preencher.
+- S5: dizer em uma frase quantas vezes o comando completo roda no D6 e alinhar o texto com a spec (§2.8 (e)).
+- S6: corrigir a numeração dos casos de M8 no Red de T1 (falham o 2º e o 3º; o 1º nasce verde).
+- S7: informar em qual arquivo mora `EvalCommandLineParseResult` e refletir na §3 e na árvore proposta para o `ARCHITECTURE.md`.
+
+Este pedido não é a aprovação do plano; a aprovação continua pendente.
+
+### Respostas do Planejador (rodada 2, 2026-10-23)
+
+- **S1 → §2.2 (coluna "Teste" nova na tabela G1–G12), §4 (P14 novo: `original` ausente e em branco), §4 Totais e Placeholders, §5 T2 (P1–P15, 37 casos).** → Incorporado. P14 cobre os dois ramos `missing`/`blank` da G8; os ramos de tipo de `original` continuam em P13. Totais: P 33 → 37 (P14 +2, P15 +2).
+- **S2 → §2.2 e §2.3 (frases ligadas a E6, P15 e M8 caso 4), §4 (E6, P15 e M8 com 4 casos; "Condicionais"), §5 T1 (E1–E6; E6 nasce verde, com mutação) e T2 (P1–P15), §10 D2.** → Incorporado. Foi mantida a frase sobre maiúsculas e propriedade desconhecida, com teste (P15, um caso para cada metade). E6: fragmento `""`, `"   "` e `"..."` devolve falso; mutação: remover a guarda "ao menos uma palavra" (a lista vazia passa a casar). M8 caso 4: uma única `Correction` satisfaz as duas esperadas. Totais: E 12 → 15, M 17 → 18, Core 100 → 108, total 129 → 137.
+- **S3 → §7 (linha "Oscilação do D6").** → Incorporado, com uma correção ao texto da revisão (AP-036). Conferi `tasks/US-006/plan.md`: o 4/5 medido é do Ollama (D5, 3 rodadas iguais); o Claude Code só tem o mínimo de 4/5 da US-004. Os dados de formato do Ollama antes do reforço do prompt são "frases fora do formato por execução: 2, 0, 1, 0 e 1 de 5" (0 a 2 frases por execução, todas por contagem de perguntas), e não "2 respostas em 5 execuções" como diz a revisão; o plano cita o dado do registro de origem.
+- **S4 → §5 T8 (grafia fixa da linha, conferência pelo `git grep` antes do commit) e T9, §10 D7, §2.8 (e) (novo texto do D7 da spec, com os dois lados).** → Incorporado. A linha é `  "reviewedBy": "",`; o Executor cola na §11 a linha achada (código 0) antes de o usuário preencher.
+- **S5 → §5 T9, §10 D5 e D6, §7 (oscilação e consumo da assinatura: 3 rodadas completas, 96 a 192 chamadas), §9 P7, §2.8 (e) (novo texto do D6 da spec).** → Incorporado. O comando completo do D5 (com os dois provedores) roda 3 vezes seguidas; as 3 rodadas são o D5 e o D6; nenhuma rodada é só do ClaudeCode. O texto do plano e o da spec dizem o mesmo.
+- **S6 → §5 T1 (Red).** → Incorporado. Falham M8 casos 2, 3 e 4; o caso 1 ("nenhuma → 0") nasce verde, com a mutação que devolve `expected.Count`.
+- **S7 → §2.1, §2.7, §3 (linhas de `EvalCommandLine.cs` e `EvalCommandLineParser.cs` separadas), §2.8 Commit 2 item 2 (árvore do Console), §5 T6.** → Incorporado. `EvalCommandLineParseResult` mora em `EvalCommandLineParser.cs`; a árvore do `ARCHITECTURE.md` passa a citá-lo.
+
+Conferência de contagens (AP-025, AP-046, AP-049): E 15, M 18, P 37, X 12, R 12, B 13, F 1 = 108 (Core); C 18, A 11 = 29 (Console); total 137. A §4, a T2 ("37 casos"), a T5 ("13 casos") e o D2 ("137 casos novos (108 no Core, 29 no Console)") batem; não restou "129", "100 casos" nem "33 casos" fora deste histórico.
+
+Este pedido não é a aprovação do plano; a aprovação continua pendente. Status mantido: Aguardando aprovação.
