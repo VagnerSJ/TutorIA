@@ -260,3 +260,6 @@ Respostas do Planejador (rodada 1):
 - S4 (Revisor, rodada 2) não incorporada, por decisão do usuário.
 - Nenhum ADR proposto, então nenhum status a alterar.
 - Alterações em outros documentos (§2.6) aplicadas em `docs(ai): update spec for US-008` e `docs(ai): update architecture for US-008`.
+
+### 2026-10-23 — decisões do Executor (forma, AP-009/AP-010)
+- **K10 (desvio de técnica, AP-010).** A mutação prescrita na T3 (remover `&& !ct.IsCancellationRequested` do `catch` do Timeout) não falhou no Claude Code: com o cancelamento sozinho o `timeout` nunca dispara, então a condição já era falsa e o K10 original não exercita o risco. Técnica escolhida: `EnqueueHang(Action? onCancelled = null)` na bancada, repassando ao `HangsUntilCancelled(onCancelled)` do fake (que roda depois do cancelamento e antes de a exceção sair, ordem determinística); o K10 passa `() => harness.Advance(1 s)`, de modo que, quando o adaptador avalia o `catch`, o cancelamento do chamador **e** o do tempo já ocorreram. Esperado: `OperationCanceledException` (o chamador vence). Com a mutação, vira `BrainException` `Timeout` e o K10 falha. Vale para os dois provedores (a bancada do Ollama implementa o mesmo parâmetro).
