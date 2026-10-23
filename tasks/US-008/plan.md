@@ -1,6 +1,6 @@
 # Plano — US-008 Suíte de contrato do ITutorBrain
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-23
 Branch: feature/US-008_contrato-itutorbrain
 Spec: specs/sprints/SPRINT_1.md#us-008
 Regras: RN-BRAIN01, RN-BRAIN03 (da US); RN-BRAIN04, RN-BRAIN07, RN-BRAIN09 (tocadas pelos testes, sem mudança); ARCHITECTURE §3, §10; ADR-005, ADR-006, ADR-007, ADR-009 (como consumidoras)
@@ -254,3 +254,9 @@ Respostas do Planejador (rodada 1):
 - **S1** → §5 T4: acrescentadas as mutações K3, K4a/K4b, K9, K13 e K14 para o Ollama.
 - **S2** → §4 (linha de K13 e linha de comentários): K13 passa a citar `RN-BRAIN07`.
 - **S3** → §5 T4: a mutação `Skip(1)` aponta a linha `messages.AddRange(request.Messages.Select(ToChatMessage));` de `OllamaTutorBrain.SendAsync` (conferida na linha 54 de `OllamaTutorBrain.cs`).
+
+### 2026-10-23 — aprovação do usuário
+- Plano aprovado. Perguntas em aberto P1 a P8: respostas padrão aceitas, sem alteração.
+- S4 (Revisor, rodada 2) não incorporada, por decisão do usuário.
+- Nenhum ADR proposto, então nenhum status a alterar.
+- Alterações em outros documentos (§2.6) aplicadas em `docs(ai): update spec for US-008` e `docs(ai): update architecture for US-008`.
