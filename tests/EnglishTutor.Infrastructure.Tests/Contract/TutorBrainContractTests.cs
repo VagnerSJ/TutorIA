@@ -125,6 +125,110 @@ public abstract class TutorBrainContractTests : IDisposable
         thrown.Which.RawText.Should().Be(modelText);
     }
 
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN01
+    [Fact]
+    public async Task SendAsync_WithFullWindow_SendsSystemPromptAndEveryMessageInOrder()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueModelText(ReplyJson("Reply t1?"));
+        var request = new BrainRequest(
+            "system t1",
+            [
+                new BrainMessage(BrainRole.User, "student t1"),
+                new BrainMessage(BrainRole.Assistant, "tutor t1"),
+                new BrainMessage(BrainRole.User, "student t2"),
+                new BrainMessage(BrainRole.Assistant, "tutor t2"),
+                new BrainMessage(BrainRole.User, "student t3"),
+            ],
+            SessionHint: null);
+
+        await harness.Brain.SendAsync(request, TestContext.Current.CancellationToken);
+
+        var sent = harness.Sent.Should().ContainSingle().Subject;
+        sent.SystemPrompt.Should().StartWith("system t1");
+        AssertInOrder(sent.Conversation, "student t1", "tutor t1", "student t2", "tutor t2", "student t3");
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN01 (ADR-006: a retentativa leva a resposta rejeitada)
+    [Theory]
+    [InlineData("rejected reply t1")]
+    [InlineData("")]
+    public async Task SendAsync_WithRetryMessages_SendsRejectedReplyAndCorrectionInOrder(string rejectedReply)
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueModelText(ReplyJson("Reply t1?"));
+        var request = new BrainRequest(
+            "system t1",
+            [
+                new BrainMessage(BrainRole.User, "student t1"),
+                new BrainMessage(BrainRole.Assistant, rejectedReply),
+                new BrainMessage(BrainRole.User, "correction t1"),
+            ],
+            SessionHint: null);
+
+        var reply = await harness.Brain.SendAsync(request, TestContext.Current.CancellationToken);
+
+        reply.Reply.Should().Be("Reply t1?");
+        string[] expected = ["student t1", rejectedReply, "correction t1"];
+        AssertInOrder(
+            harness.Sent.Should().ContainSingle().Subject.Conversation,
+            [.. expected.Where(text => text.Length > 0)]);
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN01
+    [Fact]
+    public async Task SendAsync_OnSecondCallWithUnrelatedWindow_DoesNotCarryMessagesFromTheFirst()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueModelText(ReplyJson("Reply t1?"));
+        harness.EnqueueModelText(ReplyJson("Reply t2?"));
+
+        var first = await harness.Brain.SendAsync(Request("first window a1"), TestContext.Current.CancellationToken);
+        var second = await harness.Brain.SendAsync(
+            Request("second window b2 more words"), TestContext.Current.CancellationToken);
+
+        first.Reply.Should().Be("Reply t1?");
+        second.Reply.Should().Be("Reply t2?");
+        harness.Sent.Should().HaveCount(2);
+        harness.Sent[1].Conversation.Should().Contain("b2").And.NotContain("a1");
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN01 (ADR-007: o Claude Code pode mandar só a última)
+    [Fact]
+    public async Task SendAsync_WhenSecondRequestExtendsTheFirst_ReturnsTheSecondAnswer()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueModelText(ReplyJson("Reply t1?"));
+        harness.EnqueueModelText(ReplyJson("Reply t2?"));
+        var first = await harness.Brain.SendAsync(Request("student t1"), TestContext.Current.CancellationToken);
+        var extended = new BrainRequest(
+            "system t1",
+            [
+                new BrainMessage(BrainRole.User, "student t1"),
+                new BrainMessage(BrainRole.Assistant, first.RawText),
+                new BrainMessage(BrainRole.User, "student t2"),
+            ],
+            SessionHint: null);
+
+        var second = await harness.Brain.SendAsync(extended, TestContext.Current.CancellationToken);
+
+        second.Reply.Should().Be("Reply t2?");
+        harness.Sent.Should().HaveCount(2);
+        harness.Sent[1].Conversation.Should().Contain("student t2");
+    }
+
+    // Every part appears, each after the previous one.
+    private static void AssertInOrder(string conversation, params string[] parts)
+    {
+        var position = 0;
+        foreach (var part in parts)
+        {
+            var found = conversation.IndexOf(part, position, StringComparison.Ordinal);
+            found.Should().BeGreaterThanOrEqualTo(0, $"\"{part}\" should appear after position {position} in: {conversation}");
+            position = found + part.Length;
+        }
+    }
+
     private BrainContractHarness Harness(string outputMode)
     {
         var harness = CreateHarness(outputMode);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Brain;
+using EnglishTutor.Infrastructure.Processes;
 using EnglishTutor.Infrastructure.Tests.Fakes;
 using EnglishTutor.Infrastructure.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,6 +20,10 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
 
     private readonly string _outputMode;
 
+    private readonly FakeTimeProvider _timeProvider = new();
+
+    private readonly List<SentToModel> _sent = [];
+
     private int _sessions;
 
     public ClaudeCodeContractHarness(string outputMode)
@@ -34,12 +39,13 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
             OutputMode = outputMode,
             TimeoutSeconds = TimeoutSeconds,
         };
+        _processRunner.OnRun = Record;
         Brain = new ClaudeCodeTutorBrain(
             _processRunner,
             new TutorReplyParser(NullLogger<TutorReplyParser>.Instance),
             new PromptFiles(Path.Combine(AppContext.BaseDirectory, "prompts")),
             Options.Create(options),
-            new FakeTimeProvider(),
+            _timeProvider,
             NullLogger<ClaudeCodeTutorBrain>.Instance);
     }
 
@@ -53,7 +59,7 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
 
     public override Task CallStarted => throw new NotImplementedException();
 
-    public override IReadOnlyList<SentToModel> Sent => throw new NotImplementedException();
+    public override IReadOnlyList<SentToModel> Sent => _sent;
 
     // A JSON object in JsonSchema mode goes through "structured_output"; anything else (plain text, tags,
     // truncated JSON) goes through "result", so the raw text comes back unchanged.
@@ -70,7 +76,7 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
 
     public override void EnqueueUnavailable() => throw new NotImplementedException();
 
-    public override void Advance(TimeSpan time) => throw new NotImplementedException();
+    public override void Advance(TimeSpan time) => _timeProvider.Advance(time);
 
     public override void Dispose()
     {
@@ -78,6 +84,14 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
         {
             Directory.Delete(_rootDirectory, recursive: true);
         }
+    }
+
+    // The system prompt file exists only while the process runs, so it is read here.
+    private void Record(ProcessRequest request)
+    {
+        var argumentIndex = request.Arguments.ToList().IndexOf("--system-prompt-file");
+        var systemPrompt = File.ReadAllText(request.Arguments[argumentIndex + 1]);
+        _sent.Add(new SentToModel(systemPrompt, request.StandardInput));
     }
 
     private static bool IsJsonObject(string text)
