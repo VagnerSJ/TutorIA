@@ -12,7 +12,7 @@
 | US-005 | Erros do Claude Code com mensagens claras | 2 | US-004 | Concluída |
 | US-006 | Professor local via Ollama | 2b | US-003 | Concluída |
 | US-007 | Troca de cérebro por configuração e fallback | 2b | US-005, US-006 | Concluída |
-| US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | A fazer |
+| US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | Concluída |
 | US-009 | Avaliação comparativa dos cérebros (golden set + `eval`) | 2b | US-007 | A fazer |
 
 ## Definition of Done comum (todas as US)
@@ -487,7 +487,7 @@ Como desenvolvedor do projeto,
 quero uma única suíte de testes que todo cérebro precisa passar,
 para garantir que trocar de provedor não muda o comportamento da aplicação.
 
-**Regras:** RN-BRAIN01, RN-BRAIN03; ARCHITECTURE §10.
+**Regras:** RN-BRAIN01, RN-BRAIN03, RN-BRAIN04, RN-BRAIN07, RN-BRAIN09; ARCHITECTURE §10.
 
 ```gherkin
 Cenário: mesma suíte para todos os provedores
@@ -507,6 +507,9 @@ Cenário: testes live opcionais
 | # | Comando | Esperado |
 |---|---|---|
 | D5 | `dotnet test --filter "FullyQualifiedName~ContractTests" --logger "console;verbosity=normal"` | os mesmos testes do contrato listados para ClaudeCode e Ollama, todos verdes |
+| D6 | `dotnet test --filter "FullyQualifiedName~ClaudeCodeTutorBrainContractTests"` e o mesmo com `OllamaTutorBrainContractTests` | verde, com o mesmo número de testes nos dois (o contrato inteiro roda por provedor) |
+| D7 | (Git Bash) `dotnet test --no-build --filter "Category!=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` e `dotnet test --no-build --filter "Category=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` | `0` no primeiro (código de saída 1 com contagem 0 é o esperado); pelo menos `2` no segundo: os testes live não entram em `Category!=LiveBrain` e aparecem em `Category=LiveBrain` |
+| D8 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ContractLiveTests"`, com a CLI do Claude Code autenticada e o Ollama rodando com o modelo padrão baixado | verde em 3 rodadas seguidas: cada provedor responde 2 turnos pelo `ConversationService` sem cair na resposta crua (a retentativa única do ADR-006 vale) |
 
 ---
 

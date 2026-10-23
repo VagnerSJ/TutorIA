@@ -86,7 +86,7 @@ public sealed class FakeTutorBrain : ITutorBrain
 ```csharp
 public abstract class TutorBrainContractTests
 {
-    protected abstract ITutorBrain CreateBrain(/* respostas simuladas */);
+    protected abstract BrainContractHarness CreateHarness(string outputMode);   // bancada: adaptador real sobre o fake do provedor
 
     [Fact]
     public async Task SendAsync_WithValidOutput_ReturnsReplyWithOneQuestion() { ... }
@@ -95,7 +95,7 @@ public abstract class TutorBrainContractTests
 public sealed class OllamaTutorBrainContractTests : TutorBrainContractTests { ... }
 ```
 
-Variantes live: subclasses marcadas com `[Trait("Category", "LiveBrain")]`, excluídas no CI com `--filter "Category!=LiveBrain"`.
+Variantes live: classes `<Provedor>ContractLiveTests` (não herdam da suíte de contrato, cujos fakes simulam falhas que o provedor real não provoca), marcadas com `[Trait("Category", "LiveBrain")]` e excluídas no CI com `--filter "Category!=LiveBrain"`.
 
 ## Fixtures
 

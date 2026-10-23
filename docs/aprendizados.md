@@ -536,3 +536,12 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** qualquer teste de componente ou comando de DoD que procure uma linha exata na saída do console falha por causa do prefixo; o erro aparece só na execução real (D8).
 - **Correção (proposta, não aplicada):** (a) `.claude/skills/bdd-para-testes/SKILL.md`: "no console, o prompt `> ` não quebra linha: testes que procuram uma linha de saída consideram o prefixo (`EndsWith`/`Contains`), e cenários e DoD dizem 'a saída contém', não 'a linha'"; (b) `.claude/agents/planejador.md`: ao escrever critério de saída do console, usar 'a saída contém'. Para a US-007, a redação de D8 e D9 em `specs/sprints/SPRINT_1.md` ("a linha `Switched to`") pode ser ajustada para "a saída contém"; isso é spec e depende de decisão do usuário (o Documentador não altera a spec).
 - **Status:** Proposta
+
+### AP-058 — Mutação prescrita no plano para provar o Red não falhava o teste
+
+- **Data / US:** 2026-10-23 / US-008 (`review.md` Aprendizados; `plan.md` §12, K10)
+- **Quem errou:** planejador
+- **O que aconteceu:** quando a US só adiciona testes que caracterizam código pronto, o Red é provado por mutação. A mutação prescrita para o K10 (remover `&& !ct.IsCancellationRequested` do `catch` do Timeout) não fez o teste falhar no Claude Code: só com o cancelamento do chamador o timeout nunca dispara, então a condição já era falsa. O Executor detectou, mudou a técnica (`EnqueueHang(onCancelled)` avançando o relógio após o cancelamento) e registrou o desvio na §12 antes do commit (AP-010). Sem dano, mas a mutação do plano estava errada.
+- **Por que importa:** uma mutação que não falha o teste deixa o teste sem prova de que exercita o risco; só a conferência do Executor evitou um K10 inócuo.
+- **Correção (aplicada em 2026-10-23):** `.claude/agents/planejador.md` (junto da regra de AP-054, lista de Red por tarefa): "para cada mutação prescrita como prova de Red, rodar mentalmente o teste contra o código mutado e confirmar que a asserção falha; se o caso exige duas condições simultâneas (ex.: cancelamento do chamador e do tempo), o plano descreve a técnica que as produz juntas". Opcional: o Revisor do plano confere a mesma coisa em mutações não triviais.
+- **Status:** Aplicada
