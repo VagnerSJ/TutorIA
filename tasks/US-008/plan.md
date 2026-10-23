@@ -244,3 +244,7 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-22 — pedido do Revisor do plano (rodada 1)
+- **B1** — O comando do D7 (`--list-tests | grep -c "LiveTests"`) não dá `0`: os métodos G3 `LiveTests_Always_CarryTheLiveBrainTrait` e G4 `LiveBrainTrait_OnlyOnClassesNamedLiveTests` rodam em `Category!=LiveBrain` e contêm "LiveTests" no nome. Ajustar o D7 (no plano e no texto idêntico a registrar em `SPRINT_1.md`) para casar só o que identifica os testes live (ex.: nome de classe `...LiveTests.` ou `ContractLiveTests` nos dois filtros) ou renomear G3/G4; mostrar controle positivo e negativo (AP-035).
+- Sugestões a avaliar: S1 (mutações K13/K14 também no Ollama em T4), S2 (K13 citar `RN-BRAIN07`), S3 (apontar o ponto exato da mutação `Skip(1)` em `OllamaTutorBrain`).
