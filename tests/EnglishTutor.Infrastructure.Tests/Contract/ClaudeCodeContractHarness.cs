@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Infrastructure.Brain;
@@ -23,6 +24,8 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
     private readonly FakeTimeProvider _timeProvider = new();
 
     private readonly List<SentToModel> _sent = [];
+
+    private readonly TaskCompletionSource _callStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private int _sessions;
 
@@ -57,7 +60,7 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
 
     public override string UnavailableSettingKey => $"{ClaudeCodeOptions.SectionName}:ExecutablePath";
 
-    public override Task CallStarted => throw new NotImplementedException();
+    public override Task CallStarted => _callStarted.Task;
 
     public override IReadOnlyList<SentToModel> Sent => _sent;
 
@@ -72,9 +75,10 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
                 : ClaudeOutputs.Text(sessionId, modelText));
     }
 
-    public override void EnqueueHang() => throw new NotImplementedException();
+    public override void EnqueueHang() => _processRunner.HangsUntilCancelled();
 
-    public override void EnqueueUnavailable() => throw new NotImplementedException();
+    // ERROR_FILE_NOT_FOUND: the executable does not exist.
+    public override void EnqueueUnavailable() => _processRunner.Throws(new Win32Exception(2));
 
     public override void Advance(TimeSpan time) => _timeProvider.Advance(time);
 
@@ -92,6 +96,7 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
         var argumentIndex = request.Arguments.ToList().IndexOf("--system-prompt-file");
         var systemPrompt = File.ReadAllText(request.Arguments[argumentIndex + 1]);
         _sent.Add(new SentToModel(systemPrompt, request.StandardInput));
+        _callStarted.TrySetResult();
     }
 
     private static bool IsJsonObject(string text)

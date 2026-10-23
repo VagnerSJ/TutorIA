@@ -1,6 +1,9 @@
 using System.Text.Json.Nodes;
 using EnglishTutor.Core.Brain;
+using EnglishTutor.Core.Conversation;
 using EnglishTutor.Infrastructure.Brain;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace EnglishTutor.Infrastructure.Tests.Contract;
 
@@ -217,6 +220,109 @@ public abstract class TutorBrainContractTests : IDisposable
         harness.Sent[1].Conversation.Should().Contain("student t2");
     }
 
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenCallerCancels_PropagatesOperationCanceledException()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueHang();
+        using var cancellation = new CancellationTokenSource();
+        var call = harness.Brain.SendAsync(Request("student t1"), cancellation.Token);
+        await harness.CallStarted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await cancellation.CancelAsync();
+
+        var thrown = await FluentActions
+            .Awaiting(() => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<OperationCanceledException>();
+        thrown.Which.Should().NotBeOfType<BrainException>();
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN09
+    [Fact]
+    public async Task SendAsync_WhenModelDoesNotAnswerInTime_ThrowsTimeoutNamingTheSetting()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueHang();
+        var call = harness.Brain.SendAsync(Request("student t1"), TestContext.Current.CancellationToken);
+        await harness.CallStarted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        harness.Advance(TimeSpan.FromMilliseconds((BrainContractHarness.TimeoutSeconds * 1000) - 1));
+        var pendingBeforeLimit = !call.IsCompleted;
+        harness.Advance(TimeSpan.FromMilliseconds(1));
+        var thrown = await FluentActions
+            .Awaiting(() => call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().ThrowExactlyAsync<BrainException>();
+
+        pendingBeforeLimit.Should().BeTrue();
+        thrown.Which.Kind.Should().Be(BrainErrorKind.Timeout);
+        thrown.Which.Message.Should().Contain($"Brain:{harness.ProviderName}:TimeoutSeconds");
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_WhenProviderIsUnavailable_ThrowsBrainExceptionOfTheProviderKind()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueUnavailable();
+
+        var thrown = await FluentActions
+            .Awaiting(() => harness.Brain.SendAsync(Request("student t1"), TestContext.Current.CancellationToken))
+            .Should().ThrowExactlyAsync<BrainException>();
+
+        thrown.Which.Kind.Should().Be(harness.UnavailableKind);
+        thrown.Which.Message.Should().Contain(harness.UnavailableSettingKey);
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN07
+    [Fact]
+    public async Task SendAsync_AfterFailure_NextCallSucceeds()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueUnavailable();
+        harness.EnqueueModelText(ReplyJson("Reply t2?"));
+        await FluentActions
+            .Awaiting(() => harness.Brain.SendAsync(Request("student t1"), TestContext.Current.CancellationToken))
+            .Should().ThrowExactlyAsync<BrainException>();
+
+        var reply = await harness.Brain.SendAsync(Request("student t2"), TestContext.Current.CancellationToken);
+
+        reply.Reply.Should().Be("Reply t2?");
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores
+    [Fact]
+    public async Task SendAsync_WithNullRequest_ThrowsArgumentNullException()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+
+        await FluentActions
+            .Awaiting(() => harness.Brain.SendAsync(null!, TestContext.Current.CancellationToken))
+            .Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    // US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN04
+    [Fact]
+    public async Task SendAsync_ThroughConversationService_WhenFirstReplyIsInvalid_RetriesOnceAndReturnsSecondReply()
+    {
+        var harness = Harness(BrainOutputModes.JsonSchema);
+        harness.EnqueueModelText("plain words t1 without any tag");
+        harness.EnqueueModelText(ReplyJson("Reply t2?"));
+        var service = new ConversationService(
+            harness.Brain,
+            new FixedPromptSource(),
+            Options.Create(new ConversationOptions()),
+            NullLogger<ConversationService>.Instance);
+
+        var result = await service.SendAsync("student t1", TestContext.Current.CancellationToken);
+
+        result.Reply.Should().NotBeNull();
+        result.Reply!.Reply.Should().Be("Reply t2?");
+        result.Reply.IsRawFallback.Should().BeFalse();
+        harness.Sent.Should().HaveCount(2);
+        harness.Sent[1].Conversation.Should().Contain("format");
+    }
+
     // Every part appears, each after the previous one.
     private static void AssertInOrder(string conversation, params string[] parts)
     {
@@ -234,6 +340,11 @@ public abstract class TutorBrainContractTests : IDisposable
         var harness = CreateHarness(outputMode);
         _harnesses.Add(harness);
         return harness;
+    }
+
+    private sealed class FixedPromptSource : ITutorPromptSource
+    {
+        public Task<string> GetSystemPromptAsync(CancellationToken ct) => Task.FromResult("system t1");
     }
 
     private static BrainRequest Request(string studentText) =>
