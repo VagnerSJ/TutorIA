@@ -56,3 +56,59 @@ Nenhum.
 ## Aprendizados para o processo
 - Dado quantitativo de outra US citado sem a fonte certa (S3, AP-036): ao citar medição anterior, nomear o plano/linha e o provedor medido. Reforça a regra existente de conferir a afirmação no registro de origem antes de usá-la como justificativa de risco.
 - A frase "um caso de teste por ramo" (S1, S2) foi autoafirmada na §2.2 sem tabela de ramo × teste. Sugestão de regra para o Planejador: quando o plano declara cobertura por ramo, incluir a coluna "ramo → teste" na própria tabela de mensagens (G1 a G12), para o Revisor conferir sem reconstruir.
+
+---
+
+## Rodada 2
+
+# Revisão do plano — US-009 Avaliação comparativa dos cérebros (Rodada 2)
+
+Data: 2026-10-23
+Escopo revisado: `C:\Crescimento\TutorIA\tasks\US-009\plan.md` (§1 a §12, inclusive as respostas do Planejador da rodada 2) e `tasks/US-009/plan-review.md` (rodada 1). Conferi também `tasks/US-006/plan.md` (linhas 276 e 891) para a correção do S3. Não reli a spec, o ADR-011 nem o `ARCHITECTURE.md` desta vez, só os trechos "antigo → novo" que o plano cita (conferidos na rodada 1). Branch: `feature/US-009_avaliacao-comparativa-cerebros`, árvore limpa. Não há código de produção da US.
+Resultado: APROVADO (0 bloqueantes, 0 sugestões)
+
+## Verificações (seção "Revisão de plano" do checklist)
+| Item | Resultado |
+|---|---|
+| [O] Cenários S1 a S5 no mapa da §4, com projeto, classe e método `Metodo_Cenario_Resultado` | ✅ Sem mudança desde a rodada 1. A tabela G1–G12 ganhou a coluna "Teste", e cada ramo tem caso. G8 `missing`/`blank` está em P14. G8 de tipo (`null`, array) está em P13. |
+| [O] P* com efeito observável têm teste (§4) e tarefa (§5) | ✅ P1 a P15 na T2 (37 casos). |
+| [O] DoD (§10) cobre a da US, com comandos e resultado esperado | ✅ D1 a D14. D3 pede o line-rate mesclado do Core (≥ 80%). D5 a D7 bate com o texto novo da spec (§2.8 (e)). |
+| [O] R1–R4, `RN-*`, regras rápidas e ADR Proposto | ✅ Sem mudança. |
+| [O] Escopo, fora de escopo e adiamentos (AP-022, AP-040) | ✅ L1 a L6 listam consumidores e efeito. Não há adiamento para outra US. |
+| [O] Consistência §3 × §4 × §5 × §6 (AP-025, AP-046, AP-049) | ✅ Refiz as somas pelas tabelas: E 3+2+3+3+1+3 = 15; M 3+2+2+1+3+2+1+4 = 18; P 1+3+1+4+2+1+2+4+1+3+4+1+6+2+2 = 37; X 12; R 12; B 13; F 1; Core = 108. C 18 e A 11 somam 29 no Console. Total 137. O mesmo número aparece na T2 (37), na T5 (13), no D2 (137, 108 e 29) e no parágrafo de Totais. Não achei "129", "100 casos" nem "33 casos" fora do histórico do §12. |
+| Transformações com teste nos dois lados (AP-015, AP-016) | ✅ Percentual (B2, B3), ms (B4), p95 (X2), limites 0/1/2/3 (P8), G1 só confere trecho do projeto (P3). |
+| Condicionais da §2 (AP-047) | ✅ Os dois buracos da rodada 1 estão fechados. E6 cobre `ContainsWords` com fragmento sem palavras. P15 cobre nomes sensíveis a maiúsculas e propriedade desconhecida, um caso para cada metade. M8 caso 4 declara que uma única `Correction` satisfaz as duas esperadas. |
+| [O] Ordem das tarefas preserva o Red | ✅ T1: E6 e M8 caso 1 nascem verdes, e cada um tem mutação prescrita. Os casos que falham (M8 2, 3 e 4) conferem com o esqueleto. T2: P14 e P15 falham no esqueleto, porque ele devolve resultado válido com 0 frases. T6: 16 dos 18 casos falham (C1–C9 = 14, mais 2 verdadeiros de C10). |
+| AP-051, AP-050, AP-039 | N/A, como na rodada 1. |
+| Critério `LiveBrain` (AP-032, AP-052) | ✅ D6 diz camada, tolerância, 3 rodadas do comando completo, retentativa não exigida e dono da decisão (o usuário). |
+| Justificativas que citam outra US (AP-036) | ✅ Corrigido (ver S3 abaixo). |
+| "Nenhuma linha" na DoD (AP-035) | ✅ D7 tem os dois lados. A T8 fixa a grafia `  "reviewedBy": "",`, e o Executor cola na §11 a linha que o `git grep` acha (código 0) antes de o usuário preencher. |
+| Alteração na `ARCHITECTURE.md` lista `CLAUDE.md` e skills | ✅ Sem mudança. |
+| Riscos e ambiguidades | ✅ A T9 diz que o comando completo do D5 roda 3 vezes seguidas, que essas rodadas são o D5 e o D6 ao mesmo tempo, e que nenhuma é só do ClaudeCode. §7, §9 P7, §10 e a spec (§2.8 (e)) dizem o mesmo. |
+| Viabilidade técnica | ✅ Sem mudança. |
+
+## Itens da rodada anterior
+O usuário mandou aplicar as sugestões S1 a S7. Todas estão resolvidas no plano. Elas não têm hash, porque a revisão do plano ainda não foi commitada. O commit de revisão do plano (`828213c`) é anterior a esta rodada e a rodada 2 ainda não foi commitada.
+- **S1 (G8 `original` ausente ou em branco sem caso)** — resolvido. P14 novo (2 casos). A §4 "Placeholders" cita P14 em `{missing | blank | kind}`. Os totais foram atualizados.
+- **S2 (condicionais sem teste)** — resolvido. E6 cobre `ContainsWords` com fragmento sem palavras (3 casos, nasce verde, com mutação). P15 cobre maiúsculas e propriedade desconhecida (2 casos). M8 explicita o caso de uma única `Correction`. A lista de condicionais da §4 foi atualizada.
+- **S3 (atribuição do 4/5 na §7)** — resolvido. O 4/5 medido é do Ollama (US-006); o Claude Code só tem o mínimo de 4/5 da US-004. Conferi `tasks/US-006/plan.md` (linhas 276 e 891): "frases fora do formato por execução: 2, 0, 1, 0 e 1 de 5". O plano reproduz esse dado do registro de origem e corrige a minha leitura da rodada 1 ("2 de 5 execuções"). O dado do plano é o que está certo.
+- **S4 (grafia do literal do D7)** — resolvido, nas formas descritas na linha D7 acima.
+- **S5 (D6 em 3 execuções)** — resolvido, nas formas descritas na linha "Riscos e ambiguidades" acima. O consumo da assinatura foi recalculado para 96 a 192 chamadas.
+- **S6 (numeração de M8 no Red da T1)** — resolvido. Falham os casos 2, 3 e 4; o caso 1 nasce verde, com a mutação que devolve `expected.Count`.
+- **S7 (`EvalCommandLineParseResult` sem arquivo na §3)** — resolvido. O tipo mora em `EvalCommandLineParser.cs`. A §3 tem linhas separadas para `EvalCommandLine.cs` e `EvalCommandLineParser.cs`, o item 2 da árvore do `ARCHITECTURE.md` (§2.8) o cita, e a T6 manda criar primeiro o `EvalCommandLine.cs`.
+
+## Bloqueantes
+Nenhum.
+
+## Sugestões
+Nenhuma nova.
+
+## Pontos positivos
+- O Planejador conferiu a sugestão S3 contra o registro de origem e corrigiu o detalhe que a revisão tinha errado (AP-036).
+- As contagens foram conferidas nas tabelas e batem em todos os pontos do plano (AP-049).
+- Cada teste que nasce verde tem mutação prescrita, e o Red de cada tarefa confere com o esqueleto.
+- D7 e T8/T9 fecham o lado positivo da verificação de "nenhuma linha".
+
+## Aprendizados para o processo
+- A regra sugerida na rodada 1 ("coluna ramo → teste" na tabela de mensagens) foi seguida: a coluna "Teste" da G1–G12 deixou a conferência direta. Vale registrar como prática do Planejador para tabelas de mensagens com ramos.
+- O Revisor também errou na rodada 1, ao resumir o dado da US-006 sem reler a origem. Ao citar medição de outra US, o relatório da revisão deve copiar o texto da fonte, como o Planejador fez agora (AP-036).
