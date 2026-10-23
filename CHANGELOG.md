@@ -46,3 +46,6 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: `FallbackTutorBrain` (decorator), `BrainFallbackPolicy` e a porta `IBrainSwitchNotifier` no Core, implementada pelo console; ADR-010 (US-007).
 - Added: `Brain:FallbackProvider` validado na partida: provedor desconhecido ou igual a `Brain:Provider` encerra o app com código 2 e mensagem que diz o esperado (US-007).
 - Changed: sem a partida do host (ex.: DI nos testes), `Brain:Provider` vazio ou inválido deixa de cair em silêncio no Claude Code e lança erro com os provedores aceitos (US-007).
+- Added: suíte de contrato do `ITutorBrain` (`TutorBrainContractTests`) executada para `ClaudeCode` e `Ollama` com fakes de processo e de cliente de chat: formatos de saída, perguntas, janela completa, ausência de estado, timeout, inalcançável, cancelamento e retentativa (RN-BRAIN01, RN-BRAIN03, RN-BRAIN04, RN-BRAIN07, RN-BRAIN09) (US-008).
+- Added: guardas por reflexão que exigem uma subclasse por provedor e mantêm o trait `LiveBrain` só nas classes `*LiveTests` (US-008).
+- Added: testes de conformidade `LiveBrain` (`ClaudeCodeContractLiveTests`, `OllamaContractLiveTests`) contra os provedores reais, excluídos de `Category!=LiveBrain` (US-008).
