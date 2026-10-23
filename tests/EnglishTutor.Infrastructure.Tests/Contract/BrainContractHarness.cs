@@ -29,8 +29,9 @@ public abstract class BrainContractHarness : IDisposable
     // Next answer of the "model".
     public abstract void EnqueueModelText(string modelText);
 
-    // The next call ends only by cancellation.
-    public abstract void EnqueueHang();
+    // The next call ends only by cancellation; onCancelled runs after the token is cancelled and before the
+    // exception leaves the fake.
+    public abstract void EnqueueHang(Action? onCancelled = null);
 
     // The next call finds the process or the server unreachable.
     public abstract void EnqueueUnavailable();

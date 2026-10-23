@@ -75,7 +75,7 @@ public sealed class ClaudeCodeContractHarness : BrainContractHarness
                 : ClaudeOutputs.Text(sessionId, modelText));
     }
 
-    public override void EnqueueHang() => _processRunner.HangsUntilCancelled();
+    public override void EnqueueHang(Action? onCancelled = null) => _processRunner.HangsUntilCancelled(onCancelled);
 
     // ERROR_FILE_NOT_FOUND: the executable does not exist.
     public override void EnqueueUnavailable() => _processRunner.Throws(new Win32Exception(2));

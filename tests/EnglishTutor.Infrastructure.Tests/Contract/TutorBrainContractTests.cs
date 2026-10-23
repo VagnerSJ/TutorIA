@@ -225,7 +225,8 @@ public abstract class TutorBrainContractTests : IDisposable
     public async Task SendAsync_WhenCallerCancels_PropagatesOperationCanceledException()
     {
         var harness = Harness(BrainOutputModes.JsonSchema);
-        harness.EnqueueHang();
+        // The time limit also expires while the call ends: the caller's cancellation still wins.
+        harness.EnqueueHang(() => harness.Advance(TimeSpan.FromSeconds(BrainContractHarness.TimeoutSeconds)));
         using var cancellation = new CancellationTokenSource();
         var call = harness.Brain.SendAsync(Request("student t1"), cancellation.Token);
         await harness.CallStarted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
