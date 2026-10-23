@@ -80,7 +80,7 @@ Cada trecho é identificado pelo texto antigo (AP-023). Os comandos de busca for
 
 ```
 | D6 | `dotnet test --filter "FullyQualifiedName~ClaudeCodeTutorBrainContractTests"` e o mesmo com `OllamaTutorBrainContractTests` | verde, com o mesmo número de testes nos dois (o contrato inteiro roda por provedor) |
-| D7 | (Git Bash) `dotnet test --no-build --filter "Category!=LiveBrain" --list-tests \| grep -c "LiveTests"` e `dotnet test --no-build --filter "Category=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` | `0` no primeiro (código de saída 1 com contagem 0 é o esperado); pelo menos `2` no segundo: os testes live não entram em `Category!=LiveBrain` e aparecem em `Category=LiveBrain` |
+| D7 | (Git Bash) `dotnet test --no-build --filter "Category!=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` e `dotnet test --no-build --filter "Category=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` | `0` no primeiro (código de saída 1 com contagem 0 é o esperado); pelo menos `2` no segundo: os testes live não entram em `Category!=LiveBrain` e aparecem em `Category=LiveBrain` |
 | D8 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ContractLiveTests"`, com a CLI do Claude Code autenticada e o Ollama rodando com o modelo padrão baixado | verde em 3 rodadas seguidas: cada provedor responde 2 turnos pelo `ConversationService` sem cair na resposta crua (a retentativa única do ADR-006 vale) |
 ```
 
@@ -129,7 +129,7 @@ Projeto: `EnglishTutor.Infrastructure.Tests`. Os K rodam **uma vez por subclasse
 | mesma suíte (RN-BRAIN09) | `TutorBrainContractTests` | K10 `SendAsync_WhenCallerCancels_PropagatesOperationCanceledException` (espera limitada; não é `BrainException`) | 1 | Contrato |
 | mesma suíte (RN-BRAIN09) | `TutorBrainContractTests` | K11 `SendAsync_WhenModelDoesNotAnswerInTime_ThrowsTimeoutNamingTheSetting` (a 999 ms a chamada segue pendente; a 1000 ms lança `BrainException` `Timeout` cuja mensagem contém `Brain:<Provedor>:TimeoutSeconds`; os dois lados do limite, AP-016) | 1 | Contrato |
 | mesma suíte (RN-BRAIN07) | `TutorBrainContractTests` | K12 `SendAsync_WhenProviderIsUnavailable_ThrowsBrainExceptionOfTheProviderKind` (tipo exato `BrainException`; `Kind` = `UnavailableKind`; mensagem contém `UnavailableSettingKey`) | 1 | Contrato |
-| mesma suíte (RN-BRAIN01) | `TutorBrainContractTests` | K13 `SendAsync_AfterFailure_NextCallSucceeds` (inalcançável e depois resposta válida) | 1 | Contrato |
+| mesma suíte (RN-BRAIN07) | `TutorBrainContractTests` | K13 `SendAsync_AfterFailure_NextCallSucceeds` (inalcançável e depois resposta válida) | 1 | Contrato |
 | mesma suíte | `TutorBrainContractTests` | K14 `SendAsync_WithNullRequest_ThrowsArgumentNullException` | 1 | Contrato |
 | mesma suíte (RN-BRAIN04) | `TutorBrainContractTests` | K15 `SendAsync_ThroughConversationService_WhenFirstReplyIsInvalid_RetriesOnceAndReturnsSecondReply` (`ConversationService` real; 1ª resposta `plain words t1 without any tag`, 2ª válida `t2`; resposta `Reply t2?`, não crua; 2 chamadas ao modelo; a 2ª `Conversation` contém a instrução de correção com `format`) | 1 | Contrato |
 | mesma suíte | `ContractSuiteStructureTests` | G1 `ContractSuite_ForEveryKnownProvider_HasOneConcreteSubclass` (Theory sobre `BrainProviders.All`: `<Provedor>TutorBrainContractTests` existe, não é abstrata e herda da base) | 2 | Unidade (reflexão) |
@@ -142,7 +142,7 @@ Projeto: `EnglishTutor.Infrastructure.Tests`. Os K rodam **uma vez por subclasse
 
 Total por subclasse: K1 a K15 somam **23 casos** (1+2+2+2+2+3+1+2+1+1+1+1+1+1+1+1 = 23, em 16 métodos), **46** nas duas. G1–G5 somam 6 casos. L1 e L2 não entram na suíte rápida.
 
-Cada comentário de teste cita a US e o nome exato do cenário: `// US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN03` (K2–K5), `— RN-BRAIN01` (K6–K9, K13), `— RN-BRAIN09` (K10, K11), `— RN-BRAIN07` (K12), `— RN-BRAIN04` (K15); `// US-008 — Cenário: testes live opcionais` (G3–G5, L1, L2); K1, K14, G1 e G2: `— Cenário: mesma suíte para todos os provedores`.
+Cada comentário de teste cita a US e o nome exato do cenário: `// US-008 — Cenário: mesma suíte para todos os provedores — RN-BRAIN03` (K2–K5), `— RN-BRAIN01` (K6–K9), `— RN-BRAIN09` (K10, K11), `— RN-BRAIN07` (K12, K13), `— RN-BRAIN04` (K15); `// US-008 — Cenário: testes live opcionais` (G3–G5, L1, L2); K1, K14, G1 e G2: `— Cenário: mesma suíte para todos os provedores`.
 
 **Condicionais da §2 (AP-047).** "Se o texto é objeto JSON e o modo é JsonSchema, vai por `structured_output`; senão por texto": caminho estruturado em K2 (JsonSchema) e K4b; caminho de texto em K2 (Tags) e nas três linhas de K5 (a do JSON truncado prova que um `{` que não é objeto válido cai no texto). "Instância nova recebe a janela inteira": K6, K7. "Pedido que estende o anterior": K9 (resultado, não texto). "Cada provedor tem o seu tipo para inalcançável": K12 nos dois (CliNotFound × Unknown). "Subclasses não declaram testes": G2. "Todo provedor tem subclasse": G1. "Live fora de `Category!=LiveBrain`": G3–G5 e D7. As duas fontes de falha dos adaptadores (processo × HTTP) passam pela mesma assertiva K12/K13 em papéis trocados (um provedor lança `Win32Exception`, o outro `HttpRequestException`).
 
@@ -171,7 +171,7 @@ Esta US não escreve código de produção: todo o trabalho é código de teste.
 
 - [ ] **T4 — Subclasse do Ollama e guardas da suíte (G1, G2)**
   Red: primeiro `ContractSuiteStructureTests` (G1, G2). Falha: **G1 para `Ollama`** (não existe `OllamaTutorBrainContractTests`). Nascem verdes: G1 para `ClaudeCode` e G2 (mutação do G2: declarar um `[Fact]` em `ClaudeCodeTutorBrainContractTests`).
-  Green: `OllamaContractHarness` e `OllamaTutorBrainContractTests`; os 23 casos do Ollama nascem verdes. Mutações equivalentes às das T1–T3, aplicadas ao `OllamaTutorBrain`: K1 `Name`; K2 perde as correções; K5 `RawText` vazio; K6/K7 `Skip(1)` na conversão de mensagens; K8 histórico acumulado em campo; K10 sem `&& !ct.IsCancellationRequested`; K11 `TimeoutSeconds` ×2; K12 `IsServerFailure` devolve falso (a `HttpRequestException` vaza); K15 `Unknown` no lugar de `InvalidOutput`.
+  Green: `OllamaContractHarness` e `OllamaTutorBrainContractTests`; os 23 casos do Ollama nascem verdes. Mutações equivalentes às das T1–T3, aplicadas ao `OllamaTutorBrain`: K1 `Name`; K2 perde as correções; K3 acrescenta `Praise = "x"`; K4a `_maxQuestions` do validador a 1; K4b `_maxQuestions` a 3 e `_minQuestions` a 0; K5 `RawText` vazio; K6/K7 `Skip(1)` na linha `messages.AddRange(request.Messages.Select(ToChatMessage));` de `OllamaTutorBrain.SendAsync` (passa a `request.Messages.Skip(1).Select(...)`); K8 histórico acumulado em campo; K9 a 2ª chamada devolve a resposta da 1ª; K10 sem `&& !ct.IsCancellationRequested` no `catch` do Timeout; K11 `TimeoutSeconds` ×2; K12 `IsServerFailure` devolve falso (a `HttpRequestException` vaza); K13 o adaptador guarda a falha e a relança na chamada seguinte; K14 remover `ArgumentNullException.ThrowIfNull(request)`; K15 `Unknown` no lugar de `InvalidOutput`.
   Commit: dois commits em ordem: `test(brain): add contract suite structure guards` (G1 vermelho para o Ollama) e `test(brain): run the contract suite for Ollama` (subclasse e bancada; G1 verde).
   Escolhas de forma: nenhuma
 
@@ -195,7 +195,7 @@ Nenhum pacote novo. (`Microsoft.Extensions.TimeProvider.Testing`, `Microsoft.Ext
 | **L3 (limite aceito): K12 usa tipos diferentes por provedor** (Claude Code `CliNotFound`, Ollama `Unknown`) | Reflete o ADR-009 e o limite L3 da US-007. Se uma US futura criar `ProviderUnavailable`, a propriedade `UnavailableKind` da bancada muda num ponto só |
 | `Sent.Conversation` do Claude Code com `--resume` manda só a última mensagem | K6/K7 usam instância nova; K9 confere resultado; K8 usa janelas sem relação (§2.3) |
 | O `RawText` do Claude Code em `structured_output` pode diferir do texto enviado (re-serialização) | K4b usa `Contain` com rótulo único; só K5 usa igualdade, e com textos que seguem pelo caminho de texto |
-| `dotnet test --list-tests` pode não imprimir o nome completo da classe | O D7 é a contagem de linhas com `LiveTests`; se o formato não mostrar a classe, o Executor registra na §11 e usa o resumo do `--logger "console;verbosity=normal"` como controle, com um controle positivo (`Category=LiveBrain` lista os testes live) |
+| `dotnet test --list-tests` pode não imprimir o nome completo da classe | O D7 é a contagem de linhas com `ContractLiveTests`, subcadeia que só existe nos nomes das duas classes live: nenhum método planejado na §4 (K1–K15, G1–G5, L1, L2) a contém, então as guardas G3/G4 (que rodam em `Category!=LiveBrain`) não a casam; o controle negativo é o primeiro filtro (0) e o positivo, o segundo (≥ 2). Se o formato não mostrar a classe, o Executor registra na §11 e usa o resumo do `--logger "console;verbosity=normal"` como controle, com um controle positivo (`Category=LiveBrain` lista os testes live) |
 | O D5 da spec filtra por `ContractTests` e arrastaria testes live | Nomes `*ContractLiveTests` e `ContractSuiteStructureTests` não contêm a subcadeia `ContractTests` (§2.4) |
 | Hook de edição acusa símbolo inexistente ao criar o par bancada/suíte (AP-044) | Criar primeiro o arquivo que declara e depois o que usa; se o hook falhar logo após a primeira edição, editar o outro arquivo antes de investigar |
 
@@ -217,7 +217,7 @@ Adiamentos procurados nas P*, nos comentários de teste e nos ADRs (AP-040): os 
 - **P5 — O `FallbackTutorBrain` fica fora.** Resposta padrão: sim (decisão da US-007 §8); a suíte cobre os provedores de `BrainProviders.All`. Teste: `ContractSuiteStructureTests.ContractSuite_ForEveryKnownProvider_HasOneConcreteSubclass`.
 - **P6 — Resume do Claude Code e o contrato de janela.** Resposta padrão: janela completa provada com instância nova; pedido que estende o anterior prova só o resultado (§2.3). Teste: `TutorBrainContractTests.SendAsync_WhenSecondRequestExtendsTheFirst_ReturnsTheSecondAnswer`.
 - **P7 — Tags e JSON no contrato.** Resposta padrão: os dois modos de saída entram em K2 e K3; os demais usam `JsonSchema` (o parser é único e já tem testes próprios). Teste: `TutorBrainContractTests.SendAsync_WithEachOutputMode_ReturnsTheSameTutorReply`.
-- **P8 — Formato de `--list-tests` na DoD D7.** Resposta padrão: contagem de linhas com `LiveTests`; se a saída não trouxer a classe, ver riscos. Sem efeito observável (só o comando da DoD).
+- **P8 — Formato de `--list-tests` na DoD D7.** Resposta padrão: contagem de linhas com `ContractLiveTests` (B1); se a saída não trouxer a classe, ver riscos. Sem efeito observável (só o comando da DoD).
 
 ## 10. Definition of Done (comandos verificáveis)
 
@@ -229,7 +229,7 @@ Adiamentos procurados nas P*, nos comentários de teste e nos ADRs (AP-040): os 
 | D4 | `dotnet format --verify-no-changes` | sem diferenças |
 | D5 | `dotnet test --filter "FullyQualifiedName~ContractTests" --logger "console;verbosity=normal"` (da spec) | os mesmos 16 testes do contrato (23 casos) listados para `ClaudeCodeTutorBrainContractTests` e para `OllamaTutorBrainContractTests`, todos verdes (46 casos) |
 | D6 | `dotnet test --filter "FullyQualifiedName~ClaudeCodeTutorBrainContractTests"` e o mesmo com `OllamaTutorBrainContractTests` | verde, 23 testes passados em cada um |
-| D7 | (Git Bash) `dotnet test --no-build --filter "Category!=LiveBrain" --list-tests \| grep -c "LiveTests"` e `dotnet test --no-build --filter "Category=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` | `0` no primeiro (saída 1 com contagem 0 é o esperado) e pelo menos `2` no segundo (controle positivo, AP-035) |
+| D7 | (Git Bash) `dotnet test --no-build --filter "Category!=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` e `dotnet test --no-build --filter "Category=LiveBrain" --list-tests \| grep -c "ContractLiveTests"` | `0` no primeiro (código de saída 1 com contagem 0 é o esperado); pelo menos `2` no segundo: os testes live não entram em `Category!=LiveBrain` e aparecem em `Category=LiveBrain` |
 | D8 | `dotnet test --filter "Category=LiveBrain&FullyQualifiedName~ContractLiveTests"`, no ambiente do usuário, com a CLI `claude` autenticada e o Ollama rodando com `qwen2.5:14b-instruct-q4_K_M` baixado | verde (2 testes) em **3 rodadas seguidas**; critério e tolerância em §2.4; sem Ollama ou sem a CLI no ambiente, o Executor registra "não reproduzido" na §11 e o usuário decide |
 | D9 | `dotnet test --filter "FullyQualifiedName~ContractSuiteStructureTests\|FullyQualifiedName~LiveBrainTraitTests"` | verde (G1–G5, 6 casos) |
 | D10 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha (continua valendo da US-007; código de saída 1) |
@@ -248,3 +248,9 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
 ### 2026-10-22 — pedido do Revisor do plano (rodada 1)
 - **B1** — O comando do D7 (`--list-tests | grep -c "LiveTests"`) não dá `0`: os métodos G3 `LiveTests_Always_CarryTheLiveBrainTrait` e G4 `LiveBrainTrait_OnlyOnClassesNamedLiveTests` rodam em `Category!=LiveBrain` e contêm "LiveTests" no nome. Ajustar o D7 (no plano e no texto idêntico a registrar em `SPRINT_1.md`) para casar só o que identifica os testes live (ex.: nome de classe `...LiveTests.` ou `ContractLiveTests` nos dois filtros) ou renomear G3/G4; mostrar controle positivo e negativo (AP-035).
 - Sugestões a avaliar: S1 (mutações K13/K14 também no Ollama em T4), S2 (K13 citar `RN-BRAIN07`), S3 (apontar o ponto exato da mutação `Skip(1)` em `OllamaTutorBrain`).
+
+Respostas do Planejador (rodada 1):
+- **B1** → Incorporado em §2.6 (Commit 1, D7), §7 (linha do `--list-tests`), §9 P8 e §10 D7. O padrão passou a ser `ContractLiveTests` nos dois filtros. Essa subcadeia só existe nos nomes das duas classes live, e nenhum método da §4 a contém (G3 `LiveTests_Always_CarryTheLiveBrainTrait` e G4 `LiveBrainTrait_OnlyOnClassesNamedLiveTests` não casam). Controle negativo = primeiro filtro (0); positivo = segundo (≥ 2). O texto do D7 é idêntico na §2.6 e na §10. G3/G4 não foram renomeados.
+- **S1** → §5 T4: acrescentadas as mutações K3, K4a/K4b, K9, K13 e K14 para o Ollama.
+- **S2** → §4 (linha de K13 e linha de comentários): K13 passa a citar `RN-BRAIN07`.
+- **S3** → §5 T4: a mutação `Skip(1)` aponta a linha `messages.AddRange(request.Messages.Select(ToChatMessage));` de `OllamaTutorBrain.SendAsync` (conferida na linha 54 de `OllamaTutorBrain.cs`).
