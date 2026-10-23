@@ -268,8 +268,8 @@ SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala tran
 |---|---|---|
 | Unidade (TDD) | `EnglishTutor.Core.Tests` | xUnit, FluentAssertions, NSubstitute; fakes de todas as portas |
 | Parser / fixtures | `EnglishTutor.Infrastructure.Tests` | saídas reais gravadas em `Fixtures/` (Claude Code JSON, Ollama JSON) a partir da US-004; até lá (US-002), exemplos da spec em `Fixtures/TutorReply/` |
-| Contrato | `Infrastructure.Tests/Contract/TutorBrainContractTests` (classe abstrata) | uma subclasse por provedor; fake de processo/HTTP |
-| Live | mesmas classes com `[Trait("Category","LiveBrain")]` | excluídas por padrão: `dotnet test --filter "Category!=LiveBrain"` |
+| Contrato | `Infrastructure.Tests/Contract/TutorBrainContractTests` (classe abstrata) | uma subclasse por provedor (`ClaudeCodeTutorBrainContractTests`, `OllamaTutorBrainContractTests`), sem testes próprios; fake de processo/HTTP por trás de uma bancada por provedor |
+| Live | classes `*LiveTests` (as de contrato: `<Provedor>ContractLiveTests`, com o `ConversationService` real sobre o adaptador real) com `[Trait("Category","LiveBrain")]` | excluídas por padrão: `dotnet test --filter "Category!=LiveBrain"` |
 | Avaliação | comando `eval` + `eval/golden-set.json` | relatório em `eval/reports/` |
 
 Meta: cobertura de linhas do Core ≥ 80% (coverlet).
