@@ -424,17 +424,17 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Commit: `test(eval): cover the eval command end to end` + `feat(eval): add the eval command`.
   Escolhas de forma: §12 em 4c2a7bd e e128bcd
 
-- [ ] **T8 — Golden set e guia (F1)**
+- [x] **T8 — Golden set e guia (F1)** — feito: 63f43de (Red 6d218a8); `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` achou `eval/golden-set.json:2:  "reviewedBy": "",` (código 0) antes do commit
   Red: `GoldenSetFileTests.GoldenSetFile_InRepository_IsValidWithAtLeastThirtySentences`, que falha (`eval/` só tem `.gitkeep`; o teste reporta "arquivo não encontrado").
   Green: `eval/golden-set.json` com as 32 frases da §2.9 (sem alterar texto) e `reviewedBy` gravado **exatamente** como a linha `  "reviewedBy": "",` (aspas, dois-pontos, **um** espaço, duas aspas, em linha própria), a grafia que o `git grep -n -F '"reviewedBy": ""'` do D7 procura; e `eval/README.md` (formato, como o critério casa, como ampliar `accepted`, comando de execução em Windows PowerShell 5.1 e Bash, aviso de que `reviewedBy` é do usuário). Antes do commit, o Executor roda o `git grep` do D7 e confere que acha essa linha (código 0); a saída vai à §11 na T9.
   Refactor: nenhum previsto.
   Commit: `test(eval): guard the golden set file` + `feat(eval): add the golden set draft and the eval guide`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
-- [ ] **T9 — Execuções reais e evidências (D5–D14)**
+- [x] **T9 — Execuções reais e evidências (D5–D14)** — feito (evidências na §11; commit `docs(ai): add DoD evidence for US-009`)
   Sem código. O Executor aquece o modelo do Ollama (uma chamada antes, para a 1ª frase não estourar `TimeoutSeconds`, L3) e roda o **comando completo do D5 (com `ClaudeCode,Ollama`) 3 vezes seguidas**: as três rodadas são, ao mesmo tempo, o D5 e o D6 (a 1ª prova o D5; as 3 provam o D6; nenhuma rodada é só do ClaudeCode). Depois roda o D8 a D11 e cola na §11 a saída resumida, as linhas dos provedores de cada relatório e, para o D7, a linha que o `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` acha **antes** de o usuário preencher `reviewedBy` (código 0, lado positivo da verificação, AP-035). O `reviewedBy` é do usuário: enquanto vazio, o Executor registra "D7: pendente de revisão do usuário" e o D6 vale como provisório. Se qualquer rodada do D6 ficar `not met`, o Executor **não** altera o golden set, o critério nem os limiares: registra os números e para; quem decide é o usuário, com registro prévio na spec (AP-032).
   Commit: `docs(ai): add DoD evidence for US-009` (feito pelo Executor ao fim).
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
 ## 6. Pacotes NuGet
 
@@ -515,6 +515,29 @@ Notas: a US mexe no console, então D8 a D11 rodam no Windows PowerShell 5.1 e o
 
 ## 11. Evidências
 _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+Código da US em `63f43de` (último commit de produção/teste/dados). Datas: 2026-10-23 (horário local; os relatórios saem em UTC, 2026-10-24).
+
+- D1 — `dotnet build` → 0 avisos, 0 erros (2026-10-23, 63f43de)
+- D2 — `dotnet test --filter "Category!=LiveBrain"` → Core 263, Infrastructure 261, Console 100: 624 passed, 0 failed, cada projeto em menos de 1 s (2026-10-23, 63f43de). Contagem nova: Core 155 → 263 (+108), Console 71 → 100 (+29), total +137, igual ao plano.
+- D3 — `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` + `dotnet tool run reportgenerator` sobre os três `coverage.cobertura.xml` → assembly `EnglishTutor.Core` **98,3%** de linhas (mesclado; total do relatório 91,7%); `Evaluation/` por classe: CorrectionMatcher, EvalMetrics, EvalReportBuilder, EvalText, EvalThresholds e modelos 100%; EvalRunner 94,8%; GoldenSetParser 93,4% (ramos sem teste: elemento de `sentences`/`expected` que não é objeto e item de `accepted` não textual, §12) (2026-10-23, 63f43de)
+- D4 — `dotnet format --verify-no-changes` → sem diferenças, código de saída 0 (2026-10-23, 63f43de)
+- D5 — `dotnet run --project src/EnglishTutor.Console -- eval --providers ClaudeCode,Ollama` no Windows PowerShell 5.1, 3 vezes seguidas (CLI `claude` autenticada; Ollama com `qwen2.5:14b-instruct-q4_K_M`, aquecido por uma chamada a `/api/generate`) → em cada rodada `Evaluating ClaudeCode (32 sentences)...`, `Evaluating Ollama (32 sentences)...`, a tabela com as duas linhas, `Report saved to ...\eval\reports\eval-<data>.md` e `exit=0`; arquivos `eval-20261024-004905.md`, `eval-20261024-005333.md`, `eval-20261024-005838.md` (2026-10-23, 63f43de)
+- D6 — linhas do ClaudeCode nas três rodadas do D5 (todas `met`):
+  - rodada 1: `| ClaudeCode | evaluated | 96.9% (31/32) | 100.0% (32/32) | 100.0% (32/32) | 5750 ms | 6680 ms | met |`
+  - rodada 2: `| ClaudeCode | evaluated | 93.8% (30/32) | 100.0% (32/32) | 100.0% (32/32) | 6685 ms | 6842 ms | met |`
+  - rodada 3: `| ClaudeCode | evaluated | 100.0% (32/32) | 100.0% (32/32) | 100.0% (32/32) | 5644 ms | 6673 ms | met |`
+  - Ollama nas mesmas rodadas (informativo, sem limiar nesta US): 56,2% (18/32), 59,4% (19/32), 62,5% (20/32) das correções; formato sem retentativa 100%, 96,9% (31/32) e 100%; `not met` nas três. Os números do Ollama ficam abaixo do 80% do PRODUCT para correções: a US que ajustar o modelo ou o `accepted` precisa registrar a decisão na spec antes (§7). `reviewedBy` ainda vazio, então o D6 vale como **provisório** até a revisão do usuário (D7).
+- D7 — `dotnet test --filter "FullyQualifiedName~GoldenSetFileTests"` → 1 passed; `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` → `eval/golden-set.json:2:  "reviewedBy": "",` (código 0, lado positivo). **Pendente de revisão do usuário**: o lado final (preencher `reviewedBy` e o `git grep` sem linha, código 1) é do usuário (2026-10-23, 63f43de)
+- D8 — `$env:Brain__Ollama__Endpoint="http://localhost:1"; dotnet run ... -- eval --providers Ollama; "exit=$LASTEXITCODE"` → `| Ollama | unavailable | - | - | - | - | - | - |`, `exit=0`; o relatório lista em `Unavailable providers` o motivo `Ollama is not running at "http://localhost:1". Start it (...)` e não tem `Details: Ollama` (2026-10-23, 63f43de)
+- D9 — `"/quit" | dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` → `EnglishTutor`, `Brain: ClaudeCode | Mode: free-conversation`, `Type /help for commands or /quit to exit.`, `exit=0` (2026-10-23, 63f43de)
+- D10 — `dotnet run ... -- eval --providers Inexistente 2>&1; "exit=$LASTEXITCODE"` → `Unknown provider 'Inexistente'. Accepted values: ClaudeCode, Ollama.` (com `Invalid eval arguments:` e `Usage:`), `exit=2`; nenhum arquivo novo em `eval/reports/` (contagem 0 antes do D8) (2026-10-23, 63f43de)
+- D11 — `... -- eval --providers ClaudeCode,Ollama --golden-set eval/nao-existe.json` e `... --providers "ClaudeCode,Ollama" ...` → nas duas, `Golden set not found: eval/nao-existe.json. Expected a JSON file ...` e `exit=2`, sem `Unknown provider` e sem chamar modelo (2026-10-23, 63f43de)
+- D12 — `git diff --name-only develop...HEAD -- src/EnglishTutor.Infrastructure` → nenhuma linha (2026-10-23, 63f43de)
+- D13 — `git diff develop...HEAD | LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'` → `0` (código de saída 1) (2026-10-23, 63f43de)
+- D14 — `git status --short` depois de D2–D11 → vazio (`eval/reports/`, `TestResults/`, `bin/`, `obj/` ignorados) (2026-10-23, 63f43de)
+
+Estado real do §3 e do §5 (AP-005): todos os arquivos da §3 foram criados/alterados como descrito (nenhum "Criar" para arquivo preexistente); o gancho de relógio do `FakeTutorBrain` ficou como overloads `Returns(reply, onCall)`/`ReturnsInvalid(raw, rejection, onCall)`; `AddEnglishTutorCore` também registra `TimeProvider.System` por `TryAddSingleton` (§12). Desvios sem mudança de comportamento: (1) E4, mutação "não descartar pedaços vazios": só o caso `"..."` falha, porque `StringSplitOptions.RemoveEmptyEntries` já cobre `""` e `"   "`; (2) P15 virou um `[Theory]` de 2 casos (o Red usou um `[Fact]` que cobria as duas metades; ajuste em `a51f3d0`); (3) o relatório é datado no início do comando (§12).
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
