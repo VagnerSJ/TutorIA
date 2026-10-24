@@ -1,5 +1,6 @@
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Evaluation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -19,6 +20,10 @@ public static class CoreServiceCollectionExtensions
 
         // One session per process: the service owns the history and the mode (US-004).
         services.TryAddSingleton<ConversationService>();
+
+        // Eval (US-009): the runner builds its own ConversationService per sentence.
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<EvalRunner>();
         return services;
     }
 }
