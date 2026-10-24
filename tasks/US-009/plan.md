@@ -403,12 +403,12 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Commit: `test(eval): cover the eval runner` + `feat(eval): add the eval runner`.
   Escolhas de forma: §12 em 0cc48d6
 
-- [ ] **T5 — Relatório (B1–B9)**
+- [x] **T5 — Relatório (B1–B9)** — feito: a4fd584 (Red 98ea737)
   Red: `EvalReportBuilder.Build` devolve `""` e `SummaryTable` devolve lista vazia. Falham os 13 casos (todo teste exige conteúdo presente; B9 exige também a linha `unavailable` no resumo). Nenhum nasce verde.
   Green: §2.6 (layout e transformações).
   Refactor: formatadores de percentual e de milissegundos em métodos privados únicos.
   Commit: `test(eval): cover the eval report` + `feat(eval): build the markdown eval report`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: §12 em f587058
 
 - [ ] **T6 — Argumentos do `eval` (C1–C10)**
   Red: `EvalCommandLine(IReadOnlyList<string> Providers, string GoldenSetPath, string ReportsDirectory)` (em `EvalCommandLine.cs`), `EvalCommandLineParseResult` (em `EvalCommandLineParser.cs`, criado primeiro o `EvalCommandLine.cs`); `IsEvalCommand` devolve `false`; `Parse` devolve resultado válido com `EvalCommandLine([], "", "")`. Falham: C1 a C9 (14 casos) e os 2 casos verdadeiros de C10 (16 dos 18). **Nascem verdes**: C10 `[]` e `--Brain:Provider Ollama` (devolvem `false`). Mutações depois do Green: C10 `[]` — `IsEvalCommand` devolve `true` para lista vazia; C10 `--Brain:Provider Ollama` — `IsEvalCommand` devolve `true` para qualquer lista não vazia.
