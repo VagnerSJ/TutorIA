@@ -534,8 +534,8 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Quem errou:** planejador (redação da spec) e executor (descoberta tardia)
 - **O que aconteceu:** a spec (D8/D9 da US-007) e os testes C2/C3 falam da "linha `Switched to ...`". Na saída padrão do console o prompt `> ` não é seguido de quebra de linha, então o aviso sai como `> Switched to Ollama (CLI not found)`, igual a `> Tutor: ...`. Os testes C2/C3 passaram a usar `EndsWith` e a DoD confere o trecho. O prefixo é do prompt, não do aviso, e a spec ficou com redação mais estreita do que o comportamento real.
 - **Por que importa:** qualquer teste de componente ou comando de DoD que procure uma linha exata na saída do console falha por causa do prefixo; o erro aparece só na execução real (D8).
-- **Correção (proposta, não aplicada):** (a) `.claude/skills/bdd-para-testes/SKILL.md`: "no console, o prompt `> ` não quebra linha: testes que procuram uma linha de saída consideram o prefixo (`EndsWith`/`Contains`), e cenários e DoD dizem 'a saída contém', não 'a linha'"; (b) `.claude/agents/planejador.md`: ao escrever critério de saída do console, usar 'a saída contém'. Para a US-007, a redação de D8 e D9 em `specs/sprints/SPRINT_1.md` ("a linha `Switched to`") pode ser ajustada para "a saída contém"; isso é spec e depende de decisão do usuário (o Documentador não altera a spec).
-- **Status:** Proposta
+- **Correção (proposta, não aplicada):** (a) `.claude/skills/bdd-para-testes/SKILL.md`: "no console, o prompt `> ` não quebra linha: testes que procuram uma linha de saída consideram o prefixo (`EndsWith`/`Contains`), e cenários e DoD dizem 'a saída contém', não 'a linha'"; (b) `.claude/agents/planejador.md`: ao escrever critério de saída do console, usar 'a saída contém'. Para a US-007, a redação de D8 e D9 em `specs/sprints/SPRINT_1.md` ("a linha `Switched to`") pode ser ajustada para "a saída contém"; isso é spec e depende de decisão do usuário (o Documentador não altera a spec). Aplicada também em D8 e D9 da US-007 (aprovado pelo usuário).
+- **Status:** Aplicada (2026-10-23)
 
 ### AP-058 — Mutação prescrita no plano para provar o Red não falhava o teste
 
