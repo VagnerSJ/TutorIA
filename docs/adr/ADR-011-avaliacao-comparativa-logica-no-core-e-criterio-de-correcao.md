@@ -1,6 +1,6 @@
 # ADR-011 — Avaliação comparativa: lógica no Core, comando no Console e critério de "correção encontrada"
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-10-23)
 - **Data:** 2026-10-23
 - **US relacionadas:** US-009 (e, como consumidoras, as US de cérebro das sprints seguintes, que usam a nota mínima do `eval` na DoD)
 

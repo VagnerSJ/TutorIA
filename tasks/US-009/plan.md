@@ -1,9 +1,9 @@
 # Plano — US-009 Avaliação comparativa dos cérebros
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-23
 Branch: feature/US-009_avaliacao-comparativa-cerebros
 Spec: specs/sprints/SPRINT_1.md#us-009
-Regras: PRODUCT (métricas de sucesso); RN-BRAIN04, RN-BRAIN07 (tocadas, sem mudança); RN-FEED01, RN-FEED02 (consumidas); ARCHITECTURE §2 (R1, R4), §3, §6.5, §10; ADR-006, ADR-010 (consumidos); ADR-011 (novo, Proposto)
+Regras: PRODUCT (métricas de sucesso); RN-BRAIN04, RN-BRAIN07 (tocadas, sem mudança); RN-FEED01, RN-FEED02 (consumidas); ARCHITECTURE §2 (R1, R4), §3, §6.5, §10; ADR-006, ADR-010 (consumidos); ADR-011 (novo, Aceito)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Um comando `EnglishTutor.Console eval --providers ClaudeCode,Ollama` que roda um
 
 ## 2. Abordagem
 
-Decisão técnica relevante nova: **ADR-011** (`docs/adr/ADR-011-avaliacao-comparativa-logica-no-core-e-criterio-de-correcao.md`, Status: Proposto). Resumo do que ele fixa e os pontos de detalhe que o plano acrescenta.
+Decisão técnica relevante nova: **ADR-011** (`docs/adr/ADR-011-avaliacao-comparativa-logica-no-core-e-criterio-de-correcao.md`, Status: Aceito). Resumo do que ele fixa e os pontos de detalhe que o plano acrescenta.
 
 ### 2.1 Onde mora cada coisa
 
@@ -207,7 +207,7 @@ Acrescentar depois do D7 (critérios reutilizados da US-007: `exit=` e mensagem 
    ```
 5. §10, linha de avaliação. Antigo: `| Avaliação | comando `eval` + `eval/golden-set.json` | relatório em `eval/reports/` |`. Novo: `| Avaliação | comando `eval` + `eval/golden-set.json` (lógica em `Core/Evaluation`, testada com fakes e relógio falso; `GoldenSetFileTests` guarda o arquivo) | relatório em `eval/reports/`; nota mínima: ≥ 80% das correções esperadas e ≥ 90% de formato sem retentativa (§6.6) |`.
 
-Na aprovação do plano, o ADR-011 passa de Proposto a Aceito (decisão do usuário, registrada na §12).
+Na aprovação do plano, o ADR-011 passou de Proposto a Aceito em 2026-10-23 (decisão do usuário, registrada na §12).
 
 ### 2.9 Rascunho do golden set (para o usuário revisar na aprovação do plano)
 
@@ -254,7 +254,7 @@ Com 32 frases e 32 correções esperadas, a nota mínima pede 26 (D6). Limite co
 
 | Ação | Caminho | Responsabilidade |
 |---|---|---|
-| Criar | `docs/adr/ADR-011-avaliacao-comparativa-logica-no-core-e-criterio-de-correcao.md` | Decisão (Status: Proposto, já criado pelo Planejador) |
+| Criar | `docs/adr/ADR-011-avaliacao-comparativa-logica-no-core-e-criterio-de-correcao.md` | Decisão (Status: Aceito em 2026-10-23, criado pelo Planejador) |
 | Criar | `src/EnglishTutor.Core/Evaluation/EvalText.cs` | Normalização de palavras e `ContainsWords` |
 | Criar | `src/EnglishTutor.Core/Evaluation/ExpectedCorrection.cs`, `GoldenSentence.cs`, `GoldenSet.cs`, `GoldenSetParseResult.cs` | Modelo do golden set |
 | Criar | `src/EnglishTutor.Core/Evaluation/CorrectionMatcher.cs` | `IsFound`, `CountFound` |
@@ -546,3 +546,7 @@ Este pedido não é a aprovação do plano; a aprovação continua pendente.
 Conferência de contagens (AP-025, AP-046, AP-049): E 15, M 18, P 37, X 12, R 12, B 13, F 1 = 108 (Core); C 18, A 11 = 29 (Console); total 137. A §4, a T2 ("37 casos"), a T5 ("13 casos") e o D2 ("137 casos novos (108 no Core, 29 no Console)") batem; não restou "129", "100 casos" nem "33 casos" fora deste histórico.
 
 Este pedido não é a aprovação do plano; a aprovação continua pendente. Status mantido: Aguardando aprovação.
+
+### 2026-10-23 — aprovação do plano
+
+O usuário aprovou o plano no chat. As perguntas em aberto P1 a P13 ficam com as **respostas padrão** descritas na §9 (incluindo P2, P4, P6 e P7). O rascunho de 32 frases da §2.9 segue como está; a revisão do arquivo e o preenchimento de `reviewedBy` continuam sendo do usuário (D7). ADR-011 passou a Aceito. Alterações em `specs/sprints/SPRINT_1.md` e `ARCHITECTURE.md` aplicadas nos commits `b31db78` e `8774762`.
