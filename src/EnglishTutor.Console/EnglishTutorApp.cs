@@ -1,3 +1,4 @@
+using EnglishTutor.Console.Commands;
 using EnglishTutor.Console.Logging;
 using EnglishTutor.Console.Ui;
 using EnglishTutor.Core.Brain;
@@ -100,6 +101,12 @@ public static class EnglishTutorApp
     private static Task<int> RunSessionAsync(
         IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
     {
+        // Only the first argument decides; anything else opens the chat (plan §2.7).
+        if (EvalCommandLineParser.IsEvalCommand(options.Args))
+        {
+            return new EvalCommand(services, options, logger).RunAsync(ct);
+        }
+
         var provider = CanonicalProvider(services);
         var handler = new ConversationInputHandler(
             services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger);
