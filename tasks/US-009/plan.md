@@ -396,12 +396,12 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Commit: `test(eval): cover eval metrics and the minimum grade` + `feat(eval): add eval metrics and the minimum grade`.
   Escolhas de forma: nenhuma
 
-- [ ] **T4 — `EvalRunner` (R1–R8)**
+- [x] **T4 — `EvalRunner` (R1–R8)** — feito: 3866fcf (Red f8da682)
   Esqueleto de teste: `Microsoft.Extensions.TimeProvider.Testing` no `EnglishTutor.Core.Tests.csproj` (versão já em `Directory.Packages.props`, §6) e um gancho no `FakeTutorBrain` para uma ação por chamada (avançar o `FakeTimeProvider`); a forma exata (overload de `Returns`/`ReturnsInvalid`) é escolha do Executor, registrada na §12 num commit `docs(ai)` antes do `feat`. Red: `EvalRunner.EvaluateAsync` devolve `ProviderEvaluation(provider, Evaluated, null, [])` sem chamar o cérebro. Falham todos os 12 casos (R1 a R5 e R7 esperam resultados; R6 espera `Unavailable`; R8 espera a exceção). Nenhum nasce verde.
   Green: §2.4, registro em `AddEnglishTutorCore`.
   Refactor: o contador de chamadas fica `private sealed` dentro do `EvalRunner`.
   Commit: `test(eval): cover the eval runner` + `feat(eval): add the eval runner`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: §12 em 0cc48d6
 
 - [ ] **T5 — Relatório (B1–B9)**
   Red: `EvalReportBuilder.Build` devolve `""` e `SummaryTable` devolve lista vazia. Falham os 13 casos (todo teste exige conteúdo presente; B9 exige também a linha `unavailable` no resumo). Nenhum nasce verde.
