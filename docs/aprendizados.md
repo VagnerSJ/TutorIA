@@ -545,3 +545,12 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** uma mutação que não falha o teste deixa o teste sem prova de que exercita o risco; só a conferência do Executor evitou um K10 inócuo.
 - **Correção (aplicada em 2026-10-23):** `.claude/agents/planejador.md` (junto da regra de AP-054, lista de Red por tarefa): "para cada mutação prescrita como prova de Red, rodar mentalmente o teste contra o código mutado e confirmar que a asserção falha; se o caso exige duas condições simultâneas (ex.: cancelamento do chamador e do tempo), o plano descreve a técnica que as produz juntas". Opcional: o Revisor do plano confere a mesma coisa em mutações não triviais.
 - **Status:** Aplicada
+
+### AP-059 — `grep "Passed!"` não casa com a saída do `dotnet test` em pt-BR
+
+- **Data / US:** 2026-10-23 / US-009 (`review.md`, Aprendizados para o processo)
+- **Quem errou:** revisor (comando ad hoc do fluxo de revisão, sem padrão fixo)
+- **O que aconteceu:** o Revisor usou `grep "Passed!"` para ler o resultado do `dotnet test`. Na máquina do projeto a saída vem em pt-BR (`Aprovado!`), e o padrão não casa. O mesmo vale para `Failed!` (`Com falha!`). O filtro de saída de `.claude/hooks/lib.mjs` também lista `Passed!|Failed!`, mas ele pega `error|failed|Total tests` em qualquer idioma, então o efeito lá é menor.
+- **Por que importa:** a conferência dos testes pode sair vazia ou parecer sem resultado; o risco é tomar "nenhuma linha" por "tudo certo" (AP-035).
+- **Correção (proposta):** `.claude/skills/checklist-revisao/SKILL.md` §4 (ou `.claude/agents/revisor.md`): "para ler o resultado do `dotnet test`, use o código de saída e um padrão que aceite os dois idiomas (`Passed!|Aprovado!` e `Failed!|Com falha!`), ou `--logger "console;verbosity=minimal"` com a contagem `Total tests`/`Total de testes`". Opcional: incluir `Aprovado!|Com falha!` no filtro de `.claude/hooks/lib.mjs`. A aprovar pelo usuário; o Documentador não altera `.claude/`.
+- **Status:** Proposta
