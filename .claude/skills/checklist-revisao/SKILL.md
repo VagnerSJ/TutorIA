@@ -42,7 +42,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - [O] Mudanças de comportamento estão primeiro na spec/plano e decisões técnicas relevantes têm ADR commitado **antes** do código que as implementa.
 - [O] Todos os comandos da Definition of Done foram rodados pelo Executor, com resultado colado em "Evidências" no `plan.md`, e o resultado confere com o seu.
 - Comentários do usuário no `plan.md` foram respondidos e respeitados.
-- [O] Escolha de forma que muda texto exibido, mensagem de exceção ou nome público está no §12 em commit anterior ao `feat`/`fix` que a implementa (AP-014, AP-027). Nos demais casos (nomes privados, detalhes internos), o mesmo item é sugestão.
+- [O] Escolha de forma que muda texto exibido, mensagem de exceção ou nome público está no §12 em commit anterior ao `feat`/`fix` que a implementa (AP-014, AP-027, AP-055); confira a ordem dos hashes com `git log`: linha "Escolhas de forma" que cita hash posterior ao `feat` é ❌ (registro tardio). Nos demais casos (nomes privados, detalhes internos), o mesmo item é sugestão.
 
 ## 2. Arquitetura (`ARCHITECTURE.md`)
 - [O] `EnglishTutor.Core` sem referência a Infrastructure/Console/pacotes de terceiros (R1).
