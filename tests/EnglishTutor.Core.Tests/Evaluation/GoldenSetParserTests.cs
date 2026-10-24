@@ -236,16 +236,17 @@ public sealed class GoldenSetParserTests
     }
 
     // US-009 — Cenário: golden set inválido (nomes exatos; propriedade desconhecida ignorada)
-    [Fact]
-    public void Parse_WithPropertyNamesInOtherCaseOrUnknownProperties_ReadsOnlyTheExactNames()
+    [Theory]
+    [InlineData("""{"Sentences": [ {"id": "gs-1", "text": "I am agree", "expected": [{"original": "am agree", "accepted": ["I agree"]}]} ]}""", 0)]
+    [InlineData("""{"extra": 1, "sentences": [ {"extra": 2, "id": "gs-1", "text": "I am agree", "expected": [{"original": "am agree", "accepted": ["I agree"], "extra": 3}]} ]}""", 1)]
+    public void Parse_WithPropertyNamesInOtherCaseOrUnknownProperties_ReadsOnlyTheExactNames(string json, int sentences)
     {
-        var wrongCase = GoldenSetParser.Parse($$"""{"Sentences": [ {{ValidSentence()}} ]}""");
-        var unknown = GoldenSetParser.Parse(
-            $$"""{"extra": 1, "sentences": [ {"extra": 2, "id": "gs-1", "text": "{{_text}}", "expected": [{"original": "am agree", "accepted": ["I agree"], "extra": 3}]} ]}""");
+        var result = GoldenSetParser.Parse(json);
 
-        wrongCase.IsValid.Should().BeFalse();
-        wrongCase.Errors.Should().ContainSingle().Which.Should().Contain("\"sentences\" must be a non-empty array (found: missing)");
-        unknown.IsValid.Should().BeTrue();
-        unknown.Set!.Sentences.Should().HaveCount(1);
+        result.IsValid.Should().Be(sentences == 1);
+        result.Errors.Where(error => error.Contains(
+            "\"sentences\" must be a non-empty array (found: missing)", StringComparison.Ordinal))
+            .Should().HaveCount(1 - sentences);
+        (result.Set?.Sentences.Count ?? 0).Should().Be(sentences);
     }
 }
