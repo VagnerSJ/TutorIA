@@ -417,12 +417,12 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Commit: `test(eval): cover eval command-line parsing` + `feat(eval): parse the eval command line`.
   Escolhas de forma: nenhuma
 
-- [ ] **T7 — Comando `eval` e despacho (A1–A11)**
+- [x] **T7 — Comando `eval` e despacho (A1–A11)** — feito: 1a31377 (Red b43222e); mutações de A10 aplicadas (despacho por `Count > 0` e por `Count >= 0`) e desfeitas
   Esqueleto de teste: `EvalScriptedBrain` em `Console.Tests/Support` (fila de respostas; cada resposta avança um `FakeTimeProvider` por um tempo dado; conta chamadas), referência ao pacote de relógio falso no `Console.Tests.csproj`. Red: nenhum código de produção novo (`EnglishTutorApp` ainda sem despacho: com `eval` nos argumentos abre o chat com a entrada vazia, imprime o cabeçalho e sai com 0). Falham: A1, A2, A3, A4, A5, A6, A7, A8, A9, A11 (o cérebro nunca é chamado, não há relatório, o código de saída esperado é 1 ou 2, ou faltam as linhas). **Nasce verde**: A10 (sem `eval` o chat abre e sai com 0). Mutações depois do Green para A10: o despacho trata qualquer lista de argumentos não vazia como `eval` (com `--unrelated value` o parser acusa opção desconhecida, a saída é 2 e o cabeçalho não aparece: A10 falha); o despacho sempre abre o `eval` (idem).
   Green: `EvalCommand`, `ConsoleText` (§2.6), `AppLog` 1006 e 1007, despacho em `EnglishTutorApp` (§2.7).
   Refactor: o relatório é gravado por um método único que traduz `IOException` e `UnauthorizedAccessException` na mensagem de A7.
   Commit: `test(eval): cover the eval command end to end` + `feat(eval): add the eval command`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: §12 em 4c2a7bd e e128bcd
 
 - [ ] **T8 — Golden set e guia (F1)**
   Red: `GoldenSetFileTests.GoldenSetFile_InRepository_IsValidWithAtLeastThirtySentences`, que falha (`eval/` só tem `.gitkeep`; o teste reporta "arquivo não encontrado").
