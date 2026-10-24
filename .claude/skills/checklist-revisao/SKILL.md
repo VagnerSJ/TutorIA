@@ -63,6 +63,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Nomes `Metodo_Cenario_Resultado`; um comportamento por teste.
 
 ## 4. Qualidade do código
+- Para ler o resultado do `dotnet test`, use o código de saída e um padrão que aceite os dois idiomas (`Passed!|Aprovado!` e `Failed!|Com falha!`), ou `--logger "console;verbosity=minimal"` com a contagem `Total tests`/`Total de testes`; "nenhuma linha" não significa "tudo certo" (AP-059).
 - [O] `CancellationToken` repassado em toda cadeia assíncrona; sem `.Result`/`.Wait()`.
 - [O] Sem `catch` que engole exceção; `OperationCanceledException` propaga.
 - [O] Processos externos com `ArgumentList`, timeout e encerramento da árvore do processo.
