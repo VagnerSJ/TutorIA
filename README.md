@@ -4,7 +4,7 @@ Professor de inglês **por voz**, pessoal e local, para treinar fala e escuta: c
 
 O áudio fica na máquina: fala → texto com Whisper, texto → fala com Piper ou Kokoro. O "cérebro" é plugável: **Claude Code headless** (usa a assinatura, sem API key) ou um **modelo local via Ollama** na GPU.
 
-> 🚧 **Status:** Fase 0 concluída (governança e agentes). Sprint 1 em andamento — ver [specs/sprints/SPRINT_1.md](specs/sprints/SPRINT_1.md) e [specs/ROADMAP.md](specs/ROADMAP.md).
+> 🚧 **Status:** Fase 0 concluída (governança e agentes). Sprint 1 concluída (arquivada em [specs/archive/SPRINT_1.md](specs/archive/SPRINT_1.md)); ver [specs/ROADMAP.md](specs/ROADMAP.md).
 
 ## Arquitetura
 

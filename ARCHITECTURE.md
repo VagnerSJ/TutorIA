@@ -244,6 +244,7 @@ claude -p
 - Correção esperada encontrada: algum `Corrected` da resposta contém, como palavras lado a lado (minúsculas, sem pontuação nas bordas), uma das formas aceitas da frase. Só mede cobertura: correções a mais não são penalizadas.
 - Provedor `unavailable`: a primeira frase falha com `BrainException`; as demais não rodam e o relatório traz o motivo. Falha em frase posterior conta como erro daquela frase.
 - Relatório markdown `eval/reports/eval-<aaaaMMdd-HHmmss>.md` (UTC) com resumo, nota mínima (`met` quando correções ≥ 80% e formato sem retentativa ≥ 90%, senão `not met`) e uma linha por frase. Saída 0 quando o relatório é gravado; 2 para argumentos ou golden set inválidos.
+- Regra de processo (herdada da Sprint 1): toda US que mexe em cérebro, prompt ou parser inclui na DoD o `eval` do golden set com a nota mínima acima.
 
 ## 7. Voz
 
