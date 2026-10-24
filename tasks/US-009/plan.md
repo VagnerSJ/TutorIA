@@ -410,12 +410,12 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Commit: `test(eval): cover the eval report` + `feat(eval): build the markdown eval report`.
   Escolhas de forma: §12 em f587058
 
-- [ ] **T6 — Argumentos do `eval` (C1–C10)**
+- [x] **T6 — Argumentos do `eval` (C1–C10)** — feito: 839067d (Red 80303c1); mutações de C10 aplicadas e desfeitas
   Red: `EvalCommandLine(IReadOnlyList<string> Providers, string GoldenSetPath, string ReportsDirectory)` (em `EvalCommandLine.cs`), `EvalCommandLineParseResult` (em `EvalCommandLineParser.cs`, criado primeiro o `EvalCommandLine.cs`); `IsEvalCommand` devolve `false`; `Parse` devolve resultado válido com `EvalCommandLine([], "", "")`. Falham: C1 a C9 (14 casos) e os 2 casos verdadeiros de C10 (16 dos 18). **Nascem verdes**: C10 `[]` e `--Brain:Provider Ollama` (devolvem `false`). Mutações depois do Green: C10 `[]` — `IsEvalCommand` devolve `true` para lista vazia; C10 `--Brain:Provider Ollama` — `IsEvalCommand` devolve `true` para qualquer lista não vazia.
   Green: §2.7 (parser).
   Refactor: nenhum previsto.
   Commit: `test(eval): cover eval command-line parsing` + `feat(eval): parse the eval command line`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
 - [ ] **T7 — Comando `eval` e despacho (A1–A11)**
   Esqueleto de teste: `EvalScriptedBrain` em `Console.Tests/Support` (fila de respostas; cada resposta avança um `FakeTimeProvider` por um tempo dado; conta chamadas), referência ao pacote de relógio falso no `Console.Tests.csproj`. Red: nenhum código de produção novo (`EnglishTutorApp` ainda sem despacho: com `eval` nos argumentos abre o chat com a entrada vazia, imprime o cabeçalho e sai com 0). Falham: A1, A2, A3, A4, A5, A6, A7, A8, A9, A11 (o cérebro nunca é chamado, não há relatório, o código de saída esperado é 1 ou 2, ou faltam as linhas). **Nasce verde**: A10 (sem `eval` o chat abre e sai com 0). Mutações depois do Green para A10: o despacho trata qualquer lista de argumentos não vazia como `eval` (com `--unrelated value` o parser acusa opção desconhecida, a saída é 2 e o cabeçalho não aparece: A10 falha); o despacho sempre abre o `eval` (idem).
