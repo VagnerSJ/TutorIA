@@ -389,12 +389,12 @@ Convenções desta lista: o "Red" usa um esqueleto que compila e devolve o valor
   Commit: `test(eval): cover golden set parsing and validation` + `feat(eval): parse and validate the golden set`.
   Escolhas de forma: §12 em 7ca0eac
 
-- [ ] **T3 — Resultados, métricas e nota mínima (X1–X4)**
+- [x] **T3 — Resultados, métricas e nota mínima (X1–X4)** — feito: 1a88ebf (Red 390d07a); as 3 mutações prescritas falharam pelos casos previstos e foram desfeitas
   Red: tipos `SentenceResult`, `ProviderEvaluation`, `ProviderStatus`, `EvalMetrics`, `EvalThresholds`; `EvalMetrics.From` devolve zeros; `EvalThresholds.IsMet` devolve `false`. Falham: X1, X2 (4), X3, X4 casos (80,100,90,100) e (4,5,9,10). **Nascem verdes**: X4 casos (79,100,90,100), (80,100,89,100), (0,5,10,10), (0,0,0,0). Mutações depois do Green: (79,100,90,100) e (0,5,10,10) — `IsMet` compara só o formato (os dois passam a `true`); (80,100,89,100) — `IsMet` compara só as correções (passa a `true`); (0,0,0,0) — remover a guarda `expected > 0 && sentences > 0` (0 ≥ 0 passa a `true`).
   Green: §2.5, com inteiros.
   Refactor: nenhum previsto.
   Commit: `test(eval): cover eval metrics and the minimum grade` + `feat(eval): add eval metrics and the minimum grade`.
-  Escolhas de forma: nenhuma | §12 em <hash>
+  Escolhas de forma: nenhuma
 
 - [ ] **T4 — `EvalRunner` (R1–R8)**
   Esqueleto de teste: `Microsoft.Extensions.TimeProvider.Testing` no `EnglishTutor.Core.Tests.csproj` (versão já em `Directory.Packages.props`, §6) e um gancho no `FakeTutorBrain` para uma ação por chamada (avançar o `FakeTimeProvider`); a forma exata (overload de `Returns`/`ReturnsInvalid`) é escolha do Executor, registrada na §12 num commit `docs(ai)` antes do `feat`. Red: `EvalRunner.EvaluateAsync` devolve `ProviderEvaluation(provider, Evaluated, null, [])` sem chamar o cérebro. Falham todos os 12 casos (R1 a R5 e R7 esperam resultados; R6 espera `Unavailable`; R8 espera a exceção). Nenhum nasce verde.
