@@ -526,7 +526,7 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **O que aconteceu:** o D3 do `plan.md` registrou `line-rate` 0,9822 do Core no relatório do `Core.Tests`, anotando que os relatórios do `Infrastructure.Tests` e do `Console.Tests` mostram o Core parcial (0,7494 e 0,8181). O Revisor mesclou os três com `reportgenerator` e obteve 100% para o assembly Core (solução 90,5%). Os dois números passam de 80%, mas são grandezas diferentes, e a comparação entre US fica ambígua (a US-006 registrou 100%, a US-007 98,22%).
 - **Por que importa:** cobertura do Core é critério do projeto (CLAUDE.md); número de fonte variável impede ver tendência e esconde queda real.
 - **Correção (proposta, não aplicada):** `.claude/skills/tdd-dotnet/SKILL.md` e o modelo do D3 em `.claude/agents/planejador.md`: "a evidência do D3 é o relatório **mesclado** (`reportgenerator` sobre todos os `coverage.cobertura.xml`), com o line-rate do assembly `EnglishTutor.Core` e o total da solução; relatório de um único projeto de teste só entra como nota". Padronizar também no `docs/us/US-XXX.md` (seção Testes e evidências).
-- **Status:** Proposta
+- **Status:** Aplicada (2026-10-23)
 
 ### AP-057 — Teste procura "linha" exata de saída, mas o prompt `> ` não quebra linha
 

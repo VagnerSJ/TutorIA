@@ -103,4 +103,4 @@ Saídas reais de processo/HTTP gravadas em `Fixtures/*.json` (a partir da US-004
 
 ## Cobertura
 
-Meta: ≥ 80% de linhas em `EnglishTutor.Core`. Gere com `dotnet test --collect:"XPlat Code Coverage"` e leia `line-rate` do pacote `EnglishTutor.Core` no `coverage.cobertura.xml`.
+Meta: ≥ 80% de linhas em `EnglishTutor.Core`. Gere com `dotnet test --collect:"XPlat Code Coverage"` e leia `line-rate` do pacote `EnglishTutor.Core` no `coverage.cobertura.xml`. A evidência do D3 é o relatório **mesclado** (`reportgenerator` sobre todos os `coverage.cobertura.xml`), com o `line-rate` do assembly `EnglishTutor.Core` e o total da solução; relatório de um único projeto de teste só entra como nota (AP-056).
