@@ -80,6 +80,25 @@ public sealed class PiperTextToSpeechTests : IDisposable
         OutputFileOf(request).Should().EndWith(".wav");
     }
 
+    // US-011 / P2 — apoio: caminhos relativos (padrão do appsettings) viram completos, pois o Piper roda com
+    // WorkingDirectory = pasta do piper.exe e não acharia o modelo relativo ao diretório atual
+    [Fact]
+    public async Task SynthesizeAsync_WithRelativePaths_PassesFullPathsToPiper()
+    {
+        _piperOptions.ExecutablePath = Path.Combine("models", "piper", "piper.exe");
+        _piperOptions.ModelPath = Path.Combine("models", "piper", "voice.onnx");
+        PiperWrites(new WavBuilder().Build());
+        var sut = CreateSut();
+
+        await sut.SynthesizeAsync("hello", 1.0f, CancellationToken.None);
+
+        var request = _runner.Requests.Single();
+        request.FileName.Should().Be(Path.GetFullPath(Path.Combine("models", "piper", "piper.exe")));
+        request.WorkingDirectory.Should().Be(Path.GetFullPath(Path.Combine("models", "piper")));
+        request.Arguments[1].Should().Be(Path.GetFullPath(Path.Combine("models", "piper", "voice.onnx")));
+        Path.IsPathRooted(OutputFileOf(request)).Should().BeTrue();
+    }
+
     // US-011 — apoio: velocidade vira length_scale = 1/velocidade
     [Theory]
     [InlineData(1.0f, "1")]
