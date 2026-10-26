@@ -7,7 +7,7 @@
 | US | Título | Fase | Depende de | Status |
 |---|---|---|---|---|
 | US-010 | Portas de voz e áudio no Core, com configuração validada | 3 | — | Concluída |
-| US-011 | O professor fala o `reply` (Piper) | 3 | US-010 | A fazer |
+| US-011 | O professor fala o `reply` (Piper) | 3 | US-010 | Concluída |
 | US-012 | Velocidade da fala configurável e ajustável na sessão | 3 | US-011 | A fazer |
 | US-013 | Gravar a fala com push-to-talk | 4 | US-010 | A fazer |
 | US-014 | Transcrever com Whisper e confiança por palavra | 4 | US-010 | A fazer |
