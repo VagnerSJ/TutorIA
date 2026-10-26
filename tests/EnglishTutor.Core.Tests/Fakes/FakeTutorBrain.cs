@@ -20,9 +20,30 @@ public sealed class FakeTutorBrain : ITutorBrain
         return this;
     }
 
+    // onCall runs when the call arrives, before the answer (e.g. advance a fake clock to simulate latency).
+    public FakeTutorBrain Returns(TutorReply reply, Action onCall)
+    {
+        _responses.Enqueue(_ =>
+        {
+            onCall();
+            return reply;
+        });
+        return this;
+    }
+
     public FakeTutorBrain ReturnsInvalid(string rawText, TutorReplyRejection rejection)
     {
         _responses.Enqueue(_ => throw BrainException.InvalidOutput(rejection, rawText));
+        return this;
+    }
+
+    public FakeTutorBrain ReturnsInvalid(string rawText, TutorReplyRejection rejection, Action onCall)
+    {
+        _responses.Enqueue(_ =>
+        {
+            onCall();
+            throw BrainException.InvalidOutput(rejection, rawText);
+        });
         return this;
     }
 

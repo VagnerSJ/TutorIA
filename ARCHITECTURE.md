@@ -56,6 +56,9 @@ src/
                        BrainFallbackPolicy, BrainSwitchNotice, IBrainSwitchNotifier
     Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
+    Evaluation/        GoldenSet, GoldenSentence, ExpectedCorrection, GoldenSetParser, GoldenSetParseResult, EvalText,
+                       CorrectionMatcher, EvalRunner, SentenceResult, ProviderEvaluation, ProviderStatus, EvalMetrics,
+                       EvalThresholds, EvalReportBuilder
     Persistence/       IConversationStore, SessionRecord, TurnRecord, RecurringError
   EnglishTutor.Infrastructure/
     Brain/             ClaudeCodeTutorBrain, ClaudeCodeOptions, ClaudeCodeOptionsValidator, ClaudeCodeOutput, ClaudeCodeFailures,
@@ -70,13 +73,15 @@ src/
     Audio/             NAudioRecorder, NAudioPlayer
     Persistence/       SqliteConversationStore
   EnglishTutor.Console/
-    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (chat, eval), Ui/ (ChatSession, ConversationInputHandler, ConsoleBrainSwitchNotifier), Logging/; prompts/ copiado para a saída
+    Program.cs, EnglishTutorApp, appsettings.json, Commands/ (EvalCommand, EvalCommandLine, EvalCommandLineParser com EvalCommandLineParseResult; o chat continua em Ui/), Ui/ (ChatSession, ConversationInputHandler, ConsoleBrainSwitchNotifier), Logging/; prompts/ copiado para a saída
 prompts/
   tutor.md             system prompt único (regras de conteúdo)
   format.json.md       instrução de formato quando o provedor usa saída estruturada
   format.tags.md       instrução de formato com <reply>/<feedback>
 eval/
   golden-set.json
+  README.md
+  reports/             relatórios gerados (ignorados pelo Git)
 tests/
   EnglishTutor.Core.Tests/
   EnglishTutor.Infrastructure.Tests/   (inclui Fixtures/ e Contract/)
@@ -233,6 +238,14 @@ claude -p
 - O `FallbackTutorBrain` chama o primário; se ele lançar `BrainException` cujo `Kind` a `BrainFallbackPolicy` manda trocar (RN-BRAIN08), avisa o `IBrainSwitchNotifier` e envia o mesmo `BrainRequest` ao reserva, só naquele turno. Outras falhas, `InvalidOutput` (retentativa do `ConversationService`, ADR-006) e cancelamento passam adiante sem troca.
 - O console implementa o aviso (`Switched to <reserva> (<motivo>)`, saída padrão, antes da linha `Tutor:`) (ADR-010).
 
+### 6.6 Avaliação comparativa (eval)
+
+- `EnglishTutor.Console eval [--providers <lista>] [--golden-set <arquivo>] [--reports-dir <pasta>]` (padrões: todos os provedores de `BrainProviders`, `eval/golden-set.json`, `eval/reports`). A lógica mora em `Core/Evaluation` (ADR-011): para cada provedor, cada frase do golden set vai sozinha (janela vazia, modo `free-conversation`) por um `ConversationService` novo sobre o cérebro do provedor **sem reserva** (`ITutorBrain` com chave, ADR-010). Mede correções esperadas encontradas, formato válido sem retentativa e com a retentativa única (RN-BRAIN04), e latência média e p95 do turno.
+- Correção esperada encontrada: algum `Corrected` da resposta contém, como palavras lado a lado (minúsculas, sem pontuação nas bordas), uma das formas aceitas da frase. Só mede cobertura: correções a mais não são penalizadas.
+- Provedor `unavailable`: a primeira frase falha com `BrainException`; as demais não rodam e o relatório traz o motivo. Falha em frase posterior conta como erro daquela frase.
+- Relatório markdown `eval/reports/eval-<aaaaMMdd-HHmmss>.md` (UTC) com resumo, nota mínima (`met` quando correções ≥ 80% e formato sem retentativa ≥ 90%, senão `not met`) e uma linha por frase. Saída 0 quando o relatório é gravado; 2 para argumentos ou golden set inválidos.
+- Regra de processo (herdada da Sprint 1): toda US que mexe em cérebro, prompt ou parser inclui na DoD o `eval` do golden set com a nota mínima acima.
+
 ## 7. Voz
 
 - STT: Whisper.net; runtime **CUDA** (GPU NVIDIA RTX 4070 Ti SUPER, 16 GB), fallback Vulkan e depois CPU. Modelo padrão `large-v3-turbo`, baixado na primeira execução para `models/` (ignorado pelo Git). Confiança por palavra a partir das probabilidades de token.
@@ -270,7 +283,7 @@ SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala tran
 | Parser / fixtures | `EnglishTutor.Infrastructure.Tests` | saídas reais gravadas em `Fixtures/` (Claude Code JSON, Ollama JSON) a partir da US-004; até lá (US-002), exemplos da spec em `Fixtures/TutorReply/` |
 | Contrato | `Infrastructure.Tests/Contract/TutorBrainContractTests` (classe abstrata) | uma subclasse por provedor (`ClaudeCodeTutorBrainContractTests`, `OllamaTutorBrainContractTests`), sem testes próprios; fake de processo/HTTP por trás de uma bancada por provedor |
 | Live | classes `*LiveTests` (as de contrato: `<Provedor>ContractLiveTests`, com o `ConversationService` real sobre o adaptador real) com `[Trait("Category","LiveBrain")]` | excluídas por padrão: `dotnet test --filter "Category!=LiveBrain"` |
-| Avaliação | comando `eval` + `eval/golden-set.json` | relatório em `eval/reports/` |
+| Avaliação | comando `eval` + `eval/golden-set.json` (lógica em `Core/Evaluation`, testada com fakes e relógio falso; `GoldenSetFileTests` guarda o arquivo) | relatório em `eval/reports/`; nota mínima: ≥ 80% das correções esperadas e ≥ 90% de formato sem retentativa (§6.6) |
 
 Meta: cobertura de linhas do Core ≥ 80% (coverlet).
 

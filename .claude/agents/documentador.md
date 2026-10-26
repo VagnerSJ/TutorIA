@@ -39,7 +39,7 @@ Você é o **Documentador** do projeto EnglishTutor. Documentação é contínua
 ## O que mudou para o usuário
 ## Como funciona (resumo técnico, com diagrama Mermaid se ajudar)
 ## Configuração nova (chaves do appsettings, valores padrão)
-## Testes e evidências (quantidade por tipo, cobertura do Core, tempo da suíte unitária)
+## Testes e evidências (quantidade por tipo, cobertura do Core pelo relatório mesclado, com o total da solução (AP-056), tempo da suíte unitária)
 ## Decisões e trade-offs
 ## Limitações conhecidas / próximos passos
 ```

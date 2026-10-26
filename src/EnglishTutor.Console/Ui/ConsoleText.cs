@@ -12,6 +12,24 @@ public static class ConsoleText
 
     public const string InvalidConfiguration = "Invalid configuration:";
 
+    public const string EvalInvalidArguments = "Invalid eval arguments:";
+
+    public const string EvalUsage =
+        "Usage: eval [--providers <name[,name...]>] [--golden-set <file>] [--reports-dir <folder>]";
+
+    public static string GoldenSetNotFound(string path) =>
+        $"Golden set not found: {path}. Expected a JSON file with the sentences to evaluate (default: eval/golden-set.json).";
+
+    public static string InvalidGoldenSet(string path) => $"Invalid golden set ({path}):";
+
+    public static string ReportNotSaved(string directory, string reason) =>
+        $"Could not save the report to {directory}: {reason}";
+
+    public static string EvaluatingProvider(string provider, int sentences) =>
+        $"Evaluating {provider} ({sentences} sentences)...";
+
+    public static string ReportSaved(string path) => $"Report saved to {path}";
+
     // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
     public static string StartupFailed(string reason) => $"The application could not start: {reason}";
 

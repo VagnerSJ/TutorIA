@@ -13,7 +13,7 @@
 | US-006 | Professor local via Ollama | 2b | US-003 | Concluída |
 | US-007 | Troca de cérebro por configuração e fallback | 2b | US-005, US-006 | Concluída |
 | US-008 | Suíte de contrato do ITutorBrain | 2b | US-004, US-006 | Concluída |
-| US-009 | Avaliação comparativa dos cérebros (golden set + `eval`) | 2b | US-007 | A fazer |
+| US-009 | Avaliação comparativa dos cérebros (golden set + `eval`) | 2b | US-007 | Concluída |
 
 ## Definition of Done comum (todas as US)
 
@@ -476,8 +476,8 @@ Cenário: reserva igual ao primário
 | D5 | `dotnet test --filter "FullyQualifiedName~BrainFactory\|FullyQualifiedName~FallbackTutorBrain"` | verde |
 | D6 | `$env:Brain__Provider="Ollama"; "/quit" \| dotnet run --project src/EnglishTutor.Console` | cabeçalho mostra "Ollama" |
 | D7 | `git grep -n -F "Provisional selector" -- src tests` | nenhuma linha: o seletor provisório de `ITutorBrain` por `Brain:Provider` (US-006, em `InfrastructureServiceCollectionExtensions`) foi substituído pela `BrainFactory` |
-| D8 | No Windows PowerShell 5.1, com o Ollama rodando e o modelo baixado: `$env:Brain__ClaudeCode__ExecutablePath="claude-missing-us007"; $env:Brain__FallbackProvider="Ollama"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__ClaudeCode__ExecutablePath, Env:Brain__FallbackProvider` | a linha `Switched to Ollama (CLI not found)` seguida de uma linha `Tutor: <reply>`; `exit=0` |
-| D9 | No Windows PowerShell 5.1: `$env:Brain__ClaudeCode__ExecutablePath="claude-missing-us007"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console 2>&1; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__ClaudeCode__ExecutablePath` | a mensagem `The tutor could not answer: Claude Code CLI not found`; nenhuma linha `Switched to`; `exit=0` |
+| D8 | No Windows PowerShell 5.1, com o Ollama rodando e o modelo baixado: `$env:Brain__ClaudeCode__ExecutablePath="claude-missing-us007"; $env:Brain__FallbackProvider="Ollama"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__ClaudeCode__ExecutablePath, Env:Brain__FallbackProvider` | a saída contém `Switched to Ollama (CLI not found)` seguida de uma linha `Tutor: <reply>`; `exit=0` |
+| D9 | No Windows PowerShell 5.1: `$env:Brain__ClaudeCode__ExecutablePath="claude-missing-us007"; "I have worked with C# since five years", "/quit" \| dotnet run --project src/EnglishTutor.Console 2>&1; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__ClaudeCode__ExecutablePath` | a mensagem `The tutor could not answer: Claude Code CLI not found`; a saída não contém `Switched to`; `exit=0` |
 
 ---
 
@@ -519,19 +519,38 @@ Como aluno,
 quero comparar os cérebros com um conjunto fixo de frases com erros conhecidos,
 para decidir quando um modelo local é bom o suficiente.
 
-**Regras:** PRODUCT (métricas de sucesso).
+**Regras:** PRODUCT (métricas de sucesso), RN-BRAIN04, RN-BRAIN07; ARCHITECTURE §6.6; ADR-010, ADR-011.
 
 ```gherkin
 Cenário: rodar o golden set
   Dado o arquivo eval/golden-set.json com cerca de 30 frases e correções esperadas
   Quando executo "EnglishTutor.Console eval --providers ClaudeCode,Ollama"
-  Então para cada provedor vejo: % de correções esperadas encontradas, % de respostas no formato, latência média e p95
+  Então para cada provedor vejo: % de correções esperadas encontradas, % de respostas no formato sem retentativa (e, à parte, com a retentativa única), latência média e p95
   E um relatório markdown é salvo em eval/reports/
 
 Cenário: provedor indisponível na avaliação
   Dado que o Ollama não está rodando
   Quando executo o eval com os dois provedores
   Então o relatório marca o Ollama como "unavailable" e os resultados do Claude Code continuam válidos
+  E o código de saída é 0
+
+Cenário: nota mínima no relatório
+  Dado o resultado de um provedor avaliado
+  Quando o relatório é gerado
+  Então a linha do provedor diz "met" se as correções esperadas encontradas são ≥ 80% e as respostas no formato sem retentativa são ≥ 90%
+  E diz "not met" se qualquer um dos dois ficar abaixo
+
+Cenário: argumentos inválidos no eval
+  Dado o comando "eval --providers Inexistente"
+  Quando executo o comando
+  Então a aplicação termina com código 2 e a saída de erro lista os provedores aceitos
+  E nenhum relatório é gravado
+
+Cenário: golden set inválido
+  Dado um eval/golden-set.json ausente, ou com uma frase sem correção esperada
+  Quando executo "EnglishTutor.Console eval"
+  Então a aplicação termina com código 2 e a saída de erro diz o que está errado e o que se espera
+  E nenhum relatório é gravado
 ```
 
 **DoD extra**
@@ -539,7 +558,10 @@ Cenário: provedor indisponível na avaliação
 | # | Comando | Esperado |
 |---|---|---|
 | D5 | `dotnet run --project src/EnglishTutor.Console -- eval --providers ClaudeCode,Ollama` | relatório em `eval/reports/` |
-| D6 | Nota do provedor principal (ClaudeCode) no relatório | correções esperadas encontradas ≥ 80%; formato válido ≥ 90% |
-| D7 | `eval/golden-set.json` | ≥ 30 frases, cada uma com erro e correção esperada revisados pelo usuário |
+| D6 | Nota do provedor principal (ClaudeCode) nos relatórios de 3 execuções seguidas do comando completo do D5 (com os dois provedores) | em cada uma: a linha do ClaudeCode diz `met` (correções esperadas encontradas ≥ 80%; formato válido sem retentativa ≥ 90%) |
+| D7 | `dotnet test --filter "FullyQualifiedName~GoldenSetFileTests"` e `git grep -n -F '"reviewedBy": ""' -- eval/golden-set.json` | verde (o arquivo tem ≥ 30 frases, cada uma com erro e correção esperada); enquanto o usuário não revisa, o `git grep` acha a linha `"reviewedBy": ""` (código de saída 0); depois que o usuário preenche `reviewedBy` ao revisar as frases, não acha linha (código de saída 1) |
+| D8 | No Windows PowerShell 5.1: `$env:Brain__Ollama__Endpoint="http://localhost:1"; dotnet run --project src/EnglishTutor.Console -- eval --providers Ollama; "exit=$LASTEXITCODE"; Remove-Item Env:Brain__Ollama__Endpoint` | a linha do Ollama no resumo diz `unavailable` e o relatório lista o motivo; `exit=0` |
+| D9 | No Windows PowerShell 5.1: `"/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` | o cabeçalho do chat (`Brain: ... \| Mode: free-conversation`); `exit=0` (o despacho do `eval` não quebrou o chat) |
+| D10 | No Windows PowerShell 5.1: `dotnet run --project src/EnglishTutor.Console -- eval --providers Inexistente 2>&1; "exit=$LASTEXITCODE"` | a mensagem `Unknown provider 'Inexistente'. Accepted values: ClaudeCode, Ollama.`; `exit=2`; nenhum arquivo novo em `eval/reports/` |
 
-Esses limiares (D6) passam a ser a **nota mínima do eval** na DoD das US de cérebro das sprints seguintes.
+Esses limiares (D6) passam a ser a **nota mínima do eval** na DoD das US de cérebro das sprints seguintes: a DoD roda `eval --providers <provedor>` e confere que a linha do provedor diz `met`.

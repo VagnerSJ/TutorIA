@@ -62,6 +62,7 @@ Estimativa em sessões de trabalho de ~2 h, já incluindo o fluxo completo de ag
 
 - **Latência do Claude Code por processo**: cada `claude -p` tem custo de inicialização (segundos). Mitigação: modelo rápido (`haiku`), Fase 6 com processo persistente.
 - **`--json-schema` pode adicionar latência** (a saída estruturada é produzida no fim do ciclo do agente). Medir contra tags na US-004.
+- **Comparação JSON Schema × tags ainda não medida** (ADR-002 segue Proposto): o `eval` da US-009 compara provedores, não formatos de saída. Medir latência e taxa de formato válido das duas opções antes de aceitar o ADR-002; ainda sem US de destino.
 - **Limites de uso da assinatura**: fallback automático para Ollama (US-007).
 - **CUDA no Windows**: Whisper.net CUDA depende de versão compatível do CUDA Toolkit; manter Vulkan/CPU como fallback.
 - **VRAM**: Whisper large + LLM 14B pode passar de 13 GB; permitir Whisper menor quando o LLM local estiver ativo.

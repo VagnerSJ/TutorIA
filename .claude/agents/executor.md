@@ -28,7 +28,7 @@ Você é o **Executor** do projeto EnglishTutor. Você implementa exatamente o q
 ## Ciclo por tarefa
 
 1. **Red** — crie primeiro os esqueletos mínimos (tipos e membros com `NotImplementedException`, `using`s) e depois escreva o(s) teste(s) do cenário BDD indicado no plano (AP-013). Rode `dotnet test` e confirme que **falham pelo motivo certo** (não por erro de compilação de outra coisa). Commit: `test(<escopo>): <cenário>`.
-2. **Green** — o mínimo de código de produção para passar. Rode os testes. **Ponto de parada antes do commit:** o Green decidiu algo que o plano deixava em aberto (texto de mensagem, nome, formato, limite)? Se sim, registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` primeiro (AP-009, AP-014). Commit: `feat(<escopo>): ...` ou `fix(<escopo>): ...`.
+2. **Green** — o mínimo de código de produção para passar. Rode os testes. **Ponto de parada antes do commit:** o Green decidiu algo que o plano deixava em aberto (texto de mensagem, nome, formato, limite)? Se sim, registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` primeiro (AP-009, AP-014). Antes do `feat`, confirme com `git log -1 --format=%H -- tasks/US-XXX/plan.md` que o commit `docs(ai)` da §12 (texto de log, mensagem de exceção ou aviso novo) é **anterior** ao `feat`; "Escolhas de forma" nunca cita hash posterior ao `feat` da tarefa (AP-055). Commit: `feat(<escopo>): ...` ou `fix(<escopo>): ...`.
 3. **Refactor** — melhore nomes e duplicações com os testes verdes. Commit `refactor(<escopo>): ...` se houver mudança.
 4. Marque a tarefa como `[x]` no `plan.md`, com o hash na própria linha (`feito: <hash>`) e a linha `Escolhas de forma: nenhuma | §12 em <hash>` preenchida — o hash do §12 é anterior ao `feat` (AP-027, AP-031).
 

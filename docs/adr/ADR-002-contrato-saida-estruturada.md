@@ -1,6 +1,6 @@
 # ADR-002 — Contrato de saída do professor: JSON Schema como caminho principal, tags como alternativa
 
-- **Status:** Proposto (confirmar com medições na US-004 e no `eval` da US-009)
+- **Status:** Proposto (o `eval` da US-009 não compara JSON Schema com tags; a confirmação por medição segue aberta, ver riscos em `specs/ROADMAP.md`)
 - **Data:** 2026-10-17
 - **US relacionadas:** US-002, US-004, US-006, US-009
 

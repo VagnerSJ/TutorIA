@@ -9,7 +9,7 @@ Também é um laboratório de **Spec-Driven Development (SDD)** com 4 agentes.
 
 - Arquitetura: [ARCHITECTURE.md](ARCHITECTURE.md). Em caso de conflito, ela vence.
 - Produto e regras: [specs/PRODUCT.md](specs/PRODUCT.md), [specs/BUSINESS_RULES.md](specs/BUSINESS_RULES.md) (IDs `RN-*`).
-- Histórias: `specs/sprints/SPRINT_N.md` (IDs `US-XXX`, cenários BDD + Definition of Done).
+- Histórias: `specs/sprints/SPRINT_N.md` (sprints concluídas ficam em `specs/archive/`; IDs `US-XXX`, cenários BDD + Definition of Done).
 - Fases e ambiente: [specs/ROADMAP.md](specs/ROADMAP.md). Decisões: `docs/adr/`.
 - Diário do processo: [docs/aprendizados.md](docs/aprendizados.md).
 

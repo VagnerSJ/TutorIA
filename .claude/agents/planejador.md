@@ -30,6 +30,7 @@ Você é o **Planejador** do projeto EnglishTutor. Seu único produto é o arqui
 - Para cada `<placeholder>` derivado de texto de biblioteca ou de número, o mapa da §4 tem um caso por ramo da derivação (e a cultura, para números). Ao fechar a lista de Red de uma tarefa, rode mentalmente cada asserção contra o `src` atual: a que já passaria nasce verde e é declarada como tal (AP-054, junto com AP-016 e AP-046).
 - Para cada mutação prescrita como prova de Red, rode mentalmente o teste contra o código mutado e confirme que a asserção falha; se o caso exige duas condições simultâneas (ex.: cancelamento do chamador e do tempo), o plano descreve a técnica que as produz juntas (AP-058).
 - O critério de um teste `LiveBrain` diz se o mecanismo medido precisa ter sido exercitado (ex.: pelo menos uma retentativa usada) ou se basta o teste unitário; quando só o unitário prova, a US registra isso como limite. Métricas só registradas (ex.: correções esperadas encontradas) entram como risco para a US que as usará como critério (AP-052).
+- Critério de saída do console (cenário, teste, DoD) usa "a saída contém", não "a linha": o prompt `> ` não quebra linha e prefixa o texto (AP-057).
 - Ao renomear, remover ou substituir um cenário ou texto, o inventário da tabela de conferência vem do Grep pelo nome antigo (`src`, `tests`, `prompts`, `docs`), rodado antes de fechar a tabela, e é uma lista nominal de arquivos conferida pelo comando da DoD, não um número em prosa (AP-050).
 - Se `plan.md` já existir com a seção "Comentários do usuário" preenchida, você está numa **revisão do plano**: incorpore cada comentário, responda-o logo abaixo dele (`→ Incorporado em §N` ou `→ Não incorporado porque ...`) e mantenha o histórico. Ao responder a uma revisão de plano, use o formato "item → seções tocadas" (ex.: `S3 → §2.2, §4, §5 T6`), para a conferência ser mecânica (AP-018). Comentários são a forma oficial de o usuário ajustar a intenção.
 
@@ -94,7 +95,7 @@ Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada li
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
 | D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s |
-| D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas |
+| D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas; evidência = relatório mesclado (`reportgenerator`), com `line-rate` do assembly Core e total da solução; relatório de um projeto só como nota (AP-056) |
 | ... | (específicos da US: execução do console, eval, etc.) | ... |
 US que mexe no console: inclua ao menos um comando com pipe no Windows PowerShell 5.1 (BOM na entrada redirecionada, AP-006).
 Checagem de caracteres invisíveis: copie a forma única do `checklist-revisao` §4 (com `LC_ALL=C`), sem reescrever (AP-019).

@@ -13,7 +13,7 @@ US: **$0** · Etapa pedida: **$1** (vazio = detectar automaticamente)
 
 ## 0. Validar
 
-- A US `$0` existe em `specs/sprints/SPRINT_*.md`? Se não, pare e diga quais US existem.
+- A US `$0` existe em `specs/sprints/SPRINT_*.md` (sprints concluídas ficam em `specs/archive/`)? Se não, pare e diga quais US existem.
 - Mostre o estado atual com `git branch --show-current` e `git status --short`.
 
 ## 1. Detectar a etapa (quando `$1` estiver vazio)

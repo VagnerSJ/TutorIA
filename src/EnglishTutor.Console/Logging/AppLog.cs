@@ -1,4 +1,5 @@
 using EnglishTutor.Core.Brain;
+using EnglishTutor.Core.Evaluation;
 using Microsoft.Extensions.Logging;
 
 namespace EnglishTutor.Console.Logging;
@@ -33,4 +34,19 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1005, Level = LogLevel.Warning,
         Message = "Brain call failed with {ErrorKind}; the session continues")]
     public static partial void BrainFailed(this ILogger logger, BrainErrorKind errorKind, Exception exception);
+
+    // The student's sentences are never logged (ARCHITECTURE §9); only counts and timing.
+    [LoggerMessage(EventId = 1006, Level = LogLevel.Information,
+        Message = "Eval of {Provider} finished as {Status}: {FoundTotal}/{ExpectedTotal} expected corrections found in {Sentences} sentences in {ElapsedMs} ms")]
+    public static partial void EvalProviderEvaluated(
+        this ILogger logger,
+        string provider,
+        ProviderStatus status,
+        int sentences,
+        int foundTotal,
+        int expectedTotal,
+        long elapsedMs);
+
+    [LoggerMessage(EventId = 1007, Level = LogLevel.Information, Message = "Eval report saved to {Path}")]
+    public static partial void EvalReportSaved(this ILogger logger, string path);
 }

@@ -38,6 +38,8 @@ public async Task SendAsync_WhenWindowIsFull_DropsOldestTurn()
 | Comportamento do console (comandos, mensagens) | Teste do componente de UI com `TextReader`/`TextWriter` falsos, sem processo real |
 | Build, CI, estrutura | Teste de arquitetura (reflexão sobre assemblies) ou verificação manual registrada no review |
 
+**Saída do console:** o prompt `> ` não quebra linha, então o aviso sai como `> Switched to ...`. Testes que procuram uma linha de saída consideram o prefixo (`EndsWith`/`Contains`); cenários e DoD dizem "a saída contém", não "a linha" (AP-057).
+
 **Tolerância de verificação:** ao relaxar uma validação (ver `specs/BUSINESS_RULES.md`), liste todos os testes `LiveBrain` que o filtro da DoD executa e que ainda assertam a regra original (inclusive gravadores de fixture); cada um tem decisão explícita no plano: manter e aceitar o risco, ou mover a asserção para a fixture gravada (determinística) (AP-051).
 
 ## Exemplo completo
