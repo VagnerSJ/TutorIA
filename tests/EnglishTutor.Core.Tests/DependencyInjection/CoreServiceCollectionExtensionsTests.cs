@@ -1,3 +1,4 @@
+using EnglishTutor.Core.Audio;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.DependencyInjection;
@@ -60,6 +61,23 @@ public sealed class CoreServiceCollectionExtensionsTests
         var first = provider.GetService<ConversationService>();
         first.Should().NotBeNull();
         provider.GetService<ConversationService>().Should().BeSameAs(first);
+    }
+
+    // US-011 — apoio: registro do ReplySpeaker (nasce verde com o esqueleto)
+    [Fact]
+    public void AddEnglishTutorCore_Always_RegistersReplySpeaker()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ITextToSpeech>(new FakeTextToSpeech());
+        services.AddSingleton<IAudioPlayer>(new FakeAudioPlayer());
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+
+        services.AddEnglishTutorCore();
+
+        using var provider = services.BuildServiceProvider();
+        var first = provider.GetService<ReplySpeaker>();
+        first.Should().NotBeNull();
+        provider.GetService<ReplySpeaker>().Should().BeSameAs(first);
     }
 
     // US-010 — Cenário: opções de voz inválidas falham na inicialização — RN-TTS01

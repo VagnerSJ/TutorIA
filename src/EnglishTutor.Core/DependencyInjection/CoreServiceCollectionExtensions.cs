@@ -29,6 +29,9 @@ public static class CoreServiceCollectionExtensions
         // Eval (US-009): the runner builds its own ConversationService per sentence.
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<EvalRunner>();
+
+        // Voice output (US-011): speaks the reply after the interface shows it.
+        services.TryAddSingleton<ReplySpeaker>();
         return services;
     }
 }
