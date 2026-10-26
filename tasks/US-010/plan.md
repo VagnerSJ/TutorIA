@@ -1,6 +1,6 @@
 # Plano — US-010 Portas de voz e áudio no Core, com configuração validada
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-26
 Branch: feature/US-010_portas-voz-audio-config
 Spec: specs/sprints/SPRINT_2.md#us-010--portas-de-voz-e-áudio-no-core-com-configuração-validada
 Regras: RN-TTS01, RN-TTS02, RN-STT01 (só os valores e a faixa; nenhuma regra muda); ARCHITECTURE §2 (R1, R4), §3, §4, §7, §10; ADR-004 (Options no Core, bind no composition root)
@@ -264,3 +264,6 @@ tests/EnglishTutor.Infrastructure.Tests/Contract/LiveBrainTraitTests.cs:30
 - Incorporar a S5: acrescentar à §2.5 (último parágrafo) e ao D8 uma frase dizendo que os commits de docs entram antes da T1 e a T6 só depois, então o D8 "antes" só reproduz as 13 ocorrências contra o commit anterior ao de docs (ex.: `git grep ... 9e35333`); no estado da branch logo após os commits de docs, restam 5 (`ci.yml`, os 2 hooks e as 2 de `LiveBrainTraitTests.cs`) até a T6. Revisão de código e Executor conferem assim.
 
 → Incorporado. S5 → §2.5 (nota S5, depois do último parágrafo) e §10 D8 (nota S5 no fim da célula "Esperado"; o comando de exemplo contra `9e35333` e a contagem 13 / 5 / 0 por estado da branch).
+
+### 2026-10-26 — aprovação do usuário
+Plano aprovado. Respostas às perguntas em aberto: P1 a P7 conforme a resposta padrão de cada uma na §9 (faixa 0 a 1 para `Stt:LowConfidenceThreshold`; `Voice:Enabled` não lido por ninguém; `AudioClip` mono float32 em [-1, 1]; `Tts:Speed` NaN rejeitado; `appsettings.json` com as três seções; `Voice:Enabled` não booleano herda o binder; `Transcript` sem validação). Sem ADR proposto. S5 incorporada. Commits de docs aplicados antes da T1: `docs(ai): update test filter for US-010` e `docs(ai): update architecture for US-010`.
