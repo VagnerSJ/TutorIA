@@ -588,8 +588,8 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Quem errou:** executor (3 vezes na US)
 - **O que aconteceu:** constantes privadas e campos `static readonly` privados em classes de teste foram escritos sem `_` (ex.: `headerSize`), e o IDE1006 só apareceu no hook ou no D4. Foi corrigido três vezes durante a US (ex.: `_headerSize`, `_clip`). Recorrência de AP-012 no nível da regra de nome.
 - **Por que importa:** retrabalho por edição, e o build não avisa (AP-012).
-- **Correção (proposta, não aplicada):** `.claude/skills/padroes-codigo/SKILL.md`, tabela de nomes: acrescentar a linha "Constante privada e campo estático readonly privado: `_camelCase` (também em testes; IDE1006 do `.editorconfig`)", e o `executor.md` apontar para a tabela.
-- **Status:** Proposta
+- **Correção (aplicada):** `.claude/skills/padroes-codigo/SKILL.md`, tabela de nomes: acrescentar a linha "Constante privada e campo estático readonly privado: `_camelCase` (também em testes; IDE1006 do `.editorconfig`)", e o `executor.md` apontar para a tabela.
+- **Status:** Aplicada (2026-10-26, `padroes-codigo` e `executor.md`)
 
 ### AP-064 — Filtro de DoD por nome de namespace (`~Tts`) casa classes `Live*` e exige hardware
 
