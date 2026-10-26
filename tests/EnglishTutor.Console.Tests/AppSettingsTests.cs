@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EnglishTutor.Core.Speech;
+using EnglishTutor.Infrastructure.Tts;
 
 namespace EnglishTutor.Console.Tests;
 
@@ -32,5 +33,20 @@ public sealed class AppSettingsTests
         root.GetProperty("Tts").GetProperty("Speed").GetSingle().Should().Be(new TtsOptions().Speed);
         root.GetProperty("Stt").GetProperty("LowConfidenceThreshold").GetSingle()
             .Should().Be(new SttOptions().LowConfidenceThreshold);
+    }
+
+    // US-011 — apoio: seção Tts:Piper distribuída com os padrões das opções (P1, P7)
+    [Fact]
+    public void AppSettings_WhenShipped_DeclaresPiperDefaultsEqualToOptionDefaults()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+
+        var piper = document.RootElement.GetProperty("Tts").GetProperty("Piper");
+        var defaults = new PiperOptions();
+        piper.GetProperty("ExecutablePath").GetString().Should().Be(defaults.ExecutablePath);
+        piper.GetProperty("ModelPath").GetString().Should().Be(defaults.ModelPath);
+        piper.GetProperty("TimeoutSeconds").GetInt32().Should().Be(defaults.TimeoutSeconds);
     }
 }
