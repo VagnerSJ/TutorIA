@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace EnglishTutor.Infrastructure.Tests.Contract;
 
-// Guards of the "LiveBrain" trait (US-008 §2.5): live tests stay out of Category!=LiveBrain, and nothing else
+// Guards of the "LiveBrain" trait (US-008 §2.5): live tests stay out of the default run (Category!=LiveBrain&Category!=LiveVoice), and nothing else
 // is excluded from it by mistake. The behavior of the filter itself is proved by the DoD (D7).
 public sealed class LiveBrainTraitTests
 {
@@ -27,7 +27,7 @@ public sealed class LiveBrainTraitTests
 
         others.Should().NotBeEmpty();
         others.Where(HasLiveBrainTrait).Select(type => type.Name).Should().BeEmpty(
-            because: "the trait would hide a fast test from Category!=LiveBrain");
+            because: "the trait would hide a fast test from the default run (Category!=LiveBrain&Category!=LiveVoice)");
     }
 
     // US-008 — Cenário: testes live opcionais
