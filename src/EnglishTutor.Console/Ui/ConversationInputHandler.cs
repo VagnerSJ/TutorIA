@@ -1,6 +1,7 @@
 using EnglishTutor.Console.Logging;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
 using Microsoft.Extensions.Logging;
 
 namespace EnglishTutor.Console.Ui;
@@ -14,7 +15,12 @@ public sealed class ConversationInputHandler : IChatInputHandler
     private readonly TextWriter _error;
     private readonly ILogger _logger;
 
-    public ConversationInputHandler(ConversationService conversation, TextWriter output, TextWriter error, ILogger logger)
+    public ConversationInputHandler(
+        ConversationService conversation,
+        TextWriter output,
+        TextWriter error,
+        ILogger logger,
+        ReplySpeaker? speaker = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(output);
@@ -24,6 +30,7 @@ public sealed class ConversationInputHandler : IChatInputHandler
         _output = output;
         _error = error;
         _logger = logger;
+        _ = speaker;
     }
 
     public TutorMode Mode => _conversation.Mode;
