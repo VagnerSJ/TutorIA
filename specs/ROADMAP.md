@@ -51,12 +51,13 @@ Estimativa em sessões de trabalho de ~2 h, já incluindo o fluxo completo de ag
 | 1 | Fundação: solução, DI, Options, Serilog, CI; contrato do professor; `ConversationService` dono do histórico | US-001, US-002, US-003 | 3–4 |
 | 2 | Cérebro Claude Code (processo por chamada), erros e mensagens claras, chat por texto no console | US-004, US-005 | 2–3 |
 | 2b | Ollama, `BrainFactory` + fallback, testes de contrato, golden set + `eval` | US-006 a US-009 | 3–4 |
-| 3 | Voz de saída: Piper (fala só o reply), velocidade configurável; Kokoro como alternativa | Sprint 2 | 2 |
+| 3 | Voz de saída: Piper (fala só o reply), velocidade configurável; Kokoro como alternativa (backlog: só se o Piper não agradar) | Sprint 2 | 2 |
 | 4 | Voz de entrada: push-to-talk (NAudio) + Whisper.net CUDA com confiança por palavra; ciclo completo | Sprint 2 | 3 |
 | 5 | Persistência SQLite, histórico, resumo de erros recorrentes no início da sessão | Sprint 3 | 2–3 |
 | 6 | Latência: `ClaudeCodeStreamingBrain` (stream-json persistente), medição comparativa, streaming de TTS | Sprint 3 | 2–3 |
 | 7 | Modos (conversa, entrevista, escuta), velocidade, relatório de sessão | Sprint 4 | 2 |
-| 8 | Futuro: WPF/Blazor, pronúncia por fonemas (wav2vec2), provedor API Anthropic | — | — |
+| 7b | Interface gráfica estilo ChatGPT Voice (orbe animado, microfone ligado/desligado, transcrição e feedback), WPF ou Blazor com ADR | depois da Sprint 2 | 3–4 |
+| 8 | Futuro: pronúncia por fonemas (wav2vec2), provedor API Anthropic, outras interfaces | pronúncia por fonemas (wav2vec2), provedor API Anthropic | — | — |
 
 ## 4. Riscos conhecidos
 
