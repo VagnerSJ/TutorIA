@@ -53,7 +53,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 
 ## 3. Testes
 - [O] `dotnet build` sem warnings.
-- [O] `dotnet test --filter "Category!=LiveBrain"` verde.
+- [O] `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice"` verde.
 - [O] Cobertura de linhas do `EnglishTutor.Core` ≥ 80%.
 - [O] Nenhum teste apagado, ignorado (`Skip`) ou enfraquecido sem justificativa no plano.
 - Ordem de commits mostra teste antes do código (Red → Green). Desvio pontual = sugestão; ausência geral = bloqueante.

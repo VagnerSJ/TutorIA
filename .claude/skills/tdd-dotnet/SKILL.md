@@ -95,7 +95,7 @@ public abstract class TutorBrainContractTests
 public sealed class OllamaTutorBrainContractTests : TutorBrainContractTests { ... }
 ```
 
-Variantes live: classes `<Provedor>ContractLiveTests` (não herdam da suíte de contrato, cujos fakes simulam falhas que o provedor real não provoca), marcadas com `[Trait("Category", "LiveBrain")]` e excluídas no CI com `--filter "Category!=LiveBrain"`.
+Variantes live: classes `<Provedor>ContractLiveTests` (não herdam da suíte de contrato, cujos fakes simulam falhas que o provedor real não provoca), marcadas com `[Trait("Category", "LiveBrain")]` e excluídas no CI com `--filter "Category!=LiveBrain&Category!=LiveVoice"`.
 
 ## Fixtures
 

@@ -56,7 +56,7 @@ Cinco hábitos de trabalho com IA estão embutidos na estrutura: contexto curto 
 
 ```bash
 dotnet build
-dotnet test --filter "Category!=LiveBrain"
+dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice"
 dotnet run --project src/EnglishTutor.Console
 ```
 
