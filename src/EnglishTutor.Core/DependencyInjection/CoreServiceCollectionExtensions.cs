@@ -1,6 +1,7 @@
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.Evaluation;
+using EnglishTutor.Core.Speech;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,8 @@ public static class CoreServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<BrainOptions>, BrainOptionsValidator>());
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<ConversationOptions>, ConversationOptionsValidator>());
+
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<TtsOptions>, TtsOptionsValidator>());
 
         // One session per process: the service owns the history and the mode (US-004).
         services.TryAddSingleton<ConversationService>();
