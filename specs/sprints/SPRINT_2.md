@@ -118,18 +118,18 @@ Cenário: resposta crua não é falada
 Cenário: Piper ou modelo de voz ausente
   Dado Voice:Enabled igual a true e o executável do Piper (ou o modelo de voz) inexistente
   Quando a aplicação inicia
-  Então vejo uma mensagem com o caminho esperado e como baixar
+  Então a saída de erro contém o caminho esperado e como baixar
   E o chat segue por texto, sem voz, com código de saída 0 ao digitar "/quit"
 
 Cenário: falha da síntese não derruba a sessão
   Dado um TTS que lança exceção num turno
   Quando o professor responde
-  Então o texto aparece normalmente, vejo um aviso de que o áudio falhou e a sessão continua
+  Então o texto aparece normalmente, a saída de erro contém um aviso de que o áudio falhou e a sessão continua
 
 Cenário: Ctrl+C durante o áudio
-  Dado um áudio em reprodução
+  Dado um áudio em síntese ou em reprodução
   Quando pressiono Ctrl+C
-  Então a reprodução para e o processo do Piper é encerrado
+  Então a síntese ou a reprodução para e o processo do Piper, se ainda vivo, é encerrado
   E o código de saída é 0
 ```
 
@@ -137,7 +137,7 @@ Cenário: Ctrl+C durante o áudio
 
 | # | Comando | Esperado |
 |---|---|---|
-| D5 | `dotnet test --filter "FullyQualifiedName~Tts"` | verde, com fake de processo do Piper (nenhum executável real) |
+| D5 | `dotnet test --filter "FullyQualifiedName~Tts&Category!=LiveBrain&Category!=LiveVoice"` | verde, com fake de processo do Piper (nenhum executável real); nenhum teste `LiveVoice` roda: `dotnet test --filter "FullyQualifiedName~Tts&Category!=LiveBrain&Category!=LiveVoice" --list-tests` não lista `PiperLiveVoiceTests` |
 | D6 | `dotnet test --filter "Category=LiveVoice&FullyQualifiedName~Piper"`, com o Piper e a voz baixados | verde: sintetiza uma frase de teste e toca sem erro |
 | D7 | Manual no console com `Voice:Enabled=true` e o Claude Code: 3 turnos | o usuário confirma que ouve só o `reply`, que o feedback só aparece na tela, e registra a impressão da voz em "Evidências" |
 | D8 | `git status --short` depois de baixar a voz | nenhum arquivo de `models/` ou `*.wav` no Git |
@@ -180,6 +180,7 @@ Cenário: velocidade sem argumento
 |---|---|---|
 | D5 | `dotnet test --filter "FullyQualifiedName~Speed"` | verde, incluindo os limites 0.5, 1.5, 0.49 e 1.51 |
 | D6 | Manual: `/speed 0.7` e `/speed 1.4` em dois turnos | o usuário confirma a diferença audível e registra |
+| D7 | `dotnet test --filter "FullyQualifiedName~ReplySpeakerTests"` | verde: `SpeakAsync_WhenSpeedIsConfigured_PassesItToTts` (US-011) continua verde depois que a velocidade passa a ser valor mutável da sessão; a US-012 só troca a fonte da velocidade, não o contrato `ReplySpeaker` → `ITextToSpeech.SynthesizeAsync(texto, velocidade, ct)` |
 
 ---
 
