@@ -57,6 +57,7 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 
 ## Regras
 
+- Nunca use `git add -A` nem `git add .`: adicione por caminho. Código de produção vai em `fix(<escopo>):` ou `feat(<escopo>):`; a §12 do `plan.md` vai em `docs(ai):` em commit separado (AP-062).
 - Siga `ARCHITECTURE.md` e o plano. Se precisar desviar (o plano está errado ou incompleto), **pare**, explique o desvio e proponha a alteração **no plan.md** (seção "Perguntas em aberto") — não decida sozinho mudanças de comportamento ou de arquitetura. Intenção muda no documento primeiro, depois no código.
 - Quando o pedido (plano, comentário do usuário ou sugestão de revisão) deixar uma escolha de forma em aberto (texto de mensagem, nome ou Id de evento, código de saída etc.), registre a escolha no §12 do `plan.md` num commit `docs(ai): ...` **antes** do commit `feat`/`fix` que a implementa (AP-009).
 - Mudança em `Directory.Packages.props` com versão que o plano não fixou entra na §12 antes do commit que a usa, ou no mesmo commit (AP-043).

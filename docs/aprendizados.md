@@ -579,8 +579,8 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Quem errou:** executor
 - **O que aconteceu:** o fix de `PiperTextToSpeech` (`Path.GetFullPath`) foi commitado junto com a §12 em `5c0c5de`, com tipo `docs(ai)`, porque o Executor usou `git add -A`. O Revisor apontou a violação (não bloqueante); o código estava certo e vinha depois do Red.
 - **Por que importa:** o histórico passa a esconder código de produção num commit de documentação, e o tipo do commit deixa de dizer o que mudou.
-- **Correção (proposta, não aplicada):** `.claude/agents/executor.md`: "nunca use `git add -A` nem `git add .`; adicione por caminho; código de produção vai em `fix(escopo):` ou `feat(escopo):`, e a §12 em `docs(ai):` em commit separado". Opcional: lembrete no hook `executor-stop-gate` quando um commit `docs(ai)` toca `src/`.
-- **Status:** Proposta
+- **Correção (aplicada):** `.claude/agents/executor.md`: "nunca use `git add -A` nem `git add .`; adicione por caminho; código de produção vai em `fix(escopo):` ou `feat(escopo):`, e a §12 em `docs(ai):` em commit separado". Opcional: lembrete no hook `executor-stop-gate` quando um commit `docs(ai)` toca `src/`.
+- **Status:** Aplicada (2026-10-26, `executor.md`)
 
 ### AP-063 — `.editorconfig` exige prefixo `_` em constantes privadas e campos estáticos readonly, inclusive em testes (IDE1006)
 
