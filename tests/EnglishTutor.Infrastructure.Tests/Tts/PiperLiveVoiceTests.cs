@@ -13,6 +13,8 @@ public sealed class PiperLiveVoiceTests
 {
     private const string _sentence = "Hello, this is a voice test. Can you hear me?";
 
+    // Uses the RELATIVE default paths (as the appsettings do, relative to the current directory, P2), with the
+    // current directory set to the repository root, so a regression in path handling cannot escape again.
     private static PiperOptions RealOptions()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -22,11 +24,8 @@ public sealed class PiperLiveVoiceTests
         }
 
         root.Should().NotBeNull("the repository root (EnglishTutor.slnx) must be above the test output folder");
-        return new PiperOptions
-        {
-            ExecutablePath = Path.Combine(root!.FullName, PiperOptions.DefaultExecutablePath),
-            ModelPath = Path.Combine(root.FullName, PiperOptions.DefaultModelPath),
-        };
+        Directory.SetCurrentDirectory(root!.FullName);
+        return new PiperOptions();
     }
 
     // US-011 — D6: Piper real, WavPcmReader e NAudioPlayer reais
