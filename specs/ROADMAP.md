@@ -57,7 +57,7 @@ Estimativa em sessões de trabalho de ~2 h, já incluindo o fluxo completo de ag
 | 6 | Latência: `ClaudeCodeStreamingBrain` (stream-json persistente), medição comparativa, streaming de TTS | Sprint 3 | 2–3 |
 | 7 | Modos (conversa, entrevista, escuta), velocidade, relatório de sessão | Sprint 4 | 2 |
 | 7b | Interface gráfica estilo ChatGPT Voice (orbe animado, microfone ligado/desligado, transcrição e feedback), WPF ou Blazor com ADR | depois da Sprint 2 | 3–4 |
-| 8 | Futuro: pronúncia por fonemas (wav2vec2), provedor API Anthropic, outras interfaces | pronúncia por fonemas (wav2vec2), provedor API Anthropic | — | — |
+| 8 | Futuro: pronúncia por fonemas (wav2vec2), provedor API Anthropic, outras interfaces | — | — |
 
 ## 4. Riscos conhecidos
 
