@@ -570,8 +570,8 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Quem errou:** planejador e executor (testes e `LiveVoice` só com caminhos absolutos)
 - **O que aconteceu:** o `PiperTextToSpeech` rodava o Piper com `WorkingDirectory` na pasta do executável e passava `--model` com o caminho relativo cru (`models/piper/...`, padrão do appsettings). Toda síntese falhou com `Piper exited with code -1073740791` na D7 manual. Os testes unitários e o `PiperLiveVoiceTests` (D6 verde) usavam caminhos absolutos, então nenhum exercitava o padrão real. Corrigido com `Path.GetFullPath` (5c0c5de) e testes com caminho relativo (5da4f77, 260f54d).
 - **Por que importa:** o padrão distribuído é relativo; um teste que só usa caminhos absolutos dá confiança sem cobrir o uso real.
-- **Correção (proposta, não aplicada):** `.claude/skills/tdd-dotnet/SKILL.md` e `.claude/agents/planejador.md`: "todo adaptador que lança processo com `WorkingDirectory` diferente do diretório atual precisa de teste com caminho relativo (executável, argumentos e arquivos temporários); o teste `Live*` usa os padrões reais do `appsettings.json`, com o diretório atual da raiz do repositório, e não caminhos montados em absoluto".
-- **Status:** Proposta
+- **Correção (aplicada):** `.claude/skills/tdd-dotnet/SKILL.md` e `.claude/agents/planejador.md`: "todo adaptador que lança processo com `WorkingDirectory` diferente do diretório atual precisa de teste com caminho relativo (executável, argumentos e arquivos temporários); o teste `Live*` usa os padrões reais do `appsettings.json`, com o diretório atual da raiz do repositório, e não caminhos montados em absoluto".
+- **Status:** Aplicada (2026-10-26, `tdd-dotnet` e `planejador.md`)
 
 ### AP-062 — Commit de correção entrou como `docs(ai)` por `git add -A`
 

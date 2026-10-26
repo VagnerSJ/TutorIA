@@ -97,6 +97,8 @@ public sealed class OllamaTutorBrainContractTests : TutorBrainContractTests { ..
 
 Variantes live: classes `<Provedor>ContractLiveTests` (não herdam da suíte de contrato, cujos fakes simulam falhas que o provedor real não provoca), marcadas com `[Trait("Category", "LiveBrain")]` e excluídas no CI com `--filter "Category!=LiveBrain&Category!=LiveVoice"`.
 
+Adaptador que lança processo com `WorkingDirectory` diferente do diretório atual tem teste com caminho **relativo** (executável, argumentos e arquivos temporários chegam ao processo como caminhos completos); o teste `Live*` usa os padrões reais do `appsettings.json`, com o diretório atual na raiz do repositório, não caminhos montados em absoluto (AP-061).
+
 ## Fixtures
 
 Saídas reais de processo/HTTP gravadas em `Fixtures/*.json` (a partir da US-004; a US-002 usa exemplos da spec em `Fixtures/TutorReply/`), com `<None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />`. Nunca dados pessoais nem tokens.
