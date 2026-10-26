@@ -77,4 +77,20 @@ public sealed class CoreServiceCollectionExtensionsTests
             .Which.Failures.Should().ContainSingle(
                 failure => failure.Contains("Tts:Speed", StringComparison.Ordinal));
     }
+
+    // US-010 — Cenário: opções de voz inválidas falham na inicialização — RN-STT01
+    [Fact]
+    public void AddEnglishTutorCore_Always_RegistersSttOptionsValidator()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<SttOptions>().Configure(options => options.LowConfidenceThreshold = 1.5f);
+
+        services.AddEnglishTutorCore();
+
+        using var provider = services.BuildServiceProvider();
+        var read = () => provider.GetRequiredService<IOptions<SttOptions>>().Value;
+        read.Should().Throw<OptionsValidationException>()
+            .Which.Failures.Should().ContainSingle(
+                failure => failure.Contains("Stt:LowConfidenceThreshold", StringComparison.Ordinal));
+    }
 }
