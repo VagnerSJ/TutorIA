@@ -21,6 +21,8 @@ public static class CoreServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<TtsOptions>, TtsOptionsValidator>());
 
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<SttOptions>, SttOptionsValidator>());
+
         // One session per process: the service owns the history and the mode (US-004).
         services.TryAddSingleton<ConversationService>();
 
