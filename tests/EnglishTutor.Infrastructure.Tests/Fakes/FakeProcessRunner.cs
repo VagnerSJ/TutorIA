@@ -20,6 +20,13 @@ public sealed class FakeProcessRunner : IProcessRunner
         return this;
     }
 
+    // Finishes when the test completes the task (a process that ends at a moment the test chooses).
+    public FakeProcessRunner ReturnsWhenCompleted(Task<ProcessResult> pending)
+    {
+        _calls.Enqueue(_ => pending);
+        return this;
+    }
+
     public FakeProcessRunner ReturnsOutput(string standardOutput) => Returns(new ProcessResult(0, standardOutput, string.Empty));
 
     public FakeProcessRunner Throws(Exception exception)
