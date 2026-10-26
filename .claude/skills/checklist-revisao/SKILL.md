@@ -35,7 +35,7 @@ Marque cada item como ✅, ❌ ou N/A. Itens com **[O]** são obrigatórios: ❌
 - Afirmação quantitativa sobre comportamento existente (limite, contagem, "a partir de qual turno") cita o símbolo que a sustenta (ex.: `ConversationWindow.Add`) e foi conferida no código antes de ir para o relatório (AP-036).
 
 ## 1. Spec e regras
-- [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código).
+- [O] Todo cenário BDD da US tem pelo menos um teste correspondente (tabela da seção 4 do plano confere com o código). Os nomes de teste da §4 batem com o código; renome só registrado em §11 é sugestão (AP-060).
 - [O] Comportamento implementado bate com os cenários (valores, mensagens, códigos de saída).
 - [O] Regras `RN-*` citadas pela US são respeitadas; testes citam a regra no comentário.
 - [O] Nada fora do escopo da US foi implementado sem registro no plano.
