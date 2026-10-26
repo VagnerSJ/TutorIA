@@ -4,6 +4,7 @@ using EnglishTutor.Console.Ui;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.DependencyInjection;
+using EnglishTutor.Core.Speech;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -151,6 +152,16 @@ public static class EnglishTutorApp
             .ValidateOnStart();
         builder.Services.AddOptions<ConversationOptions>()
             .Bind(builder.Configuration.GetSection(ConversationOptions.SectionName))
+            .ValidateOnStart();
+
+        builder.Services.AddOptions<TtsOptions>()
+            .Bind(builder.Configuration.GetSection(TtsOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<SttOptions>()
+            .Bind(builder.Configuration.GetSection(SttOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<VoiceOptions>()
+            .Bind(builder.Configuration.GetSection(VoiceOptions.SectionName))
             .ValidateOnStart();
 
         options.ConfigureServices?.Invoke(builder.Services);
