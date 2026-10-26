@@ -597,5 +597,5 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Quem errou:** planejador (copiou o filtro da spec sem checar o que ele casa)
 - **O que aconteceu:** a D5 `dotnet test --filter "FullyQualifiedName~Tts"` casaria `EnglishTutor.Infrastructure.Tests.Tts.PiperLiveVoiceTests`, que exige Piper real e alto-falante. O Revisor do plano pegou antes da execução (B1); o plano passou a usar `&Category!=LiveBrain&Category!=LiveVoice` e `--list-tests` como prova (56 testes contra 58 do filtro antigo). Não havia entrada anterior sobre isso (verificado por busca no diário).
 - **Por que importa:** o comando de DoD falharia fora da máquina do autor (CI), ou, pior, tocaria hardware.
-- **Correção (proposta, não aplicada):** `.claude/agents/planejador.md` e `.claude/skills/bdd-para-testes/SKILL.md`: "todo filtro de DoD por nome (`FullyQualifiedName~X`) leva `&Category!=LiveBrain&Category!=LiveVoice` e uma prova com `--list-tests` de que nenhuma classe `Live*` entra". Item [O] em `.claude/skills/checklist-revisao/SKILL.md` §0.
-- **Status:** Proposta
+- **Correção (aplicada):** `.claude/agents/planejador.md` e `.claude/skills/bdd-para-testes/SKILL.md`: "todo filtro de DoD por nome (`FullyQualifiedName~X`) leva `&Category!=LiveBrain&Category!=LiveVoice` e uma prova com `--list-tests` de que nenhuma classe `Live*` entra". Item [O] em `.claude/skills/checklist-revisao/SKILL.md` §0.
+- **Status:** Aplicada (2026-10-26, `planejador.md`, `bdd-para-testes` e `checklist-revisao` §0)
