@@ -7,6 +7,7 @@ using EnglishTutor.Core.DependencyInjection;
 using EnglishTutor.Core.Speech;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.DependencyInjection;
+using EnglishTutor.Infrastructure.Tts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -156,6 +157,9 @@ public static class EnglishTutorApp
 
         builder.Services.AddOptions<TtsOptions>()
             .Bind(builder.Configuration.GetSection(TtsOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<PiperOptions>()
+            .Bind(builder.Configuration.GetSection(PiperOptions.SectionName))
             .ValidateOnStart();
         builder.Services.AddOptions<SttOptions>()
             .Bind(builder.Configuration.GetSection(SttOptions.SectionName))
