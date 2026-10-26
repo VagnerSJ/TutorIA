@@ -46,7 +46,7 @@ if (!build.ok) {
 if (!testProject || process.env.ENGLISHTUTOR_HOOK_TESTS === "0") process.exit(0);
 
 const test = runDotnet(
-  ["test", testProject, "--no-build", "-nologo", ...testLoggerArgs, "--filter", "Category!=LiveBrain"],
+  ["test", testProject, "--no-build", "-nologo", ...testLoggerArgs, "--filter", "Category!=LiveBrain&Category!=LiveVoice"],
   root,
 );
 if (!test.ok) {

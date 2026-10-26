@@ -21,7 +21,7 @@ if (!build.ok) {
 }
 
 const test = runDotnet(
-  ["test", solution, "--no-build", "-nologo", ...testLoggerArgs, "--filter", "Category!=LiveBrain"],
+  ["test", solution, "--no-build", "-nologo", ...testLoggerArgs, "--filter", "Category!=LiveBrain&Category!=LiveVoice"],
   root,
 );
 if (!test.ok) {
