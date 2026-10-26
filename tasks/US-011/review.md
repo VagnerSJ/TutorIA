@@ -37,3 +37,47 @@ Nenhum.
 
 ## Aprendizados para o processo
 - Nenhum erro novo nesta rodada. Os cuidados dos AP-039, AP-047, AP-052 e AP-057 foram aplicados e aparecem nos testes e na DoD.
+
+---
+
+## Rodada 2
+
+Data: 2026-10-26
+Commits revisados: 5da4f77..069a5b0
+Resultado: APROVADO (0 bloqueantes)
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| Build sem warnings | ✅ (compilou; TreatWarningsAsErrors) |
+| Testes (exceto LiveBrain/LiveVoice) | ✅ 763 passaram (Core 322, Infra 321, Console 120), 0 falhas |
+| `dotnet format --verify-no-changes` | ✅ código 0 |
+| Cobertura do Core | Não remedida: o Core não mudou desde a rodada 1. Vale o valor da rodada 1. |
+| Teste antes do código | ✅ `test(tts)` 5da4f77 precede o fix 5c0c5de |
+| Evidências conferem | ✅ as contagens batem com as minhas (322/321/120) |
+| Intenção antes do código | ⚠️ ver S2: o §12 entrou no mesmo commit do fix |
+
+### Verificações pedidas
+- **O fix cobre o executável, o modelo e o WAV:** sim. `PiperTextToSpeech` aplica `Path.GetFullPath` a `ExecutablePath`, `ModelPath` e ao WAV. O `WorkingDirectory` sai do executável já completo.
+- **O teste novo falha sem o fix:** sim, por inspeção. Não rodei mutação local.
+  - Sem o fix, `FileName` ficaria `models\piper\piper.exe` e as asserções de `FileName`, `WorkingDirectory` e `Arguments[1]` falhariam.
+  - O fix do executável e o do modelo são cobertos em separado (`FileName` e `Arguments[1]`).
+  - O fix do WAV não é coberto. O teste usa `TempFolder` absoluto (`_folder/tmp`), então `Path.IsPathRooted(OutputFileOf(request))` passa sem o fix. Ver S1.
+- **`PiperLiveVoiceTests`:** usa `new PiperOptions()` com os padrões relativos. O teste faz `Directory.SetCurrentDirectory` para a raiz do repositório (o diretório que contém `EnglishTutor.slnx`). Isso reproduz o cenário do bug. Não reexecutei o teste, porque `LiveVoice` precisa de Piper e áudio. É evidência do Executor (2 aprovados, 91b1c27). O código é coerente com ela.
+- **Fix dentro de um commit `docs(ai)` (5c0c5de):** é observação, não bloqueante. O código está correto, vem depois do Red e tem testes. O Executor declarou o engano no plano. Convenção violada: o commit deveria ser `fix(tts):`, com o §12 em `docs(ai)` separado.
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S1** — `tests/EnglishTutor.Infrastructure.Tests/Tts/PiperTextToSpeechTests.cs`, `SynthesizeAsync_WithRelativePaths_PassesFullPathsToPiper`. A asserção final (`Path.IsPathRooted(OutputFileOf(request))`) é vacuosa, porque o WAV só fica relativo se o diretório temporário injetado for relativo. Esperado: o teste passar uma pasta temporária relativa, ou a asserção ser removida. Sem isso, o `GetFullPath` do WAV em `PiperTextToSpeech` fica sem teste.
+- **S2** — `tasks/US-011/plan.md` §12 foi escrito junto com o fix (5c0c5de) e não antes. Isso é registro tardio de forma (AP-014/AP-027). Não bloqueia, porque o bug foi achado na D7 e o fix só muda caminhos, não texto nem nome público.
+
+### Pontos positivos
+- O Red do teste veio antes do fix, e a causa do bug está documentada com reprodução.
+- O teste live agora exercita os padrões relativos, o que fecha a lacuna que deixou o bug escapar.
+- A evidência da correção traz contagens exatas, e elas batem com as minhas.
+
+### Aprendizados para o processo
+- `git add -A` misturou código de produção num commit `docs(ai)` → regra: usar `git add` por caminho, e commit de fix em `fix(escopo):`.
+- Testes de unidade com caminhos só absolutos escondem diferenças de diretório de trabalho → regra: todo adaptador que lança processo com `WorkingDirectory` diferente do diretório atual precisa de teste com caminho relativo.
