@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup Label="Infrastructure">
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
+    <PackageVersion Include="NAudio.WinMM" Version="2.2.1" />
     <PackageVersion Include="OllamaSharp" Version="5.5.0" />
   </ItemGroup>
   <ItemGroup Label="Console">
