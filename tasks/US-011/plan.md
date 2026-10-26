@@ -1,0 +1,240 @@
+# Plano — US-011 O professor fala o `reply` (Piper)
+
+Status: Aguardando aprovação
+Branch: feature/US-011_professor-fala-reply-piper
+Spec: specs/sprints/SPRINT_2.md#us-011--o-professor-fala-o-reply-piper
+Regras: RN-TTS01 (e RN-TTS02 só pelo valor padrão de `Tts:Speed`); ARCHITECTURE §1, §3, §4, §5 (passo 6), §7, §9, §10; ADR-004, ADR-008 (modelo de falha e tempo máximo), ADR-012 (novo, Proposto)
+
+## 1. Objetivo
+
+Com `Voice:Enabled=true`, o console mostra o `reply` e o feedback do turno e só então fala o `reply` (nunca feedback nem resposta crua) com o Piper, sem derrubar a sessão se a voz faltar ou falhar, e Ctrl+C interrompe síntese e reprodução com código 0. Com `Voice:Enabled=false` o chat é idêntico ao de hoje.
+
+## 2. Abordagem
+
+ADR novo: `docs/adr/ADR-012-voz-de-saida-piper-por-processo-e-reply-speaker-no-core.md` (Proposto), com alternativas descartadas.
+
+### 2.1 Quem fala: `ReplySpeaker` no Core, chamado pela interface depois de mostrar o texto
+
+`ConversationService.SendAsync` devolve só no fim do turno, então falar lá dentro atrasaria o texto (cenário "o texto aparece antes do áudio terminar"). `ConversationService` não muda. Novos tipos em `Core/Speech`:
+
+```csharp
+public enum SpeakResult { Spoken, Skipped, Failed }
+public sealed class ReplySpeaker(ITextToSpeech tts, IAudioPlayer player, IOptions<TtsOptions> options,
+                                 TimeProvider time, ILogger<ReplySpeaker> logger)
+{ public Task<SpeakResult> SpeakAsync(TutorReply reply, CancellationToken ct); }
+public interface IVoiceOutputCheck { VoiceOutputStatus Check(); }          // lido na partida (2.2)
+public sealed record VoiceOutputStatus(bool IsAvailable, IReadOnlyList<string> Lines);
+```
+
+Regras do `SpeakAsync` (R4: moram no Core):
+- `IsRawFallback` ou `Reply` em branco: `Skipped`, nada vai ao TTS nem ao player (log Debug `ReplyNotSpoken`, EventId 3102).
+- Caso contrário `tts.SynthesizeAsync(reply.Reply, options.Value.Speed, ct)` com o texto **exatamente** igual a `Reply`; depois `player.PlayAsync(clip, ct)`; `Spoken`. A velocidade é a de `Tts:Speed` lida a cada chamada; a US-012 troca a fonte por um valor mutável da sessão (registrado na spec da US-012, §2.6).
+- Qualquer exceção do TTS ou do player, exceto `OperationCanceledException`, é logada (Warning, EventId 3101, propriedade `Stage` = `synthesis` ou `playback`, com a exceção) e vira `Failed`; o `catch (Exception)` converte e loga, não é silencioso. `OperationCanceledException` sempre propaga, sem log de falha.
+- Em `Spoken`, loga Information `ReplySpoken` (EventId 3100) com `SynthesisMs`, `PlaybackMs` e `Characters` (tempo por `TimeProvider`); nunca o texto (`padroes-codigo`, Logs).
+- Registro: `AddEnglishTutorCore` faz `TryAddSingleton<ReplySpeaker>()` (o `TimeProvider` já é registrado ali).
+
+### 2.2 Console
+
+- `ConversationInputHandler` ganha o último parâmetro opcional `ReplySpeaker? speaker = null`. Depois de escrever `ConsoleText.TutorReply(...)` e só se houver `speaker`, faz `await speaker.SpeakAsync(result.Reply, ct)`; se `Failed`, escreve `ConsoleText.AudioFailed` na **saída de erro** (mesmo canal da falha do cérebro, `BrainFailed`; AP-024). Turno ignorado (aviso local, RN-CONV05) e `BrainException` não falam. `ChatSession` já espera `HandleAsync` terminar antes de ler a próxima linha; por isso "a próxima entrada só é lida depois do fim do áudio" não exige mudança nela.
+- `ConsoleText.AudioFailed` = `Audio failed: the reply is shown as text only. The session continues.`
+- `EnglishTutorApp.RunSessionAsync` (só o caminho do chat, não o `eval`): se `VoiceOptions.Enabled`, chama `IVoiceOutputCheck.Check()`. Disponível: cria o `ReplySpeaker` do DI e loga `VoiceOutputEnabled` (AppLog 1008, Information). Indisponível: escreve `Lines` na **saída de erro**, loga `VoiceOutputUnavailable` (AppLog 1009, Warning), segue sem `ReplySpeaker`. Com `Voice:Enabled=false` o `IVoiceOutputCheck` nem é resolvido.
+- Bind novo no `BuildHost`: `PiperOptions` (seção `Tts:Piper`) com `ValidateOnStart`.
+- O cabeçalho não muda (nenhuma linha "Voice:"; P4); `/help` não muda.
+- `appsettings.json` ganha em `Tts`: `"Piper": { "ExecutablePath": "models/piper/piper.exe", "ModelPath": "models/piper/en_US-lessac-medium.onnx", "TimeoutSeconds": 30 }` ao lado de `"Speed": 1.0` (P1).
+
+### 2.3 Infrastructure (`Tts/` e `Audio/`)
+
+- `PiperOptions` (`SectionName = "Tts:Piper"`): `ExecutablePath`, `ModelPath`, `TimeoutSeconds` (`Min` 1, `Max` 300, padrão 30). `PiperOptionsValidator` (um erro por chave, no estilo de `ClaudeCodeOptionsValidator`): caminhos em branco e timeout fora da faixa, com "found" e "Expected".
+- `PiperTextToSpeech : ITextToSpeech` (`IProcessRunner`, `IOptions<PiperOptions>`, `TimeProvider`, pasta temporária opcional no construtor, padrão `Path.GetTempPath()`):
+  1. Guarda: `speed` não positiva ou NaN lança `ArgumentOutOfRangeException` (a faixa 0.5 a 1.5 é do `TtsOptionsValidator`; o adaptador só impede divisão inválida).
+  2. Texto: quebras de linha viram um espaço (`\s*[\r\n]+\s*` → `" "`), mais `\n` final no stdin. O Piper trata cada linha como uma fala e, com `--output_file`, uma linha sobrescreve a anterior; por isso o adaptador achata (decisão do adaptador, não regra de negócio; P5).
+  3. `ProcessRequest`: `FileName` = `ExecutablePath`; `Arguments` = `["--model", <ModelPath>, "--output_file", <wav temporário único>, "--length_scale", <1/speed>]` (lista, nunca string concatenada); `WorkingDirectory` = pasta do executável (o Piper procura `espeak-ng-data` ao lado dele); `StandardInput` = texto. `length_scale` = `(1f / speed).ToString("0.####", CultureInfo.InvariantCulture)` (1.0→`1`, 0.8→`1.25`, 1.5→`0.6667`, 0.5→`2`).
+  4. Ambiente do processo filho: herdado, sem limpeza (o Piper não lê variáveis do aluno; AP-034). A DoD live diz isso.
+  5. Tempo máximo: `CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds), timeProvider)` ligado ao `ct`; estouro com o `ct` do chamador vivo lança `TimeoutException("Piper did not finish within {n} seconds. Expected the synthesis to end sooner; raise Tts:Piper:TimeoutSeconds if the machine is slow.")`; cancelamento do chamador lança `OperationCanceledException` (nunca `TimeoutException`). O runner encerra a árvore do processo nos dois casos (`ProcessRunnerLiveTests.RunAsync_WhenCancelled_KillsWholeProcessTree` já prova o runner real).
+  6. Saída: `ExitCode != 0` lança `InvalidOperationException("Piper exited with code {n}: {stderr}. Expected exit code 0; check Tts:Piper:ModelPath and that the voice .onnx.json sits next to it.")`; arquivo ausente lança `InvalidOperationException("Piper did not produce an audio file at {path}. Expected a WAV file; check the voice model.")`; senão `WavPcmReader.Read(bytes)` → `AudioClip`.
+  7. `finally`: apaga o WAV temporário (sucesso, falha e cancelamento).
+- `WavPcmReader` (`internal static`, visível aos testes por `InternalsVisibleTo` se o projeto já usar; senão `public static`, o Executor escolhe e registra na §12): lê RIFF/WAVE PCM 16 bits mono; percorre os chunks (pula `LIST` etc., com byte de preenchimento em tamanho ímpar), exige `fmt ` com formato 1, 1 canal, 16 bits e `data`. Tamanho do `data` maior que o resto do arquivo (inclui `0xFFFFFFFF`) lê até o fim; byte ímpar sobrando é ignorado; zero amostra, `fmt`/`data` ausentes, outro formato ou arquivo sem `RIFF/WAVE` lançam `InvalidDataException` dizendo o que foi achado e o que se espera. Amostra = `short / 32768f` (de -1.0 a ~0.99997).
+- `PiperVoiceOutputCheck : IVoiceOutputCheck` (`IOptions<PiperOptions>`, `Func<string, bool> fileExists` com padrão `File.Exists`): confere executável, modelo e `<ModelPath>.json`. Tudo existe: `Available`. Senão `Lines` = (1) `Voice is on, but the Piper voice was not found, so the tutor answers by text only.` (2) uma linha `Missing: <caminho completo>` por arquivo ausente (`Path.GetFullPath`, relativo ao diretório atual; P2) (3) `Download Piper (piper_windows_amd64.zip) from https://github.com/rhasspy/piper/releases/tag/2023.11.14-2 and a voice (.onnx and .onnx.json) from https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/lessac/medium, then save them at the paths above (models/ is ignored by Git).`
+- `NAudioPlayer : IAudioPlayer` com `WaveOutEvent` (`NAudio.WinMM`): `BufferedWaveProvider` ou `RawSourceWaveStream` em float32 mono na taxa do clipe; `Play()`; `TaskCompletionSource` completado em `PlaybackStopped`; cancelamento chama `Stop()` e lança `OperationCanceledException`; descarta o dispositivo em `finally`. Fino de propósito (sem regra): coberto só por `PiperLiveVoiceTests` (limite aceito, §7).
+- Registro (`AddEnglishTutorInfrastructure`): `TryAddSingleton<ITextToSpeech, PiperTextToSpeech>`, `<IAudioPlayer, NAudioPlayer>`, `<IVoiceOutputCheck, PiperVoiceOutputCheck>` e `TryAddEnumerable` do `PiperOptionsValidator`.
+
+### 2.4 Mensagens e canais
+
+| Situação | Texto | Canal | Teste (§4) |
+|---|---|---|---|
+| Piper/voz ausente na partida | `Lines` de 2.3 (3 partes) | erro | `PiperVoiceOutputCheckTests.*`, `VoiceOutputAppTests.RunAsync_WhenVoiceIsOnAndPiperFilesAreMissing_...` |
+| Síntese ou reprodução falhou no turno | `Audio failed: the reply is shown as text only. The session continues.` | erro | `SpokenReplyTests.HandleAsync_WhenTtsThrows_...`, `VoiceOutputAppTests.RunAsync_WhenTtsFailsInOneTurn_...` |
+| Ctrl+C durante síntese/reprodução | nenhuma mensagem; código 0 | — | `VoiceOutputAppTests.RunAsync_WhenCancelledDuring*` |
+
+Critério de saída (AP-057): "a saída de erro contém" e "a saída padrão contém", nunca "a linha".
+
+### 2.5 Mudanças em `ARCHITECTURE.md` (commit `docs(ai): update architecture for US-011`, antes da T1; texto antigo citado)
+
+1. §1, diagrama. Antigo: `CS -->|somente reply| TTS[ITextToSpeech<br/>Piper / Kokoro]`. Novo: `CS -->|somente reply, via ReplySpeaker| TTS[ITextToSpeech<br/>Piper / Kokoro]`.
+2. §3, linha `Speech/` do Core. Antigo (final da linha): `VoiceOptions, TtsOptions, TtsOptionsValidator, SttOptions, SttOptionsValidator`. Novo: o mesmo, seguido de `, ReplySpeaker, SpeakResult, IVoiceOutputCheck, VoiceOutputStatus`.
+3. §3, linha `Tts/` da Infrastructure. Antigo: `Tts/               PiperTextToSpeech, KokoroHttpTextToSpeech`. Novo: `Tts/               PiperTextToSpeech, PiperOptions, PiperOptionsValidator, PiperVoiceOutputCheck, WavPcmReader, KokoroHttpTextToSpeech`.
+4. §5, passo 6. Antigo: ``6. Envia **apenas** `Reply` ao TTS (RN-TTS01); o feedback vai só para a tela.`` Novo: ``6. O texto falado é **apenas** o `Reply` (RN-TTS01); o feedback vai só para a tela. Quem fala é o `ReplySpeaker` (Core), chamado pela interface depois de mostrar o texto do turno (ADR-012); a resposta crua (`IsRawFallback`) não é falada.``
+5. §7, linha TTS. Antigo: ``- TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável (`Tts:Speed`). Fala apenas o `Reply`.`` Novo: o mesmo texto até ``Velocidade configurável (`Tts:Speed`).`` seguido de ``Fala apenas o `Reply` (`ReplySpeaker`, ADR-012). O `PiperTextToSpeech` roda `piper --model --output_file <wav temporário> --length_scale <1/velocidade>` pelo `IProcessRunner`, lê o WAV PCM16 mono e apaga o arquivo. Com `Voice:Enabled=true` e arquivos ausentes, a partida avisa na saída de erro (caminhos e como baixar) e o chat segue por texto.``
+6. §7, linha de configuração. Antigo (trecho): `Stt:LowConfidenceThreshold (0 a 1, padrão 0.6).` Novo: `Stt:LowConfidenceThreshold (0 a 1, padrão 0.6); Tts:Piper:ExecutablePath (padrão models/piper/piper.exe), Tts:Piper:ModelPath (padrão models/piper/en_US-lessac-medium.onnx) e Tts:Piper:TimeoutSeconds (1 a 300, padrão 30), validados na Infrastructure.` A frase seguinte da linha ("Valor fora da faixa encerra com código 2 e a mensagem diz a faixa.") não muda.
+
+Sincronia (Grep em `CLAUDE.md`, `README.md` e `.claude/` por `Envia`, `ao TTS`, `Piper`, `somente reply`, `Speech/`, `Tts/`): `CLAUDE.md` linha 3 ("Whisper + TTS") e `README.md` (diagrama "só o reply", "Piper ou Kokoro") continuam verdadeiros; nenhuma skill repete o passo 6 nem a lista de pastas. Nenhuma linha de `CLAUDE.md` ou de skill muda.
+
+### 2.6 Mudanças em specs (commit `docs(ai): update spec for US-011`, antes da T1)
+
+`specs/sprints/SPRINT_2.md`, US-011 (texto antigo → novo):
+1. Cenário "Piper ou modelo de voz ausente". Antigo: `Então vejo uma mensagem com o caminho esperado e como baixar`. Novo: `Então a saída de erro contém o caminho esperado e como baixar`.
+2. Cenário "falha da síntese não derruba a sessão". Antigo: `Então o texto aparece normalmente, vejo um aviso de que o áudio falhou e a sessão continua`. Novo: `Então o texto aparece normalmente, a saída de erro contém um aviso de que o áudio falhou e a sessão continua`.
+3. Cenário "Ctrl+C durante o áudio". Antigo: `Dado um áudio em reprodução` e `Então a reprodução para e o processo do Piper é encerrado`. Novo: `Dado um áudio em síntese ou em reprodução` e `Então a síntese ou a reprodução para e o processo do Piper, se ainda vivo, é encerrado` (o Piper termina antes da reprodução, pois grava um WAV temporário; ADR-012).
+
+`specs/sprints/SPRINT_2.md`, US-012, acrescentar em "DoD extra" a linha (AP-022, texto exato): ``| D7 | `dotnet test --filter "FullyQualifiedName~ReplySpeakerTests"` | verde: `SpeakAsync_WhenSpeedIsConfigured_PassesItToTts` (US-011) continua verde depois que a velocidade passa a ser valor mutável da sessão; a US-012 só troca a fonte da velocidade, não o contrato `ReplySpeaker` → `ITextToSpeech.SynthesizeAsync(texto, velocidade, ct)` |``
+
+Nenhuma `RN-*` muda.
+
+## 3. Arquivos afetados
+
+| Ação | Caminho | Responsabilidade |
+|---|---|---|
+| Criar | `src/EnglishTutor.Core/Speech/ReplySpeaker.cs`, `SpeakResult.cs`, `IVoiceOutputCheck.cs`, `VoiceOutputStatus.cs`, `SpeechLog.cs` | regra de o que falar, resultado, porta de verificação, log (3100 a 3102) |
+| Alterar | `src/EnglishTutor.Core/DependencyInjection/CoreServiceCollectionExtensions.cs` | registra `ReplySpeaker` |
+| Criar | `src/EnglishTutor.Infrastructure/Tts/PiperOptions.cs`, `PiperOptionsValidator.cs`, `PiperTextToSpeech.cs`, `WavPcmReader.cs`, `PiperVoiceOutputCheck.cs` | adaptador Piper |
+| Criar | `src/EnglishTutor.Infrastructure/Audio/NAudioPlayer.cs` | reprodução |
+| Alterar | `src/EnglishTutor.Infrastructure/DependencyInjection/InfrastructureServiceCollectionExtensions.cs`, `EnglishTutor.Infrastructure.csproj`, `Directory.Packages.props` | registros e pacote |
+| Alterar | `src/EnglishTutor.Console/Ui/ConversationInputHandler.cs`, `ConsoleText.cs`, `EnglishTutorApp.cs`, `Logging/AppLog.cs`, `appsettings.json` | fala depois do texto, aviso, partida, seção `Tts:Piper` |
+| Criar | `tests/EnglishTutor.Core.Tests/Speech/ReplySpeakerTests.cs` | cenários de fala |
+| Alterar | `tests/EnglishTutor.Core.Tests/Fakes/FakeTextToSpeech.cs`, `FakeAudioPlayer.cs`, `DependencyInjection/CoreServiceCollectionExtensionsTests.cs` | `Throws`, `CancelsWhenCalled`; registro |
+| Criar | `tests/EnglishTutor.Infrastructure.Tests/Tts/WavPcmReaderTests.cs`, `PiperTextToSpeechTests.cs`, `PiperOptionsTests.cs`, `PiperOptionsValidatorTests.cs`, `PiperVoiceOutputCheckTests.cs`, `PiperLiveVoiceTests.cs`; `Support/WavBuilder.cs`; `Contract/LiveVoiceTraitTests.cs` | testes do adaptador, live e guarda do trait |
+| Alterar | `tests/EnglishTutor.Infrastructure.Tests/DependencyInjection/InfrastructureServiceCollectionExtensionsTests.cs` | registros |
+| Criar | `tests/EnglishTutor.Console.Tests/Ui/SpokenReplyTests.cs`, `VoiceOutputAppTests.cs` | cenários de console |
+| Alterar | `tests/EnglishTutor.Console.Tests/AppSettingsTests.cs`, `EnglishTutorAppTests.cs` (só o comentário de `RunAsync_WithVoiceValues_BindsThemFromConfiguration`) | arquivo distribuído; comentário |
+| Alterar (orquestrador, docs) | `ARCHITECTURE.md` (§2.5), `specs/sprints/SPRINT_2.md` (§2.6) | |
+
+Comentário a alterar em `EnglishTutorAppTests.cs`. Antigo: `// US-010 — Cenário: valores padrão (o bind lê a configuração; P2: Voice:Enabled não muda o chat)`. Novo: `// US-010 — Cenário: valores padrão (o bind lê a configuração; com Voice:Enabled=true e sem Piper o chat segue por texto, US-011)`. O teste continua verde sem outra mudança (não afirma saída de erro vazia).
+
+## 4. Mapa cenário BDD → testes
+
+Nenhum teste usa rede, GPU, processo real, microfone ou alto-falante, exceto os `LiveVoice`. Cada turno de teste tem texto único (`t1`, `t2`); não há janela, histórico nem retentativa novos (AP-017/AP-026 não se aplicam).
+
+| Cenário | Projeto | Classe | Método | Tipo |
+|---|---|---|---|---|
+| Falar somente o reply | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenReplyHasFeedback_SendsExactlyTheReplyToTts` (reply com correção, vocabulário, elogio e pronúncia; texto = `Reply`, sem trecho do feedback) | Unidade |
+| (idem, toca o clipe) | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenSynthesisSucceeds_PlaysTheSynthesizedClipAndReturnsSpoken` (`BeSameAs`) | Unidade |
+| (idem, velocidade) | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenSpeedIsConfigured_PassesItToTts` (Theory 1.0, 0.8, 1.5) | Unidade |
+| (idem, na tela) | Console.Tests | `SpokenReplyTests` | `HandleAsync_WhenSpeakerIsSet_SendsOnlyReplyToTtsAndKeepsFeedbackOnScreen` | Componente |
+| O texto aparece antes do áudio terminar | Console.Tests | `SpokenReplyTests` | `HandleAsync_WhenSpeakerIsSet_WritesReplyAndFeedbackBeforeAudioStarts` (o TTS falso captura a saída no instante da síntese: já tem `Tutor:` e `Feedback:`) | Componente |
+| (idem, entrada só depois do áudio) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenVoiceIsOnAndReplyPlays_ReadsNextInputOnlyAfterAudioEnds` (eventos `read`, `play:start`, `play:end` numa lista; o player espera 100 ms; esperado: `play:end` antes do `read` seguinte) | Componente |
+| Resposta crua não é falada | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenReplyIsRawFallback_SendsNothingToTtsAndReturnsSkipped` (nasce verde, ver T1) | Unidade |
+| (idem, texto em branco) | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenReplyIsBlank_SendsNothingToTtsAndReturnsSkipped` (Theory `""`, `"   "`; nasce verde) | Unidade |
+| (idem, na tela) | Console.Tests | `SpokenReplyTests` | `HandleAsync_WhenReplyIsRawFallback_SendsNothingToTtsAndShowsRawReply` (nasce verde, ver T8) | Componente |
+| (idem, aviso local e falha do cérebro não falam) | Console.Tests | `SpokenReplyTests` | `HandleAsync_WhenBrainFails_DoesNotCallTts`, `HandleAsync_WhenInputIsBlank_DoesNotCallTts` (nascem verdes) | Componente |
+| (idem, voz desligada) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenVoiceIsOff_NeverCallsTtsOrPlayer` (TTS e player falsos registrados, `Voice:Enabled` ausente; nasce verde) | Componente |
+| Piper ou modelo de voz ausente | Infrastructure.Tests | `PiperVoiceOutputCheckTests` | `Check_WhenAllFilesExist_IsAvailable`; `Check_WhenOnlyExecutableIsMissing_ReportsExecutablePathOnly`; `Check_WhenOnlyModelIsMissing_ReportsModelPathOnly`; `Check_WhenOnlyModelConfigIsMissing_ReportsConfigPathOnly` (cada um confere que os caminhos presentes **não** aparecem; AP-047); `Check_WhenSomethingIsMissing_ExplainsHowToDownload` (as duas URLs e `models/`); `Check_WhenPathIsRelative_ReportsFullPath` | Unidade |
+| (idem, de ponta a ponta) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenVoiceIsOnAndPiperFilesAreMissing_ShowsExpectedPathsAndDownloadOnErrorAndKeepsTextChat` (verifica a saída de erro, o log `VoiceOutputUnavailable`, TTS não chamado ao digitar uma frase, `Tutor:` na saída padrão, `/quit` com código 0) | Componente |
+| (idem, caminho feliz da partida) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenVoiceIsOnAndPiperIsAvailable_WritesNoVoiceWarningAndKeepsHeader` (saída de erro vazia, log `VoiceOutputEnabled`, cabeçalho de 3 linhas) | Componente |
+| (idem, configuração do Piper inválida) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenPiperAndTtsAreBothInvalid_ShowsBothFailures` (AP-039: `Tts:Piper:TimeoutSeconds`=0 e `Tts:Speed`=3.0; código 2; as duas mensagens; sem "An unexpected error occurred") | Componente |
+| (idem, opções do Piper) | Infrastructure.Tests | `PiperOptionsTests`, `PiperOptionsValidatorTests` | `PiperOptions_WhenCreated_HasDocumentedDefaults` (nasce verde); `Validate_WithDefaults_Succeeds` (nasce verde); `Validate_WhenExecutablePathIsBlank_FailsWithExpectation` e `Validate_WhenModelPathIsBlank_FailsWithExpectation` (Theory `""`, `"  "`); `Validate_WhenTimeoutIsOutOfRange_FailsWithRangeAndFoundValue` (0, 301); `Validate_WhenTimeoutIsAtTheLimits_Succeeds` (1, 300; nasce verde); `Validate_WhenTwoKeysAreInvalid_ReportsBoth` | Unidade |
+| (idem, arquivo distribuído) | Console.Tests | `AppSettingsTests` | `AppSettings_WhenShipped_DeclaresPiperDefaultsEqualToOptionDefaults` | Componente |
+| (idem, registros) | Infrastructure.Tests | `InfrastructureServiceCollectionExtensionsTests` | `AddEnglishTutorInfrastructure_Always_RegistersPiperAdaptersAndValidator` (resolve `ITextToSpeech`, `IAudioPlayer`, `IVoiceOutputCheck` e confere os tipos e o validador) | Unidade |
+| (idem, Core) | Core.Tests | `CoreServiceCollectionExtensionsTests` | `AddEnglishTutorCore_Always_RegistersReplySpeaker` (nasce verde, ver T1) | Unidade |
+| Falha da síntese não derruba a sessão | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenTtsThrows_ReturnsFailedWithoutPlaying`; `SpeakAsync_WhenPlayerThrows_ReturnsFailed`; `SpeakAsync_WhenTtsThrows_LogsWarningWithStageAndException` | Unidade |
+| (idem, na tela) | Console.Tests | `SpokenReplyTests` | `HandleAsync_WhenTtsThrows_ShowsTextAndWritesAudioWarningToErrorOnly` (`Tutor:` na saída padrão; "Audio failed" só na de erro) | Componente |
+| (idem, sessão continua) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenTtsFailsInOneTurn_WarnsAndSpeaksTheNextTurn` (turno 1 falha, turno 2 `t2` é falado; código 0) | Componente |
+| Ctrl+C durante o áudio | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenCancelledDuringSynthesis_PropagatesCancellation`, `SpeakAsync_WhenCancelledDuringPlayback_PropagatesCancellation` (as fakes cancelam o token ao serem chamadas; a falha não é `Failed`) | Unidade |
+| (idem, código de saída) | Console.Tests | `VoiceOutputAppTests` | `RunAsync_WhenCancelledDuringPlayback_ReturnsZeroWithoutAudioWarning`, `RunAsync_WhenCancelledDuringSynthesis_ReturnsZeroWithoutAudioWarning` (o falso espera o token; o teste cancela o do chamador; o token recebido fica cancelado) | Componente |
+| (idem, o Piper é encerrado) | Infrastructure.Tests | `PiperTextToSpeechTests` | `SynthesizeAsync_WhenCancelled_CancelsRunnerTokenDeletesFileAndThrowsOperationCanceled` (`HangsUntilCancelled`; o runner real mata a árvore: `ProcessRunnerLiveTests`) | Unidade |
+| Adaptador Piper (apoio: invocação) | Infrastructure.Tests | `PiperTextToSpeechTests` | `SynthesizeAsync_WithValidWav_ReturnsClipWithSampleRateAndNormalizedSamples`; `SynthesizeAsync_Always_RunsPiperWithModelAndOutputFileArguments` (lista de argumentos, `WorkingDirectory` = pasta do executável, WAV na pasta temporária); `SynthesizeAsync_WithSpeed_PassesInverseLengthScale` (Theory 1.0→`1`, 0.8→`1.25`, 1.5→`0.6667`, 0.5→`2`, 1.2→`0.8333`); `SynthesizeAsync_WhenCurrentCultureUsesComma_WritesLengthScaleWithDot` (pt-BR, restaurada em `finally`; AP-054); `SynthesizeAsync_WhenSpeedIsNotPositive_ThrowsWithExpectation` (Theory 0, -1, NaN) | Unidade |
+| (idem, texto) | Infrastructure.Tests | `PiperTextToSpeechTests` | `SynthesizeAsync_WhenTextIsSingleLine_SendsItWithTrailingNewline`; `SynthesizeAsync_WhenTextHasLineBreaks_SendsSingleLine` (Theory `"a\nb"`, `"a\r\nb"`, `"a\n\n  b"` → `"a b\n"`; os dois lados do limite com o teste de uma linha) | Unidade |
+| (idem, falhas e limpeza) | Infrastructure.Tests | `PiperTextToSpeechTests` | `SynthesizeAsync_WhenPiperExitsWithError_ThrowsWithExitCodeAndStandardError`; `SynthesizeAsync_WhenPiperWritesNoFile_ThrowsWithPath`; `SynthesizeAsync_WhenWavIsInvalid_ThrowsWithExpectation`; `SynthesizeAsync_AfterSuccess_DeletesTemporaryFile`; `SynthesizeAsync_WhenPiperFails_DeletesTemporaryFile`; `SynthesizeAsync_WhenTimeoutElapses_ThrowsTimeoutAndCancelsRunnerToken` (`FakeTimeProvider.Advance`; o token do chamador não foi cancelado); a contraparte (cancelamento do chamador não vira `TimeoutException`) é a asserção `OperationCanceledException` do teste de cancelamento acima | Unidade |
+| Leitor de WAV (apoio) | Infrastructure.Tests | `WavPcmReaderTests` | `Read_WithPcm16MonoWav_ReturnsSampleRateAndNormalizedSamples` (Theory 0→0, 16384→0.5, -16384→-0.5, 32767→~0.99997, -32768→-1.0); `Read_WhenExtraChunkPrecedesData_SkipsIt` (Theory tamanho par e ímpar com preenchimento); `Read_WhenDataSizeExceedsFile_ReadsUntilEnd` (Theory tamanho exato, `0xFFFFFFFF`); `Read_WhenDataEndsWithOddByte_IgnoresIt`; `Read_WhenFormatIsNotPcm16Mono_ThrowsWithFoundAndExpected` (Theory estéreo, 8 bits, float tag 3); `Read_WhenNotRiffWave_Throws`; `Read_WhenDataChunkIsMissing_Throws`; `Read_WhenDataHasNoSamples_Throws` | Unidade |
+| Registro de log (apoio) | Core.Tests | `ReplySpeakerTests` | `SpeakAsync_WhenSpoken_LogsSynthesisAndPlaybackTimes` (`FakeTimeProvider` avançado pelos falsos: 120 ms e 340 ms; propriedades, sem o texto) | Unidade |
+| Hardware real (D6) | Infrastructure.Tests | `PiperLiveVoiceTests` (`Category=LiveVoice`) | `SynthesizeAndPlay_WithRealPiper_PlaysWithoutError`; `PlayAsync_WhenCancelledDuringPlayback_StopsEarly` | LiveVoice |
+| Guarda do trait (apoio) | Infrastructure.Tests | `LiveVoiceTraitTests` | `LiveVoiceTests_Always_CarryTheLiveVoiceTrait` (exige pelo menos uma classe `*LiveVoiceTests`); `LiveVoiceTrait_OnlyOnClassesNamedLiveVoiceTests` | Arquitetura |
+
+Outras classes: `CoreDependencyTests` (3 testes existentes) nascem verdes e o D9 os roda; nenhuma regra nova de dependência no Core (só BCL e `Microsoft.Extensions.*`).
+
+Conferência: ao fechar a lista de Red (AP-054/AP-046), rodei mentalmente cada asserção contra o `src` atual; as que já passariam são exatamente as marcadas "nasce verde" acima (o comportamento que o código atual já tem: nada fala, `Voice:Enabled` ignorado). Não existe `<placeholder>` derivado de texto de biblioteca; os números usam a cultura invariável com teste em pt-BR (`length_scale`). Não há renomeação de cenário nem de texto de comportamento: as mudanças da §2.6 acrescentam "a saída de erro contém" e a síntese ao Ctrl+C. Inventário pelo nome antigo (Grep por `Piper ou modelo de voz ausente`, `Ctrl+C durante o áudio` e `falha da síntese` em `src`, `tests`, `prompts`, `docs`): nenhum arquivo, só `specs/sprints/SPRINT_2.md` (a spec é o único arquivo citando esses cenários, e o texto novo entra no commit de spec).
+
+## 5. Tarefas (ordem de execução TDD)
+
+Antes da T1 o orquestrador aplica dois commits: `docs(ai): update spec for US-011` (§2.6) e `docs(ai): update architecture for US-011` (§2.5).
+
+- [ ] T1 — `ReplySpeaker` no Core. Antes do Red o Executor cria `SpeakResult`, `IVoiceOutputCheck`, `VoiceOutputStatus` e o esqueleto de `ReplySpeaker` (`SpeakAsync` devolve `Skipped` sem chamar ninguém), acrescenta `Throws` e `CancelsWhenCalled` a `FakeTextToSpeech` e `FakeAudioPlayer` e registra o esqueleto no `AddEnglishTutorCore`. Red: `ReplySpeakerTests.SpeakAsync_WhenReplyHasFeedback_SendsExactlyTheReplyToTts`, `SpeakAsync_WhenSynthesisSucceeds_PlaysTheSynthesizedClipAndReturnsSpoken`, `SpeakAsync_WhenSpeedIsConfigured_PassesItToTts`, `SpeakAsync_WhenTtsThrows_ReturnsFailedWithoutPlaying`, `SpeakAsync_WhenPlayerThrows_ReturnsFailed`, `SpeakAsync_WhenTtsThrows_LogsWarningWithStageAndException`, `SpeakAsync_WhenCancelledDuringSynthesis_PropagatesCancellation`, `SpeakAsync_WhenCancelledDuringPlayback_PropagatesCancellation`, `SpeakAsync_WhenSpoken_LogsSynthesisAndPlaybackTimes`. Nascem verdes com o esqueleto: `CoreServiceCollectionExtensionsTests.AddEnglishTutorCore_Always_RegistersReplySpeaker` (Red por mutação "o `AddEnglishTutorCore` deixa de registrar o `ReplySpeaker`"), `SpeakAsync_WhenReplyIsRawFallback_SendsNothingToTtsAndReturnsSkipped` e `SpeakAsync_WhenReplyIsBlank_SendsNothingToTtsAndReturnsSkipped`; Red por mutação depois do Green ("o fallback cru passa a ser falado": remover a guarda `IsRawFallback`, o TTS recebe texto e o teste falha; "texto em branco passa a ser falado": remover a guarda de branco, idem). Mutação de cancelamento: fazer o `catch` também capturar `OperationCanceledException`; os dois testes de cancelamento falham (devolveriam `Failed`). / Green: regras de 2.1 e `SpeechLog` / Refactor: constantes de `Stage`. (commit: `test(core): add ReplySpeaker tests` + `feat(core): speak only the tutor reply`)
+  Escolhas de forma: nenhuma
+- [ ] T2 — `WavPcmReader`. Esqueleto: `Read` lança `NotImplementedException`; todos os testes de `WavPcmReaderTests` (e o `WavBuilder` de Support) nascem em Red por comportamento. Red: os 8 métodos da §4 (`Read_WithPcm16MonoWav_...` até `Read_WhenDataHasNoSamples_Throws`). / Green: leitor de 2.3 / Refactor: nomes de constantes de chunk. (commit: `test(infra): add WAV reader tests` + `feat(infra): read PCM16 mono WAV into float samples`)
+  Escolhas de forma: nenhuma
+- [ ] T3 — `PiperOptions` e validador. Esqueleto: `PiperOptions` com os padrões da 2.3 e `PiperOptionsValidator` que sempre devolve `Success`. Red: `Validate_WhenExecutablePathIsBlank_FailsWithExpectation`, `Validate_WhenModelPathIsBlank_FailsWithExpectation`, `Validate_WhenTimeoutIsOutOfRange_FailsWithRangeAndFoundValue`, `Validate_WhenTwoKeysAreInvalid_ReportsBoth`. Nascem verdes: `PiperOptions_WhenCreated_HasDocumentedDefaults` (Red por mutação "o `TimeoutSeconds` padrão deixa de ser 30"), `Validate_WithDefaults_Succeeds` (mutação "o `ExecutablePath` padrão passa a vazio": falha), `Validate_WhenTimeoutIsAtTheLimits_Succeeds` (mutação "o máximo passa a 299": falha). / Green: validador / Refactor: nenhum. (commit: `test(infra): add Piper options tests` + `feat(infra): validate Piper options`)
+  Escolhas de forma: nenhuma
+- [ ] T4 — `PiperTextToSpeech`, caminho feliz. Esqueleto: classe com construtor e `SynthesizeAsync` que lança `NotImplementedException`. Red: `SynthesizeAsync_WithValidWav_ReturnsClipWithSampleRateAndNormalizedSamples`, `SynthesizeAsync_Always_RunsPiperWithModelAndOutputFileArguments`, `SynthesizeAsync_WithSpeed_PassesInverseLengthScale`, `SynthesizeAsync_WhenCurrentCultureUsesComma_WritesLengthScaleWithDot`, `SynthesizeAsync_WhenSpeedIsNotPositive_ThrowsWithExpectation`, `SynthesizeAsync_WhenTextIsSingleLine_SendsItWithTrailingNewline`, `SynthesizeAsync_WhenTextHasLineBreaks_SendsSingleLine`, `SynthesizeAsync_AfterSuccess_DeletesTemporaryFile`. Estado dos ramos de falha até a T5: o código ignora `ExitCode`, não trata cancelamento nem tempo e não apaga o arquivo em falha; os testes da T4 usam só exit 0 com WAV válido. / Green: ramo feliz / Refactor: extrair o formatador de `length_scale`. (commit: `test(infra): add Piper synthesis tests` + `feat(infra): synthesize speech with Piper`)
+  Escolhas de forma: nenhuma
+- [ ] T5 — `PiperTextToSpeech`, falhas, cancelamento e tempo. Red: `SynthesizeAsync_WhenPiperExitsWithError_ThrowsWithExitCodeAndStandardError`, `SynthesizeAsync_WhenPiperWritesNoFile_ThrowsWithPath`, `SynthesizeAsync_WhenWavIsInvalid_ThrowsWithExpectation`, `SynthesizeAsync_WhenPiperFails_DeletesTemporaryFile`, `SynthesizeAsync_WhenCancelled_CancelsRunnerTokenDeletesFileAndThrowsOperationCanceled`, `SynthesizeAsync_WhenTimeoutElapses_ThrowsTimeoutAndCancelsRunnerToken`. Os testes de falha afirmam o texto escrito pelo projeto (`exited with code 3`, `did not produce an audio file`, `Expected`), para o `FileNotFoundException` da biblioteca não passar (AP-015). Mutação de prova do timeout: trocar o `TimeProvider` do `CancellationTokenSource` por `TimeProvider.System`; o `Advance` do `FakeTimeProvider` deixa de ter efeito, o fake `HangsUntilCancelled` não termina e o teste falha por `WaitAsync(10 s)`. Mutação do cancelamento do chamador: tratar toda `OperationCanceledException` como timeout; o teste de cancelamento recebe `TimeoutException` e falha. / Green: ramos de 2.3 itens 5 a 7 / Refactor: nenhum. (commit: `test(infra): add Piper failure and timeout tests` + `feat(infra): handle Piper failures, cancellation and timeout`)
+  Escolhas de forma: nenhuma
+- [ ] T6 — `PiperVoiceOutputCheck`. Esqueleto: `Check` devolve sempre `Available`. Red: `Check_WhenOnlyExecutableIsMissing_ReportsExecutablePathOnly`, `Check_WhenOnlyModelIsMissing_ReportsModelPathOnly`, `Check_WhenOnlyModelConfigIsMissing_ReportsConfigPathOnly`, `Check_WhenSomethingIsMissing_ExplainsHowToDownload`, `Check_WhenPathIsRelative_ReportsFullPath`. Nasce verde: `Check_WhenAllFilesExist_IsAvailable` (Red por mutação "o `Check` devolve sempre indisponível"). / Green: verificação e mensagem / Refactor: nenhum. (commit: `test(infra): add Piper voice output check tests` + `feat(infra): check the Piper files before enabling voice`)
+  Escolhas de forma: nenhuma
+- [ ] T7 — `NAudioPlayer`, pacote, registros e guarda do trait. Primeiro o Executor adiciona `NAudio.WinMM` e confere o build no `net10.0` (risco da §7); registra a versão na §12 no mesmo commit. Red: `InfrastructureServiceCollectionExtensionsTests.AddEnglishTutorInfrastructure_Always_RegistersPiperAdaptersAndValidator` (falha: os serviços não estão registrados), `LiveVoiceTraitTests.LiveVoiceTests_Always_CarryTheLiveVoiceTrait` (falha: nenhuma classe `*LiveVoiceTests`; o teste exige pelo menos uma). Nasce verde: `LiveVoiceTrait_OnlyOnClassesNamedLiveVoiceTests` (mutação: pôr `[Trait("Category","LiveVoice")]` numa classe de teste comum; o teste falha). / Green: `NAudioPlayer`, registros e `PiperLiveVoiceTests` (a classe com o trait `LiveVoice`; o nome termina em `LiveVoiceTests` e não em `LiveTests`, para o guarda `LiveBrainTraitTests` seguir verde) / Refactor: nenhum. O Executor baixa o Piper e a voz para `models/piper/` (D6; P8), registra tamanho e origem na §11 e roda a D6 uma vez. (commit: `test(infra): add voice trait guard and registration tests` + `feat(infra): play audio with NAudio and register the Piper adapters`)
+  Escolhas de forma: nenhuma
+- [ ] T8 — `ConversationInputHandler` fala depois do texto. Esqueleto: o parâmetro `speaker` existe e é ignorado. Red: `SpokenReplyTests.HandleAsync_WhenSpeakerIsSet_SendsOnlyReplyToTtsAndKeepsFeedbackOnScreen`, `HandleAsync_WhenSpeakerIsSet_WritesReplyAndFeedbackBeforeAudioStarts`, `HandleAsync_WhenTtsThrows_ShowsTextAndWritesAudioWarningToErrorOnly`. Nascem verdes (nada fala ainda): `HandleAsync_WhenReplyIsRawFallback_SendsNothingToTtsAndShowsRawReply` (mutação: remover a guarda `IsRawFallback` do `ReplySpeaker`), `HandleAsync_WhenBrainFails_DoesNotCallTts` e `HandleAsync_WhenInputIsBlank_DoesNotCallTts` (mutação: remover o `return` do ramo `!result.IsReplied`; o teste falha). Mutação do "antes do áudio": mover a chamada ao speaker para antes de escrever o texto; o segundo teste falha. / Green: chamada ao speaker e `ConsoleText.AudioFailed` / Refactor: nenhum. (commit: `test(console): add spoken reply tests` + `feat(console): speak the reply after showing it`)
+  Escolhas de forma: nenhuma
+- [ ] T9 — Seção `Tts:Piper` e validação na partida. Red: `VoiceOutputAppTests.RunAsync_WhenPiperAndTtsAreBothInvalid_ShowsBothFailures`, `AppSettingsTests.AppSettings_WhenShipped_DeclaresPiperDefaultsEqualToOptionDefaults`. / Green: bind de `PiperOptions` com `ValidateOnStart` no `BuildHost` e a seção no `appsettings.json` / Refactor: agrupar os binds de voz no método privado já existente, se houver. (commit: `test(console): add Piper configuration startup tests` + `feat(console): bind and validate Piper options at startup`)
+  Escolhas de forma: nenhuma
+- [ ] T10 — Voz na partida e no laço. Sem esqueleto (o `RunSessionAsync` ainda passa `null` como speaker). Red: `VoiceOutputAppTests.RunAsync_WhenVoiceIsOnAndReplyPlays_ReadsNextInputOnlyAfterAudioEnds`, `RunAsync_WhenTtsFailsInOneTurn_WarnsAndSpeaksTheNextTurn`, `RunAsync_WhenCancelledDuringPlayback_ReturnsZeroWithoutAudioWarning`, `RunAsync_WhenCancelledDuringSynthesis_ReturnsZeroWithoutAudioWarning`, `RunAsync_WhenVoiceIsOnAndPiperFilesAreMissing_ShowsExpectedPathsAndDownloadOnErrorAndKeepsTextChat`, `RunAsync_WhenVoiceIsOnAndPiperIsAvailable_WritesNoVoiceWarningAndKeepsHeader`. Nasce verde: `RunAsync_WhenVoiceIsOff_NeverCallsTtsOrPlayer` (mutação: criar o speaker mesmo com `Voice:Enabled=false`). Os dois testes de cancelamento usam um falso que só termina quando o token do chamador é cancelado, e o teste o cancela depois de o falso sinalizar que iniciou (técnica que produz só o cancelamento do chamador, sem outra condição; AP-058); a mutação do `catch` da T1 também os derruba (a sessão mostraria "Audio failed"). `RunAsync_WhenVoiceIsOnAndReplyPlays_...` usa o player que espera 100 ms; mutação: não aguardar o speaker no handler (`_ = speaker.SpeakAsync(...)`), o `read` seguinte vem antes do `play:end`. / Green: `RunSessionAsync` com `IVoiceOutputCheck`, `ReplySpeaker` e `AppLog` 1008/1009; atualizar o comentário do teste da US-010 (§3) / Refactor: extrair `ResolveReplySpeakerAsync` privado. (commit: `test(console): add voice output session tests` + `feat(console): speak replies in the chat when voice is enabled`)
+  Escolhas de forma: nenhuma
+
+## 6. Pacotes NuGet
+
+| Pacote | Projeto | Motivo |
+|---|---|---|
+| `NAudio.WinMM` | `EnglishTutor.Infrastructure` (versão em `Directory.Packages.props`) | `WaveOutEvent` para tocar o `AudioClip`. O Executor registra a versão escolhida na §12 no mesmo commit (referência de partida: 2.2.1). Só o `WinMM` (e o `NAudio.Core` que ele traz), não o meta-pacote `NAudio`, para não puxar WASAPI/ASIO que pedem TFM Windows. A US-013 reutiliza o mesmo pacote para a captura |
+
+## 7. Riscos e mitigação
+
+| Risco | Mitigação |
+|---|---|
+| `NAudio.WinMM` não compilar no `net10.0` da Infrastructure (o CI roda em `ubuntu-latest`) ou gerar CA1416 com `TreatWarningsAsErrors` | T7 começa pelo pacote e pelo build; se falhar, `[SupportedOSPlatform("windows")]` no `NAudioPlayer` e guarda `OperatingSystem.IsWindows()` no registro, registrado na §12; se ainda falhar, o Executor para e pede decisão (TFM `net10.0-windows` mexe no CI) |
+| A release `2023.11.14-2` do Piper (`rhasspy/piper`, repositório arquivado) ou a voz sumirem | O Executor confere as duas URLs antes de fixá-las na mensagem e no teste; se uma sumir, para e pergunta (não troca de fonte sozinho) |
+| Processo do Piper a cada turno recarrega a voz: latência de síntese | Medida só registrada: `SynthesisMs` do log `ReplySpoken` na D7 e na §11. Risco para a US-016/US-017, que usam a latência fim a fim como critério; se pesar, Fase 6 (processo persistente/streaming) |
+| `--output_file` com mais de uma linha sobrescrever a anterior | O adaptador achata quebras de linha (2.3, passo 2), testado nos dois lados; a D6 usa uma frase de duas sentenças numa linha |
+| Arquivo temporário vazar (cancelamento no meio) | `finally` apaga; três testes (sucesso, falha, cancelamento) conferem a pasta temporária vazia; D8 e D13 conferem o Git |
+| Teste de cultura mudar `CurrentCulture` | síncrono dentro do `Fact`, cultura restaurada em `finally` |
+| Limite aceito: `NAudioPlayer` sem teste unitário (hardware) | Consumidores: validador (nenhum), testes `LiveBrain` (não tocados), DoD (a D6 é a única que o exercita, com alto-falante). Efeito: um defeito de reprodução só aparece na D6/D7; em uso o `ReplySpeaker` o trata como `Failed` |
+| Limite aceito: `Tts:Speed` é o valor da partida | Consumidores: `ReplySpeaker` (usa o valor da partida), `/speed` (não existe ainda), DoD (D5 de `Speed` é da US-012). Registrado na spec da US-012 (§2.6) |
+| Limite aceito: Piper presente mas sem dispositivo de áudio só falha no primeiro turno | Consumidores: `ReplySpeaker` (vira `Failed`), console (mostra "Audio failed" na saída de erro), DoD (D7 manual). A verificação de partida só olha arquivos (P3) |
+
+## 8. Fora de escopo
+
+Velocidade ajustável na sessão e `/speed` (US-012; o item "fica para a US-012" está na spec dela, texto exato na §2.6); gravação, STT, `/mic` e linha de voz no cabeçalho (US-013 a US-016); download automático da voz (manual, documentado na mensagem); processo persistente ou streaming do Piper (Fase 6); Kokoro (backlog); escolha de dispositivo de saída; cache de áudio; qualquer mudança em cérebro, prompt ou parser (`eval` não entra na DoD); `ConversationService` e `TurnMessageBuilder` não mudam.
+
+## 9. Perguntas em aberto
+
+- **P1** — Voz e caminhos padrão. Resposta padrão: `en_US-lessac-medium` em `models/piper/` (voz `medium`, boa relação qualidade/tamanho); a impressão da voz é julgada na D7 e, se desagradar, a Kokoro volta ao sprint. Teste: `PiperOptionsTests.PiperOptions_WhenCreated_HasDocumentedDefaults`.
+- **P2** — Caminhos relativos em `Tts:Piper:*`. Resposta padrão: relativos ao diretório atual (`dotnet run` na raiz do repositório acha `models/`); a mensagem mostra sempre o caminho completo. Teste: `PiperVoiceOutputCheckTests.Check_WhenPathIsRelative_ReportsFullPath`.
+- **P3** — Dispositivo de áudio ausente com Piper presente. Resposta padrão: não é checado na partida; a primeira reprodução falha e vira "Audio failed". Teste: `ReplySpeakerTests.SpeakAsync_WhenPlayerThrows_ReturnsFailed`.
+- **P4** — Cabeçalho com estado da voz. Resposta padrão: não mudar o cabeçalho nesta US (o estado do microfone entra na US-016). Teste: `VoiceOutputAppTests.RunAsync_WhenVoiceIsOnAndPiperIsAvailable_WritesNoVoiceWarningAndKeepsHeader`.
+- **P5** — Resposta de várias linhas ao Piper. Resposta padrão: o adaptador achata quebras de linha em espaço. Teste: `PiperTextToSpeechTests.SynthesizeAsync_WhenTextHasLineBreaks_SendsSingleLine`.
+- **P6** — Aviso de voz ausente na saída de erro (não na padrão). Resposta padrão: erro, como `BrainFailed`; "Switched to" é informação, não problema. Teste: `VoiceOutputAppTests.RunAsync_WhenVoiceIsOnAndPiperFilesAreMissing_ShowsExpectedPathsAndDownloadOnErrorAndKeepsTextChat`.
+- **P7** — Tempo máximo do Piper (padrão 30 s, faixa 1 a 300). Resposta padrão: valores do plano; são decisão do Planejador, não vêm de revisão. Teste: `PiperOptionsValidatorTests.Validate_WhenTimeoutIsOutOfRange_FailsWithRangeAndFoundValue`.
+- **P8** — Download da voz pelo Executor na T7 (precisa de rede só nesse passo). Resposta padrão: sim, manual, com tamanho e origem na §11; os testes do D2 seguem sem rede. Sem efeito observável.
+
+## 10. Definition of Done (comandos verificáveis)
+
+| # | Comando | Esperado |
+|---|---|---|
+| D1 | `dotnet build` | 0 warnings, 0 erros |
+| D2 | `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice"` | todos verdes, em < 30 s, sem rede, sem GPU, sem microfone e sem alto-falante |
+| D3 | `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas; evidência = relatório mesclado (`reportgenerator`), com `line-rate` do assembly Core e total da solução; relatório de um projeto só como nota (AP-056) |
+| D4 | `dotnet format --verify-no-changes` | sem diferenças |
+| D5 | `dotnet test --filter "FullyQualifiedName~Tts"` | verde, com fake de processo do Piper (nenhum executável real) |
+| D6 | `dotnet test --filter "Category=LiveVoice&FullyQualifiedName~Piper"`, com o Piper e a voz baixados em `models/piper/`, ambiente herdado sem limpeza (o Piper não lê variáveis do aluno) | verde, 1 rodada (sem modelo de linguagem, resultado determinístico): `SynthesizeAndPlay_WithRealPiper_PlaysWithoutError` sintetiza "Hello, this is a voice test. Can you hear me?" (duas frases), o clipe tem `SampleRate` > 0 e duração de 1 s a 8 s, e a reprodução termina sem exceção (exercita Piper real, `WavPcmReader` e `NAudioPlayer`); `PlayAsync_WhenCancelledDuringPlayback_StopsEarly` cancela 300 ms após iniciar e a tarefa termina em menos de 1,5 s. Registrar `SynthesisMs` na §11 (só registrada) |
+| D7 | Manual no console com `Voice:Enabled=true` e o Claude Code: 3 turnos | o usuário confirma que ouve só o `reply`, que o feedback só aparece na tela, e registra a impressão da voz em "Evidências" |
+| D8 | `git status --short` depois de baixar a voz | nenhum arquivo de `models/` ou `*.wav` no Git |
+| D9 | `dotnet test --filter "FullyQualifiedName~ReplySpeaker\|FullyQualifiedName~SpokenReply\|FullyQualifiedName~VoiceOutputApp\|FullyQualifiedName~CoreDependencyTests"` | verde; `--list-tests` com o mesmo filtro lista os métodos da §4 com esses nomes de classe |
+| D10 | No Windows PowerShell 5.1: `"/quit" \| dotnet run --project src/EnglishTutor.Console; "exit=$LASTEXITCODE"` (voz desligada) | a saída contém `EnglishTutor` e `Brain: ...`; `exit=0`; nenhuma linha "Voice" |
+| D11 | No Windows PowerShell 5.1: `$env:Voice__Enabled="true"; $env:Tts__Piper__ExecutablePath="C:\naoexiste\piper.exe"; "/quit" \| dotnet run --project src/EnglishTutor.Console 2>&1; "exit=$LASTEXITCODE"; Remove-Item Env:Voice__Enabled, Env:Tts__Piper__ExecutablePath` | a saída (com `2>&1`) contém `C:\naoexiste\piper.exe`, `rhasspy/piper/releases` e `piper-voices`; cabeçalho do chat; `exit=0` |
+| D12 | `git diff develop...HEAD \| LC_ALL=C grep -c -e $'\xef\xbb\xbf' -e $'\xe2\x80\x8b' -e $'\xc2\xa0'` (Git Bash) | contagem 0 (código de saída 1 é o esperado) |
+| D13 | `git ls-files models` e `git ls-files "*.wav"` | nenhuma linha |
+
+Critério `LiveVoice` (AP-052): a D6 mede no adaptador (Piper real e `NAudioPlayer` reais) e exige que a reprodução tenha rodado de fato (sem exceção, duração do clipe de 1 a 8 s); o teste unitário não substitui isso. O unitário prova o resto (argumentos, WAV, limpeza); o que só a D6 prova é a compatibilidade com o Piper real e com o dispositivo de áudio (limite da §7). Tolerância 0 em "sem exceção"; sem modelo de linguagem não há oscilação entre rodadas; se ficar vermelha, quem decide é o usuário. Não há `eval`: a US não toca cérebro, prompt ou parser.
+
+## 11. Evidências
+_Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e hash do commit._
+
+## 12. Comentários do usuário
+_O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
