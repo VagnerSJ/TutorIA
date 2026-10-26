@@ -257,3 +257,6 @@ tests/EnglishTutor.Infrastructure.Tests/Contract/LiveBrainTraitTests.cs:30
 - S2 → §2.1 (esqueleto), §5 T3 e T4 (esqueleto que devolve `Success`; como consequência, `Validate_WhenSpeedIsInRange_Succeeds` e `Validate_WhenThresholdIsInRange_Succeeds` nascem verdes e ganham Red por mutação do limite).
 - S3 → §7 (última linha: "testes síncronos; a cultura é por thread e restaurada em `finally`").
 - S4 → §2.5 (nota) e §10 D8 (nota curta).
+
+### 2026-10-26 — pedido do usuário (S5 do plan-review, rodada 2)
+- Incorporar a S5: acrescentar à §2.5 (último parágrafo) e ao D8 uma frase dizendo que os commits de docs entram antes da T1 e a T6 só depois, então o D8 "antes" só reproduz as 13 ocorrências contra o commit anterior ao de docs (ex.: `git grep ... 9e35333`); no estado da branch logo após os commits de docs, restam 5 (`ci.yml`, os 2 hooks e as 2 de `LiveBrainTraitTests.cs`) até a T6. Revisão de código e Executor conferem assim.
