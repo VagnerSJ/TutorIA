@@ -43,3 +43,32 @@ Resultado: REPROVADO (1 bloqueante)
 
 ## Aprendizados para o processo
 - Inventário de troca de texto montado de memória ou de um Grep restrito a alguns diretórios (AP-050 de novo). Regra sugerida: o Planejador roda o comando do D8 sobre `git grep` na solução inteira, incluindo `tests/`, antes de fixar a contagem no plano, e cola a saída no plan.md.
+
+---
+
+## Rodada 2
+
+Data: 2026-10-26
+Escopo revisado: `tasks/US-010/plan.md` (§2.5, §3, §4, §5 T6, §10 D8, §12), `plan-review.md` (rodada 1) e a busca do D8 na solução inteira. As demais seções não mudaram desde a rodada 1.
+Resultado: APROVADO (0 bloqueantes)
+
+### Itens da rodada anterior
+- **B1** resolvido: o comando do D8 devolve exatamente 13 linhas, as mesmas do plano, nominais e com os mesmos números de linha (`post-edit-dotnet.mjs:49`, `executor-stop-gate.mjs:24`, `ci.yml:37`, `README.md:59`, `revisor.md:35`, `executor.md:51` e `:67`, `planejador.md:97` e `:98`, `checklist-revisao/SKILL.md:56`, `tdd-dotnet/SKILL.md:98`, `LiveBrainTraitTests.cs:5` e `:30`). Arquivos fora do inventário são só histórico ou já têm o filtro novo. O plano cobre as 13 em §2.5, §3, T6, D8 e §12.
+- **S1 a S4** aplicadas (AudioClip get-only; esqueleto dos validadores; frase da cultura; nota da linha §10).
+
+### Verificações
+| Item | Resultado |
+|---|---|
+| Inventário nominal conferido por comando da DoD (AP-050) | ✅ 13/13 |
+| "Nenhuma linha" com o outro lado demonstrado (AP-035) | ✅ |
+| §3 × §4 × §5 × §10 coerentes com o inventário | ✅ |
+| Commits de escopo adequado | ✅ |
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S5** — `plan.md` §2.5, último parágrafo — os commits de docs do orquestrador entram antes da T1 e `ci.yml`, hooks e o teste na T6; logo o D8 "antes" só reproduz as 13 contra o commit anterior ao de docs (ex.: `git grep` em `9e35333`). Vale uma frase dizendo isso. Não bloqueia.
+
+### Aprendizados para o processo
+- Segunda rodada do padrão AP-050: o inventário de troca de texto vem de busca na solução inteira, incluindo `tests/`; o Planejador roda o comando do D8 antes de fixar a contagem.
