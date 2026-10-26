@@ -252,3 +252,6 @@ _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo 
   → Incorporado em §2.3 (item 5), §4 (linha "tempo máximo, os dois lados": `SynthesizeAsync_WhenFinishesBeforeTimeout_ReturnsClipAndDoesNotCancelRunnerToken`), §5 T5 (nasce verde; Red por mutação com prazo fixo de 10 s).
 - **S2 (sugestão):** declarar que o construtor do `NAudioPlayer` não abre o dispositivo (só o `PlayAsync`), para o teste de DI não depender de WinMM no CI.
   → Incorporado em §2.3 (`NAudioPlayer`), §3, §4 (teste de registros), §5 T7.
+
+### Escolhas do Executor (formas deixadas em aberto pelo plano; AP-009)
+- **T1 — textos de log do `ReplySpeaker`** (`SpeechLog`, EventIds do plano): 3100 Information `Reply spoken ({Characters} characters): synthesis {SynthesisMs} ms, playback {PlaybackMs} ms`; 3101 Warning `Voice output failed at {Stage}; the session continues with text only` (`Stage` = `synthesis` ou `playback`); 3102 Debug `Reply not spoken: {Reason}` (`Reason` = `raw fallback` ou `blank reply`). Nenhum inclui o texto do reply.
