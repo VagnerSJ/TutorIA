@@ -53,3 +53,6 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: nota mínima `met` / `not met` no relatório (correções >= 80% e formato sem retentativa >= 90%), usada na DoD das US de cérebro seguintes; provedor fora do ar sai como `unavailable` com o motivo e o código de saída continua 0 (US-009).
 - Added: `Core/Evaluation` (`GoldenSetParser` com erros que dizem o que está errado e o que se espera, `CorrectionMatcher`, `EvalRunner`, `EvalMetrics`, `EvalThresholds`, `EvalReportBuilder`), `eval/README.md` e ADR-011 (US-009).
 - Added: `eval` com argumentos inválidos ou golden set ausente/inválido termina com código 2, mensagem na saída de erro e sem relatório (US-009).
+- Added: portas de voz e áudio no Core (`ISpeechToText`, `ITextToSpeech`, `IAudioRecorder`, `IAudioPlayer`, `Transcript`, `TranscribedWord`) e `AudioClip` (PCM mono float32) que rejeita taxa <= 0 e clipe vazio, com fakes de teste (US-010).
+- Added: opções `Tts:Speed` (0.5 a 1.5, padrão 1.0), `Stt:LowConfidenceThreshold` (0 a 1, padrão 0.6) e `Voice:Enabled` (padrão false) no `appsettings.json`, validadas na partida; valor fora da faixa encerra com código 2 e mensagem que diz a faixa (US-010).
+- Changed: filtro padrão de testes passa a ser `Category!=LiveBrain&Category!=LiveVoice` em hooks, CI, README, agentes e skills (US-010).
