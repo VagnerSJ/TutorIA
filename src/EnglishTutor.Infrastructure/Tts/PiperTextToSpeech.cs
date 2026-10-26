@@ -25,7 +25,6 @@ public sealed partial class PiperTextToSpeech(
                 "Expected a speed multiplier such as 1.0 (Tts:Speed is validated between 0.5 and 1.5).");
         }
 
-        _ = time;
         var piper = options.Value;
         var wavPath = Path.Combine(temporaryDirectory ?? Path.GetTempPath(), $"piper-{Guid.NewGuid():N}.wav");
         var request = new ProcessRequest(
@@ -34,12 +33,45 @@ public sealed partial class PiperTextToSpeech(
             Path.GetDirectoryName(Path.GetFullPath(piper.ExecutablePath)) ?? string.Empty,
             LineBreaks().Replace(text, " ") + "\n");
 
-        await runner.RunAsync(request, ct);
+        try
+        {
+            var result = await RunWithTimeoutAsync(request, piper.TimeoutSeconds, ct);
+            if (result.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Piper exited with code {result.ExitCode}: {result.StandardError.Trim()}. " +
+                    "Expected exit code 0; check Tts:Piper:ModelPath and that the voice .onnx.json sits next to it.");
+            }
 
-        var bytes = await File.ReadAllBytesAsync(wavPath, ct);
-        var clip = WavPcmReader.Read(bytes);
-        File.Delete(wavPath);
-        return clip;
+            if (!File.Exists(wavPath))
+            {
+                throw new InvalidOperationException(
+                    $"Piper did not produce an audio file at {wavPath}. Expected a WAV file; check the voice model.");
+            }
+
+            var bytes = await File.ReadAllBytesAsync(wavPath, ct);
+            return WavPcmReader.Read(bytes);
+        }
+        finally
+        {
+            File.Delete(wavPath);
+        }
+    }
+
+    private async Task<ProcessResult> RunWithTimeoutAsync(ProcessRequest request, int timeoutSeconds, CancellationToken ct)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds), time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
+        try
+        {
+            return await runner.RunAsync(request, linked.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Piper did not finish within {timeoutSeconds} seconds. " +
+                "Expected the synthesis to end sooner; raise Tts:Piper:TimeoutSeconds if the machine is slow.");
+        }
     }
 
     private static string FormatLengthScale(float speed) =>
