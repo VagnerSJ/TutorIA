@@ -1,6 +1,7 @@
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
 using EnglishTutor.Core.DependencyInjection;
+using EnglishTutor.Core.Speech;
 using EnglishTutor.Core.Tests.Fakes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -59,5 +60,21 @@ public sealed class CoreServiceCollectionExtensionsTests
         var first = provider.GetService<ConversationService>();
         first.Should().NotBeNull();
         provider.GetService<ConversationService>().Should().BeSameAs(first);
+    }
+
+    // US-010 — Cenário: opções de voz inválidas falham na inicialização — RN-TTS01
+    [Fact]
+    public void AddEnglishTutorCore_Always_RegistersTtsOptionsValidator()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<TtsOptions>().Configure(options => options.Speed = 3.0f);
+
+        services.AddEnglishTutorCore();
+
+        using var provider = services.BuildServiceProvider();
+        var read = () => provider.GetRequiredService<IOptions<TtsOptions>>().Value;
+        read.Should().Throw<OptionsValidationException>()
+            .Which.Failures.Should().ContainSingle(
+                failure => failure.Contains("Tts:Speed", StringComparison.Ordinal));
     }
 }
