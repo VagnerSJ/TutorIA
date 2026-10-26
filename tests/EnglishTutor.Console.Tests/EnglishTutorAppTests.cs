@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using EnglishTutor.Console.Tests.Support;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
 using EnglishTutor.Infrastructure.Processes;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -569,6 +570,105 @@ public sealed class EnglishTutorAppTests : IDisposable
             Directory.Delete(_logDirectory, recursive: true);
         }
     }
+
+    // US-010 — Cenário: opções de voz inválidas falham na inicialização — RN-TTS01
+    [Fact]
+    public async Task RunAsync_WhenTtsSpeedIsOutOfRange_ExitsWithInvalidConfigurationBeforePrompt()
+    {
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode", extraValues: new Dictionary<string, string?> { ["Tts:Speed"] = "3.0" }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Invalid configuration:")
+            .And.Contain("Tts:Speed must be between 0.5 and 1.5 (found 3.0)");
+        _output.ToString().Should().BeEmpty();
+    }
+
+    // US-010 — Cenário: opções de voz inválidas falham na inicialização (duas seções ao mesmo tempo, AP-039)
+    [Fact]
+    public async Task RunAsync_WhenTtsAndSttAreBothInvalid_ShowsBothFailures()
+    {
+        var options = CreateOptions("ClaudeCode", "/quit") with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode",
+                extraValues: new Dictionary<string, string?>
+                {
+                    ["Tts:Speed"] = "3.0",
+                    ["Stt:LowConfidenceThreshold"] = "1.5",
+                }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(ExitCodes.InvalidConfiguration);
+        _error.ToString().Should().Contain("Tts:Speed must be between 0.5 and 1.5 (found 3.0)")
+            .And.Contain("Stt:LowConfidenceThreshold must be between 0 and 1 (found 1.5)")
+            .And.NotContain("An unexpected error occurred");
+    }
+
+    // US-010 — Cenário: valores padrão
+    [Fact]
+    public async Task RunAsync_WithoutVoiceSections_BindsDefaultsAndKeepsTextChat()
+    {
+        var probe = new OptionsProbe();
+        var options = WithProbe(CreateOptions("ClaudeCode", "/quit"), probe);
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        probe.TtsSpeed.Should().Be(1.0f);
+        probe.SttLowConfidenceThreshold.Should().Be(0.6f);
+        probe.VoiceEnabled.Should().BeFalse();
+        _output.ToString().Should().StartWith(Lines(
+            "EnglishTutor",
+            "Brain: ClaudeCode | Mode: free-conversation",
+            "Type /help for commands or /quit to exit."));
+    }
+
+    // US-010 — Cenário: valores padrão (o bind lê a configuração; P2: Voice:Enabled não muda o chat)
+    [Fact]
+    public async Task RunAsync_WithVoiceValues_BindsThemFromConfiguration()
+    {
+        var probe = new OptionsProbe();
+        var options = WithProbe(CreateOptions("ClaudeCode", "/quit"), probe) with
+        {
+            Configuration = TestConfiguration.Create(
+                "ClaudeCode",
+                extraValues: new Dictionary<string, string?>
+                {
+                    ["Tts:Speed"] = "0.8",
+                    ["Stt:LowConfidenceThreshold"] = "0.7",
+                    ["Voice:Enabled"] = "true",
+                }),
+        };
+
+        var exitCode = await EnglishTutorApp.RunAsync(options, TestContext.Current.CancellationToken);
+
+        exitCode.Should().Be(0);
+        probe.TtsSpeed.Should().Be(0.8f);
+        probe.SttLowConfidenceThreshold.Should().Be(0.7f);
+        probe.VoiceEnabled.Should().BeTrue();
+        _output.ToString().Should().StartWith(Lines(
+            "EnglishTutor",
+            "Brain: ClaudeCode | Mode: free-conversation",
+            "Type /help for commands or /quit to exit."));
+    }
+
+    private static AppRunOptions WithProbe(AppRunOptions options, OptionsProbe probe) =>
+        options with
+        {
+            ConfigureServices = services =>
+            {
+                options.ConfigureServices?.Invoke(services);
+                probe.Install(services);
+            },
+        };
 
     private AppRunOptions CreateOptions(string provider, params string[] lines) =>
         new([],
