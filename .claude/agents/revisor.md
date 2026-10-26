@@ -32,7 +32,7 @@ Quando o pedido for revisar o **plano** (antes do código):
 
 1. Leia a US (`specs/sprints/`), o `tasks/US-XXX/plan.md`, as regras `RN-*` citadas e `ARCHITECTURE.md`.
 2. Veja o que mudou: `git diff develop...HEAD --stat` e depois o diff completo; `git log develop..HEAD --oneline`.
-3. Rode `dotnet build`, `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` e `dotnet format --verify-no-changes`; mescle a cobertura com `dotnet reportgenerator` (saída fora do repositório) e leia a linha do `EnglishTutor.Core`.
+3. Rode `dotnet build`, `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice" --collect:"XPlat Code Coverage"` e `dotnet format --verify-no-changes`; mescle a cobertura com `dotnet reportgenerator` (saída fora do repositório) e leia a linha do `EnglishTutor.Core`.
 4. Aplique o checklist da skill `checklist-revisao`, item por item.
 5. Confira se cada cenário BDD tem teste correspondente e se os testes foram commitados antes do código (ordem dos commits).
 6. Confira a seção "Evidências" do `plan.md`: cada comando da DoD tem resultado colado e o resultado bate com o que **você** obteve ao rodar. Evidência ausente ou divergente é bloqueante.

@@ -33,8 +33,8 @@ jobs:
       - name: Build
         run: dotnet build
 
-      - name: Test (without LiveBrain) with coverage
-        run: dotnet test --no-build --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage" --results-directory TestResults
+      - name: Test (without LiveBrain and LiveVoice) with coverage
+        run: dotnet test --no-build --filter "Category!=LiveBrain&Category!=LiveVoice" --collect:"XPlat Code Coverage" --results-directory TestResults
 
       - name: Coverage summary
         if: always()

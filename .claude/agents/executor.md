@@ -48,9 +48,10 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 
 - Ao concluir todas as tarefas, rode **cada comando** da seção "Definition of Done" do `plan.md`.
 - Cole o resultado resumido na seção "Evidências" do `plan.md` (comando, resultado, data, hash do commit). Exemplo:
-  `D2 — dotnet test --filter "Category!=LiveBrain" → 42 passed, 0 failed, 3,1 s (2026-10-18, a1b2c3d)`
+  `D2 — dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice" → 42 passed, 0 failed, 3,1 s (2026-10-18, a1b2c3d)`
 - Na mesma tarefa de DoD, revise o §3 e o §5 do `plan.md`: troque estados como "em andamento", "não commitado" ou "Criar" (para arquivo que já existia) pelo estado real e o hash do commit correspondente (AP-005).
 - Mudou uma contagem de testes (inclusive numa rodada de correção)? Atualize o cabeçalho e o detalhamento por classe da §4 e os D2/D5/D8, e confira que as somas batem (AP-031).
+- Renomeou, dividiu ou trocou a forma de um teste previsto na §4? Atualize a linha da §4 (e da §5) no mesmo commit do teste; desvio só em §11 não basta (AP-060).
 - Só declare a US concluída com **todos** os itens verdes. Se algum não puder ficar verde, diga qual, por quê e o que falta — nunca "deve funcionar".
 - Commit das evidências: `docs(ai): add DoD evidence for US-XXX`.
 
@@ -64,7 +65,7 @@ As ferramentas Edit/Write e o `sed` podem transformar o escape de um caractere i
 - Nunca enfraqueça ou apague um teste para fazê-lo passar.
 - Não use `--no-verify`, não faça push, não faça merge em `develop`/`main`.
 - Testes que chamam provedores reais levam `[Trait("Category","LiveBrain")]`.
-- Ao final: `dotnet build` sem warnings, `dotnet test --filter "Category!=LiveBrain"` verde e cobertura do Core medida com `dotnet test --collect:"XPlat Code Coverage"`.
+- Ao final: `dotnet build` sem warnings, `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice"` verde e cobertura do Core medida com `dotnet test --collect:"XPlat Code Coverage"`.
 
 ## Ao corrigir um review.md
 

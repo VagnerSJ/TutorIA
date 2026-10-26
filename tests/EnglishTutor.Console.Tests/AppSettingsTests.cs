@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EnglishTutor.Core.Speech;
 
 namespace EnglishTutor.Console.Tests;
 
@@ -16,5 +17,20 @@ public sealed class AppSettingsTests
         var brain = document.RootElement.GetProperty("Brain");
         brain.TryGetProperty("FallbackProvider", out var fallback).Should().BeTrue(because: "the key documents the option");
         fallback.GetString().Should().BeEmpty();
+    }
+
+    // US-010 — Cenário: valores padrão (arquivo distribuído)
+    [Fact]
+    public void AppSettings_WhenShipped_DeclaresVoiceDefaultsEqualToOptionDefaults()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+
+        var root = document.RootElement;
+        root.GetProperty("Voice").GetProperty("Enabled").GetBoolean().Should().Be(new VoiceOptions().Enabled);
+        root.GetProperty("Tts").GetProperty("Speed").GetSingle().Should().Be(new TtsOptions().Speed);
+        root.GetProperty("Stt").GetProperty("LowConfidenceThreshold").GetSingle()
+            .Should().Be(new SttOptions().LowConfidenceThreshold);
     }
 }

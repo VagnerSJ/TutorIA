@@ -94,8 +94,8 @@ Copie a DoD da US na sprint e acrescente o que for específico do plano. Cada li
 | # | Comando | Esperado |
 |---|---|---|
 | D1 | `dotnet build` | 0 warnings, 0 erros |
-| D2 | `dotnet test --filter "Category!=LiveBrain"` | todos verdes, em < 30 s |
-| D3 | `dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas; evidência = relatório mesclado (`reportgenerator`), com `line-rate` do assembly Core e total da solução; relatório de um projeto só como nota (AP-056) |
+| D2 | `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice"` | todos verdes, em < 30 s |
+| D3 | `dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice" --collect:"XPlat Code Coverage"` | Core ≥ 80% de linhas; evidência = relatório mesclado (`reportgenerator`), com `line-rate` do assembly Core e total da solução; relatório de um projeto só como nota (AP-056) |
 | ... | (específicos da US: execução do console, eval, etc.) | ... |
 US que mexe no console: inclua ao menos um comando com pipe no Windows PowerShell 5.1 (BOM na entrada redirecionada, AP-006).
 Checagem de caracteres invisíveis: copie a forma única do `checklist-revisao` §4 (com `LC_ALL=C`), sem reescrever (AP-019).

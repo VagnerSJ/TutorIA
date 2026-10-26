@@ -54,7 +54,7 @@ src/
                        TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,
                        BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders,
                        BrainFallbackPolicy, BrainSwitchNotice, IBrainSwitchNotifier
-    Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech
+    Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech, VoiceOptions, TtsOptions, TtsOptionsValidator, SttOptions, SttOptionsValidator
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Evaluation/        GoldenSet, GoldenSentence, ExpectedCorrection, GoldenSetParser, GoldenSetParseResult, EvalText,
                        CorrectionMatcher, EvalRunner, SentenceResult, ProviderEvaluation, ProviderStatus, EvalMetrics,
@@ -124,6 +124,7 @@ public interface ITextToSpeech
 }
 public interface IAudioRecorder { Task<AudioClip> RecordUntilReleasedAsync(CancellationToken ct); }
 public interface IAudioPlayer   { Task PlayAsync(AudioClip clip, CancellationToken ct); }
+// AudioClip: PCM mono float32 em [-1, 1] com SampleRate; o construtor rejeita taxa <= 0 e clipe sem amostras (US-010).
 
 public interface IConversationStore { /* sessões, turnos, erros recorrentes, palavras de baixa confiança */ }
 ```
@@ -252,6 +253,7 @@ claude -p
 - Entrada de voz: push-to-talk com a tecla **Ctrl** segurada (`Voice:PushToTalkKey`, estado da tecla consultado no Windows atrás de uma porta de teclado; Ctrl+C continua cancelando). `/mic on|off` liga e desliga o microfone para o Whisper não ouvir nada fora de contexto. A interface gráfica estilo ChatGPT Voice (WPF ou Blazor, ROADMAP fase 7b) reaproveita o Core sem mudança (R2).
 - TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável (`Tts:Speed`). Fala apenas o `Reply`.
 - Áudio: NAudio (captura 16 kHz mono para o Whisper; reprodução).
+- Configuração (Core, validada na partida): Voice:Enabled (padrão false), Tts:Speed (0.5 a 1.5, padrão 1.0), Stt:LowConfidenceThreshold (0 a 1, padrão 0.6). Valor fora da faixa encerra com código 2 e a mensagem diz a faixa.
 
 ### Orçamento de VRAM (alvo, a medir)
 
