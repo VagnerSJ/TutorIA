@@ -96,7 +96,29 @@ public sealed class PiperTextToSpeechTests : IDisposable
         request.FileName.Should().Be(Path.GetFullPath(Path.Combine("models", "piper", "piper.exe")));
         request.WorkingDirectory.Should().Be(Path.GetFullPath(Path.Combine("models", "piper")));
         request.Arguments[1].Should().Be(Path.GetFullPath(Path.Combine("models", "piper", "voice.onnx")));
-        Path.IsPathRooted(OutputFileOf(request)).Should().BeTrue();
+    }
+
+    // US-011 / P2 / review S1 — apoio: pasta temporária relativa também gera o WAV com caminho completo
+    [Fact]
+    public async Task SynthesizeAsync_WithRelativeTemporaryDirectory_PassesFullWavPathToPiper()
+    {
+        var relativeTemp = $"piper-rel-{Guid.NewGuid():N}";
+        Directory.CreateDirectory(relativeTemp);
+        try
+        {
+            PiperWrites(new WavBuilder().Build());
+            var sut = new PiperTextToSpeech(_runner, Options.Create(_piperOptions), _time, relativeTemp);
+
+            await sut.SynthesizeAsync("hello", 1.0f, CancellationToken.None);
+
+            var wavPath = OutputFileOf(_runner.Requests.Single());
+            Path.IsPathRooted(wavPath).Should().BeTrue();
+            Path.GetDirectoryName(wavPath).Should().Be(Path.GetFullPath(relativeTemp));
+        }
+        finally
+        {
+            Directory.Delete(relativeTemp, recursive: true);
+        }
     }
 
     // US-011 — apoio: velocidade vira length_scale = 1/velocidade
