@@ -40,3 +40,54 @@ Resultado: REPROVADO (1 bloqueante)
 
 ## Aprendizados para o processo
 - Filtro de DoD copiado da spec por nome de namespace (`~Tts`) pega testes `Live*` da mesma pasta. Sugestão de regra para o Planejador: todo filtro `FullyQualifiedName~X` na DoD deve ser conferido contra a lista de classes `Live*` da pasta e levar `&Category!=LiveBrain&Category!=LiveVoice`, a menos que o objetivo seja justamente o live.
+
+---
+
+## Rodada 2
+
+Data: 2026-10-26
+Escopo revisado: `tasks/US-011/plan.md` no commit 2fd67df (revisão do plano da rodada 1, com o `plan-review.md` do d4c9dad). Li também o `plan-review.md` da rodada 1 e fiz Grep no repositório. Não rodei build nem testes: ainda não há código.
+Resultado: APROVADO (0 bloqueantes)
+
+### Itens da rodada anterior
+- **B1 (filtro da D5): resolvido no plano.**
+  - §2.6 item 4 cita o texto antigo da linha inteira e dá o novo. O filtro passa a ser `FullyQualifiedName~Tts&Category!=LiveBrain&Category!=LiveVoice`, e o esperado diz que nenhum teste `LiveVoice` roda.
+  - §10 D5 usa o mesmo filtro, mais `--list-tests`, e exige que a lista não contenha `PiperLiveVoiceTests`.
+  - A T7 prova os dois lados, com o filtro antigo listando a classe e o novo não. A §7 ganhou o risco correspondente.
+  - Conferi no Grep que a D5 antiga existe só em `specs/sprints/SPRINT_2.md:140` (as outras ocorrências estão em `tasks/`). O texto antigo da §2.6 bate com essa linha.
+  - A D14 (`grep -F 'filter "FullyQualifiedName~Tts"' specs`) acha a linha antiga hoje e não acha a nova, que tem `~Tts&Category...`. Isso dá o lado "achou antes" e o "não acha depois" (AP-035, AP-050).
+  - Também conferi que a D9 não casa com classes `LiveVoice`.
+- **S1 (lado "dentro do tempo" do timeout): resolvido.** `SynthesizeAsync_WhenFinishesBeforeTimeout_ReturnsClipAndDoesNotCancelRunnerToken` está na §4 e na T5, com a mutação do prazo fixo de 10 s como Red.
+- **S2 (construtor do `NAudioPlayer` sem efeito): resolvido.** Está declarado na §2.3, na §3, na §4 (teste de registros) e na T7.
+
+### Verificações (seção "Revisão de plano" do checklist)
+| Item | Resultado |
+|---|---|
+| [O] Cenários BDD no mapa da §4 (projeto, classe, método) | ✅ |
+| [O] Respostas P* com efeito observável têm teste e tarefa | ✅ |
+| [O] DoD da §10 cobre a DoD da US, com comando e resultado esperado (cobertura do Core na D3) | ✅ (D5 corrigida) |
+| [O] R1–R4, `RN-*`, regras rápidas e ADR-012 Proposto | ✅ |
+| [O] Escopo e adiamentos com texto exato (US-012 D7, AP-022); limites aceitos com consumidores (AP-040) | ✅ |
+| [O] Consistência §3 × §4 × §5 × §6 | ✅ |
+| Transformações testadas nos dois lados (AP-016); asserção com texto do projeto (AP-015) | ✅ |
+| Condicionais da §2 com teste (AP-047) | ✅ |
+| [O] Ordem das tarefas preserva o Red; "nasce verde" com mutação | ✅ |
+| `ValidateOnStart` com duas seções inválidas (AP-039) | ✅ |
+| Inventário de renomeações (AP-050) e "nenhuma linha" com os dois lados (AP-035) | ✅ |
+| Critério `LiveVoice` (AP-032, AP-052) | ✅ |
+| `ARCHITECTURE.md`, `CLAUDE.md` e skills em sincronia | ✅ |
+| Riscos e viabilidade (`NAudio.WinMM` no `net10.0`) | ✅ |
+
+### Bloqueantes
+Nenhum.
+
+### Sugestões
+- **S3** — §10, D14. O comando só vale como prova se o Executor o rodar no `develop` antes do commit de spec, como o plano diz. Se a ordem dos commits mudar, a "contagem antes" some. Só registrar essa contagem na §11.
+
+### Pontos positivos
+- A correção do B1 ficou completa: spec, DoD, tarefa de prova, risco e uma conferência das outras linhas da DoD.
+- Os dois lados do filtro são demonstrados por `--list-tests`, e a D14 prova que o filtro antigo não sobra na spec.
+- A S1 e a S2 da rodada 1 foram incorporadas com mutação de Red e com referência cruzada entre §2, §3, §4 e §5.
+
+### Aprendizados para o processo
+- Mesmo registro da rodada 1: filtro de DoD por nome de namespace (`~X`) deve levar `&Category!=LiveBrain&Category!=LiveVoice`, a menos que o objetivo seja o live. Aqui o Planejador aplicou a regra e provou com `--list-tests`.
