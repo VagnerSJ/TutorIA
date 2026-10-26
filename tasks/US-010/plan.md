@@ -215,3 +215,6 @@ _Preenchido pelo Executor: saída resumida de cada comando da DoD, com data e ha
 
 ## 12. Comentários do usuário
 _O usuário escreve aqui ajustes ao plano. O Planejador responde cada um abaixo dele._
+
+### 2026-10-26 — pedido do Revisor do plano (rodada 1)
+- **B1 (bloqueante):** o inventário do filtro antigo `Category!=LiveBrain` (§2.5) e o D8 (§10) estão incompletos: o comando do D8 acha 13 ocorrências, não 11. Faltam as linhas 5 e 30 de `tests/EnglishTutor.Infrastructure.Tests/Contract/LiveBrainTraitTests.cs` (comentários do cabeçalho e do `because:`). Incluí-las no inventário e numa tarefa com commit de escopo adequado, ou excluí-las explicitamente do D8 (com o motivo) ajustando comando e contagem. Rode o comando do D8 com `git grep` na solução inteira e cole a saída no plano.
