@@ -26,11 +26,16 @@ public sealed partial class PiperTextToSpeech(
         }
 
         var piper = options.Value;
-        var wavPath = Path.Combine(temporaryDirectory ?? Path.GetTempPath(), $"piper-{Guid.NewGuid():N}.wav");
+        var wavPath = Path.GetFullPath(Path.Combine(temporaryDirectory ?? Path.GetTempPath(), $"piper-{Guid.NewGuid():N}.wav"));
+
+        // Piper runs with WorkingDirectory = its own folder, so relative paths from the configuration (relative
+        // to the current directory, P2) must be made full here or Piper would resolve them from that folder.
+        var executablePath = Path.GetFullPath(piper.ExecutablePath);
+        var modelPath = Path.GetFullPath(piper.ModelPath);
         var request = new ProcessRequest(
-            piper.ExecutablePath,
-            ["--model", piper.ModelPath, "--output_file", wavPath, "--length_scale", FormatLengthScale(speed)],
-            Path.GetDirectoryName(Path.GetFullPath(piper.ExecutablePath)) ?? string.Empty,
+            executablePath,
+            ["--model", modelPath, "--output_file", wavPath, "--length_scale", FormatLengthScale(speed)],
+            Path.GetDirectoryName(executablePath) ?? string.Empty,
             LineBreaks().Replace(text, " ") + "\n");
 
         try
