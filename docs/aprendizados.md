@@ -563,3 +563,39 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** o `plan.md` é a fonte do mapa BDD -> teste; com nomes divergentes, o Revisor e a D11 conferem contra um mapa que já não vale. O Documentador não pode alterar `tasks/`, então a correção ficou na lista de nomes reais em `docs/us/US-010.md`, e a §4 do plano ficou como estava.
 - **Correção (proposta, não aplicada; `.claude/` é do orquestrador):** `.claude/agents/executor.md`, passo Refactor/commit: "ao renomear, dividir ou trocar a forma de um teste previsto na §4, atualize a linha da §4 (e da §5) no mesmo commit do teste; desvio só em §11 não basta". Opcional: item [O] em `.claude/skills/checklist-revisao/SKILL.md` §1: "nomes de teste da §4 batem com o código ou o desvio está na própria §4".
 - **Status:** Aplicada (2026-10-26, `executor.md` e `checklist-revisao` §1)
+
+### AP-061 — Caminho relativo com `WorkingDirectory` diferente do diretório atual escapou dos testes e do live
+
+- **Data / US:** 2026-10-26 / US-011 (`plan.md` §12, bug achado na D7; `review.md` rodada 2)
+- **Quem errou:** planejador e executor (testes e `LiveVoice` só com caminhos absolutos)
+- **O que aconteceu:** o `PiperTextToSpeech` rodava o Piper com `WorkingDirectory` na pasta do executável e passava `--model` com o caminho relativo cru (`models/piper/...`, padrão do appsettings). Toda síntese falhou com `Piper exited with code -1073740791` na D7 manual. Os testes unitários e o `PiperLiveVoiceTests` (D6 verde) usavam caminhos absolutos, então nenhum exercitava o padrão real. Corrigido com `Path.GetFullPath` (5c0c5de) e testes com caminho relativo (5da4f77, 260f54d).
+- **Por que importa:** o padrão distribuído é relativo; um teste que só usa caminhos absolutos dá confiança sem cobrir o uso real.
+- **Correção (aplicada):** `.claude/skills/tdd-dotnet/SKILL.md` e `.claude/agents/planejador.md`: "todo adaptador que lança processo com `WorkingDirectory` diferente do diretório atual precisa de teste com caminho relativo (executável, argumentos e arquivos temporários); o teste `Live*` usa os padrões reais do `appsettings.json`, com o diretório atual da raiz do repositório, e não caminhos montados em absoluto".
+- **Status:** Aplicada (2026-10-26, `tdd-dotnet` e `planejador.md`)
+
+### AP-062 — Commit de correção entrou como `docs(ai)` por `git add -A`
+
+- **Data / US:** 2026-10-26 / US-011 (`review.md` rodada 2, `plan.md` §11)
+- **Quem errou:** executor
+- **O que aconteceu:** o fix de `PiperTextToSpeech` (`Path.GetFullPath`) foi commitado junto com a §12 em `5c0c5de`, com tipo `docs(ai)`, porque o Executor usou `git add -A`. O Revisor apontou a violação (não bloqueante); o código estava certo e vinha depois do Red.
+- **Por que importa:** o histórico passa a esconder código de produção num commit de documentação, e o tipo do commit deixa de dizer o que mudou.
+- **Correção (aplicada):** `.claude/agents/executor.md`: "nunca use `git add -A` nem `git add .`; adicione por caminho; código de produção vai em `fix(escopo):` ou `feat(escopo):`, e a §12 em `docs(ai):` em commit separado". Opcional: lembrete no hook `executor-stop-gate` quando um commit `docs(ai)` toca `src/`.
+- **Status:** Aplicada (2026-10-26, `executor.md`)
+
+### AP-063 — `.editorconfig` exige prefixo `_` em constantes privadas e campos estáticos readonly, inclusive em testes (IDE1006)
+
+- **Data / US:** 2026-10-26 / US-011 (`plan.md` §12, desvio 6)
+- **Quem errou:** executor (3 vezes na US)
+- **O que aconteceu:** constantes privadas e campos `static readonly` privados em classes de teste foram escritos sem `_` (ex.: `headerSize`), e o IDE1006 só apareceu no hook ou no D4. Foi corrigido três vezes durante a US (ex.: `_headerSize`, `_clip`). Recorrência de AP-012 no nível da regra de nome.
+- **Por que importa:** retrabalho por edição, e o build não avisa (AP-012).
+- **Correção (aplicada):** `.claude/skills/padroes-codigo/SKILL.md`, tabela de nomes: acrescentar a linha "Constante privada e campo estático readonly privado: `_camelCase` (também em testes; IDE1006 do `.editorconfig`)", e o `executor.md` apontar para a tabela.
+- **Status:** Aplicada (2026-10-26, `padroes-codigo` e `executor.md`)
+
+### AP-064 — Filtro de DoD por nome de namespace (`~Tts`) casa classes `Live*` e exige hardware
+
+- **Data / US:** 2026-10-26 / US-011 (`plan-review.md` rodada 1, B1; plano §2.6 e D5)
+- **Quem errou:** planejador (copiou o filtro da spec sem checar o que ele casa)
+- **O que aconteceu:** a D5 `dotnet test --filter "FullyQualifiedName~Tts"` casaria `EnglishTutor.Infrastructure.Tests.Tts.PiperLiveVoiceTests`, que exige Piper real e alto-falante. O Revisor do plano pegou antes da execução (B1); o plano passou a usar `&Category!=LiveBrain&Category!=LiveVoice` e `--list-tests` como prova (56 testes contra 58 do filtro antigo). Não havia entrada anterior sobre isso (verificado por busca no diário).
+- **Por que importa:** o comando de DoD falharia fora da máquina do autor (CI), ou, pior, tocaria hardware.
+- **Correção (aplicada):** `.claude/agents/planejador.md` e `.claude/skills/bdd-para-testes/SKILL.md`: "todo filtro de DoD por nome (`FullyQualifiedName~X`) leva `&Category!=LiveBrain&Category!=LiveVoice` e uma prova com `--list-tests` de que nenhuma classe `Live*` entra". Item [O] em `.claude/skills/checklist-revisao/SKILL.md` §0.
+- **Status:** Aplicada (2026-10-26, `planejador.md`, `bdd-para-testes` e `checklist-revisao` §0)

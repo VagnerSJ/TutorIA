@@ -27,6 +27,7 @@ public async Task SendAsync_WhenWindowIsFull_DropsOldestTurn()
 
 - O comentário cita a US, o nome exato do cenário e as regras.
 - O plano (`tasks/US-XXX/plan.md`, seção 4) lista cenário → classe → método. O Revisor confere essa tabela.
+- Filtro de DoD por nome (`FullyQualifiedName~X`) leva `&Category!=LiveBrain&Category!=LiveVoice` e é provado com `--list-tests` (AP-064).
 
 ## Escolha do nível do teste
 

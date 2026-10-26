@@ -1,7 +1,11 @@
+using EnglishTutor.Core.Audio;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
+using EnglishTutor.Infrastructure.Audio;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.Processes;
+using EnglishTutor.Infrastructure.Tts;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,6 +52,13 @@ public static class InfrastructureServiceCollectionExtensions
             ServiceDescriptor.Singleton<IValidateOptions<ClaudeCodeOptions>, ClaudeCodeOptionsValidator>());
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<OllamaOptions>, OllamaOptionsValidator>());
+
+        // Voice output (US-011): Piper through the process runner, NAudio playback, startup file check.
+        services.TryAddSingleton<ITextToSpeech, PiperTextToSpeech>();
+        services.TryAddSingleton<IAudioPlayer, NAudioPlayer>();
+        services.TryAddSingleton<IVoiceOutputCheck, PiperVoiceOutputCheck>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<PiperOptions>, PiperOptionsValidator>());
         return services;
     }
 }

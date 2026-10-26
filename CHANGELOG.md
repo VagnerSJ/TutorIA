@@ -56,3 +56,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: portas de voz e áudio no Core (`ISpeechToText`, `ITextToSpeech`, `IAudioRecorder`, `IAudioPlayer`, `Transcript`, `TranscribedWord`) e `AudioClip` (PCM mono float32) que rejeita taxa <= 0 e clipe vazio, com fakes de teste (US-010).
 - Added: opções `Tts:Speed` (0.5 a 1.5, padrão 1.0), `Stt:LowConfidenceThreshold` (0 a 1, padrão 0.6) e `Voice:Enabled` (padrão false) no `appsettings.json`, validadas na partida; valor fora da faixa encerra com código 2 e mensagem que diz a faixa (US-010).
 - Changed: filtro padrão de testes passa a ser `Category!=LiveBrain&Category!=LiveVoice` em hooks, CI, README, agentes e skills (US-010).
+- Added: com `Voice:Enabled=true` o professor fala só o `reply` com o Piper (voz `en_US-lessac-medium`) depois de o texto aparecer; feedback e resposta crua não são falados, e a próxima entrada só é lida depois do áudio (US-011).
+- Added: `Tts:Piper:ExecutablePath`, `Tts:Piper:ModelPath` e `Tts:Piper:TimeoutSeconds` (padrão 30, faixa 1 a 300), validados na partida (US-011).
+- Added: aviso na saída de erro quando o Piper ou a voz faltam (caminho completo e como baixar) e quando a síntese ou a reprodução falha num turno; a sessão continua por texto. Ctrl+C interrompe o áudio com código 0 (US-011).
+- Added: ADR-012 (voz de saída por processo do Piper e `ReplySpeaker` no Core) (US-011).

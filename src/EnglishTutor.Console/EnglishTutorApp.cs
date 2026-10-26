@@ -7,6 +7,7 @@ using EnglishTutor.Core.DependencyInjection;
 using EnglishTutor.Core.Speech;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.DependencyInjection;
+using EnglishTutor.Infrastructure.Tts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -99,22 +100,49 @@ public static class EnglishTutorApp
         return exitCode.Value;
     }
 
-    private static Task<int> RunSessionAsync(
+    private static async Task<int> RunSessionAsync(
         IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
     {
         // Only the first argument decides; anything else opens the chat (plan §2.7).
         if (EvalCommandLineParser.IsEvalCommand(options.Args))
         {
-            return new EvalCommand(services, options, logger).RunAsync(ct);
+            return await new EvalCommand(services, options, logger).RunAsync(ct);
         }
 
         var provider = CanonicalProvider(services);
+        var speaker = await ResolveReplySpeakerAsync(services, options, logger, ct);
         var handler = new ConversationInputHandler(
-            services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger);
+            services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger, speaker);
         logger.ApplicationStarted(provider, handler.Mode.Name);
 
         var session = new ChatSession(options.Input, options.Output, handler, provider);
-        return session.RunAsync(ct);
+        return await session.RunAsync(ct);
+    }
+
+    // US-011: with Voice:Enabled=false nothing voice-related is resolved. With it on and the Piper files missing,
+    // the reasons go to the error output once and the chat continues by text (no speaker).
+    private static async Task<ReplySpeaker?> ResolveReplySpeakerAsync(
+        IServiceProvider services, AppRunOptions options, ILogger logger, CancellationToken ct)
+    {
+        if (!services.GetRequiredService<IOptions<VoiceOptions>>().Value.Enabled)
+        {
+            return null;
+        }
+
+        var status = services.GetRequiredService<IVoiceOutputCheck>().Check();
+        if (!status.IsAvailable)
+        {
+            foreach (var line in status.Lines)
+            {
+                await options.Error.WriteLineAsync(line.AsMemory(), ct);
+            }
+
+            logger.VoiceOutputUnavailable();
+            return null;
+        }
+
+        logger.VoiceOutputEnabled();
+        return services.GetRequiredService<ReplySpeaker>();
     }
 
     private static IHost BuildHost(AppRunOptions options)
@@ -156,6 +184,9 @@ public static class EnglishTutorApp
 
         builder.Services.AddOptions<TtsOptions>()
             .Bind(builder.Configuration.GetSection(TtsOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<PiperOptions>()
+            .Bind(builder.Configuration.GetSection(PiperOptions.SectionName))
             .ValidateOnStart();
         builder.Services.AddOptions<SttOptions>()
             .Bind(builder.Configuration.GetSection(SttOptions.SectionName))

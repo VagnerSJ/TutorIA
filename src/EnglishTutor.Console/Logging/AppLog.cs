@@ -49,4 +49,11 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1007, Level = LogLevel.Information, Message = "Eval report saved to {Path}")]
     public static partial void EvalReportSaved(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1008, Level = LogLevel.Information, Message = "Voice output enabled")]
+    public static partial void VoiceOutputEnabled(this ILogger logger);
+
+    [LoggerMessage(EventId = 1009, Level = LogLevel.Warning,
+        Message = "Voice output unavailable; the chat continues by text only")]
+    public static partial void VoiceOutputUnavailable(this ILogger logger);
 }

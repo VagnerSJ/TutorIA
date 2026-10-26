@@ -1,6 +1,7 @@
 using EnglishTutor.Console.Logging;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
 using Microsoft.Extensions.Logging;
 
 namespace EnglishTutor.Console.Ui;
@@ -13,8 +14,14 @@ public sealed class ConversationInputHandler : IChatInputHandler
     private readonly TextWriter _output;
     private readonly TextWriter _error;
     private readonly ILogger _logger;
+    private readonly ReplySpeaker? _speaker;
 
-    public ConversationInputHandler(ConversationService conversation, TextWriter output, TextWriter error, ILogger logger)
+    public ConversationInputHandler(
+        ConversationService conversation,
+        TextWriter output,
+        TextWriter error,
+        ILogger logger,
+        ReplySpeaker? speaker = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(output);
@@ -24,6 +31,7 @@ public sealed class ConversationInputHandler : IChatInputHandler
         _output = output;
         _error = error;
         _logger = logger;
+        _speaker = speaker;
     }
 
     public TutorMode Mode => _conversation.Mode;
@@ -57,6 +65,12 @@ public sealed class ConversationInputHandler : IChatInputHandler
         }
 
         await WriteLinesAsync(ConsoleText.TutorReply(result.Reply), ct);
+
+        // US-011: the turn text is on screen first; only the reply is spoken (ADR-012). The next line is read after this ends.
+        if (_speaker is not null && await _speaker.SpeakAsync(result.Reply, ct) == SpeakResult.Failed)
+        {
+            await _error.WriteLineAsync(ConsoleText.AudioFailed.AsMemory(), ct);
+        }
     }
 
     private async Task WriteLinesAsync(IReadOnlyList<string> lines, CancellationToken ct)

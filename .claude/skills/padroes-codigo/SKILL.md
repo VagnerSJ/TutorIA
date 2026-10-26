@@ -24,6 +24,7 @@ A estrutura de pastas e as camadas estão em `ARCHITECTURE.md` §2–§3. Aqui f
 | Options | `<Área>Options`, seção = nome sem sufixo | `BrainOptions` ↔ `"Brain"` |
 | Assíncrono | sufixo `Async`, último parâmetro `CancellationToken ct` | `SendAsync(BrainRequest request, CancellationToken ct)` |
 | Campo privado | `_camelCase` | `_brain` |
+| Constante privada e campo estático readonly privado | `_camelCase` (também em testes; IDE1006 do `.editorconfig`) | `_headerSize` |
 | Testes | `Metodo_Cenario_Resultado` | ver skill `tdd-dotnet` |
 
 Caracteres não imprimíveis ou invisíveis (BOM, espaço sem quebra, zero-width etc.) aparecem em código e testes **sempre como escape** (`'\uXXXX'`), nunca como caractere literal (AP-007).

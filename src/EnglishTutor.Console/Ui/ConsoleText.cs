@@ -33,6 +33,9 @@ public static class ConsoleText
     // No logger exists yet when the host cannot be built, so the reason goes to the console (without a stack trace).
     public static string StartupFailed(string reason) => $"The application could not start: {reason}";
 
+    // US-011: shown on the error output when synthesis or playback failed; the reply text was already shown.
+    public const string AudioFailed = "Audio failed: the reply is shown as text only. The session continues.";
+
     // ADR-008: the message of the BrainException says what happened and what to do; the next step is the same for all.
     public static IReadOnlyList<string> BrainFailed(string message) =>
     [

@@ -11,7 +11,7 @@ flowchart LR
     STT -->|Transcript<br/>texto + confiança| CS[ConversationService]
     CS -->|BrainRequest<br/>system prompt + janela + resumo de erros| Brain[ITutorBrain]
     Brain -->|TutorReply<br/>reply + feedback| CS
-    CS -->|somente reply| TTS[ITextToSpeech<br/>Piper / Kokoro]
+    CS -->|somente reply, via ReplySpeaker| TTS[ITextToSpeech<br/>Piper / Kokoro]
     TTS --> Player[IAudioPlayer] --> Spk[Alto-falante]
     CS -->|feedback| UI[Interface<br/>Console → WPF/Blazor]
     CS --> Store[IConversationStore<br/>SQLite]
@@ -54,7 +54,7 @@ src/
                        TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,
                        BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders,
                        BrainFallbackPolicy, BrainSwitchNotice, IBrainSwitchNotifier
-    Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech, VoiceOptions, TtsOptions, TtsOptionsValidator, SttOptions, SttOptionsValidator
+    Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech, VoiceOptions, TtsOptions, TtsOptionsValidator, SttOptions, SttOptionsValidator, ReplySpeaker, SpeakResult, IVoiceOutputCheck, VoiceOutputStatus
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Evaluation/        GoldenSet, GoldenSentence, ExpectedCorrection, GoldenSetParser, GoldenSetParseResult, EvalText,
                        CorrectionMatcher, EvalRunner, SentenceResult, ProviderEvaluation, ProviderStatus, EvalMetrics,
@@ -69,7 +69,7 @@ src/
     Processes/         IProcessRunner, ProcessRequest, ProcessResult, ProcessRunner
     DependencyInjection/ InfrastructureServiceCollectionExtensions
     Stt/               WhisperNetSpeechToText, WhisperModelDownloader
-    Tts/               PiperTextToSpeech, KokoroHttpTextToSpeech
+    Tts/               PiperTextToSpeech, PiperOptions, PiperOptionsValidator, PiperVoiceOutputCheck, WavPcmReader, KokoroHttpTextToSpeech
     Audio/             NAudioRecorder, NAudioPlayer
     Persistence/       SqliteConversationStore
   EnglishTutor.Console/
@@ -147,7 +147,7 @@ A cada turno o `ConversationService`:
 3. Monta o `BrainRequest`: system prompt (`tutor.md`, via `ITutorPromptSource`; a instrução de formato do provedor é anexada pelo adaptador, ADR-002) + resumo dos erros recorrentes + últimos N turnos (`Conversation:MaxTurnsInWindow`; o professor entra com o `RawText` da resposta) + mensagem atual.
 4. Chama `ITutorBrain.SendAsync`. O cérebro devolve um `TutorReply` já validado pelo parser. Se o parser rejeitar, o adaptador lança `BrainException.InvalidOutput(rejection, rawText)` (ADR-005, ADR-006).
 5. Em `InvalidOutput`, o serviço faz **uma** nova tentativa: as mesmas mensagens + a resposta rejeitada (`Assistant`) + a instrução de correção com `TutorReplyRejection.Message` (`User`). Se falhar de novo, usa `TutorReply.RawFallback` (`IsRawFallback = true`, sem feedback) (RN-BRAIN04). A tentativa rejeitada e a correção não entram no histórico (ADR-006).
-6. Envia **apenas** `Reply` ao TTS (RN-TTS01); o feedback vai só para a tela.
+6. O texto falado é **apenas** o `Reply` (RN-TTS01); o feedback vai só para a tela. Quem fala é o `ReplySpeaker` (Core), chamado pela interface depois de mostrar o texto do turno (ADR-012); a resposta crua (`IsRawFallback`) não é falada.
 7. Persiste o turno e atualiza erros recorrentes / palavras de baixa confiança.
 
 Provedores com estado (Claude Code via `--resume`) guardam o identificador da sessão no próprio adaptador e só o reaproveitam quando o `BrainRequest` tem o mesmo system prompt, repete exatamente as mensagens que a sessão já conhece e acrescenta uma única mensagem do aluno; em qualquer outro caso enviam a janela completa numa sessão nova (ADR-007). `BrainRequest.SessionHint` fica reservado, e o `ConversationService` o envia `null`.
@@ -251,9 +251,9 @@ claude -p
 
 - STT: Whisper.net; runtime **CUDA** preferido (GPU NVIDIA RTX 4070 Ti SUPER, 16 GB; CUDA Toolkit 13.4 instalado em 2026-10-26), fallback Vulkan e depois CPU. A US-014 mede CUDA, Vulkan e CPU e fixa o padrão em ADR (sem ganho claro do CUDA, o padrão é o Vulkan). Modelo padrão `large-v3-turbo` (ou menor, se a medição indicar), baixado na primeira execução para `models/` (ignorado pelo Git). Confiança por palavra a partir das probabilidades de token.
 - Entrada de voz: push-to-talk com a tecla **Ctrl** segurada (`Voice:PushToTalkKey`, estado da tecla consultado no Windows atrás de uma porta de teclado; Ctrl+C continua cancelando). `/mic on|off` liga e desliga o microfone para o Whisper não ouvir nada fora de contexto. A interface gráfica estilo ChatGPT Voice (WPF ou Blazor, ROADMAP fase 7b) reaproveita o Core sem mudança (R2).
-- TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável (`Tts:Speed`). Fala apenas o `Reply`.
+- TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável (`Tts:Speed`). Fala apenas o `Reply` (`ReplySpeaker`, ADR-012). O `PiperTextToSpeech` roda `piper --model --output_file <wav temporário> --length_scale <1/velocidade>` pelo `IProcessRunner`, lê o WAV PCM16 mono e apaga o arquivo. Com `Voice:Enabled=true` e arquivos ausentes, a partida avisa na saída de erro (caminhos e como baixar) e o chat segue por texto.
 - Áudio: NAudio (captura 16 kHz mono para o Whisper; reprodução).
-- Configuração (Core, validada na partida): Voice:Enabled (padrão false), Tts:Speed (0.5 a 1.5, padrão 1.0), Stt:LowConfidenceThreshold (0 a 1, padrão 0.6). Valor fora da faixa encerra com código 2 e a mensagem diz a faixa.
+- Configuração (Core, validada na partida): Voice:Enabled (padrão false), Tts:Speed (0.5 a 1.5, padrão 1.0), Stt:LowConfidenceThreshold (0 a 1, padrão 0.6); Tts:Piper:ExecutablePath (padrão models/piper/piper.exe), Tts:Piper:ModelPath (padrão models/piper/en_US-lessac-medium.onnx) e Tts:Piper:TimeoutSeconds (1 a 300, padrão 30), validados na Infrastructure. Valor fora da faixa encerra com código 2 e a mensagem diz a faixa.
 
 ### Orçamento de VRAM (alvo, a medir)
 

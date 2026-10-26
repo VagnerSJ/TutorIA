@@ -631,7 +631,7 @@ public sealed class EnglishTutorAppTests : IDisposable
             "Type /help for commands or /quit to exit."));
     }
 
-    // US-010 — Cenário: valores padrão (o bind lê a configuração; P2: Voice:Enabled não muda o chat)
+    // US-010 — Cenário: valores padrão (o bind lê a configuração; com Voice:Enabled=true e sem Piper o chat segue por texto, US-011)
     [Fact]
     public async Task RunAsync_WithVoiceValues_BindsThemFromConfiguration()
     {

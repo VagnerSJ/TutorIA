@@ -1,8 +1,12 @@
+using EnglishTutor.Core.Audio;
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
+using EnglishTutor.Infrastructure.Audio;
 using EnglishTutor.Infrastructure.Brain;
 using EnglishTutor.Infrastructure.DependencyInjection;
 using EnglishTutor.Infrastructure.Tests.Fakes;
+using EnglishTutor.Infrastructure.Tts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -169,5 +173,22 @@ public sealed class InfrastructureServiceCollectionExtensionsTests
         read.Should().Throw<OptionsValidationException>()
             .Which.Failures.Should().ContainSingle(
                 failure => failure.Contains("Brain:Ollama:Model is required", StringComparison.Ordinal));
+    }
+
+    // US-011 — apoio: adaptadores do Piper registrados (resolver o NAudioPlayer só o constrói, sem abrir dispositivo)
+    [Fact]
+    public void AddEnglishTutorInfrastructure_Always_RegistersPiperAdaptersAndValidator()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+
+        services.AddEnglishTutorInfrastructure(_promptsDirectory);
+
+        using var provider = services.BuildServiceProvider();
+        provider.GetService<ITextToSpeech>().Should().BeOfType<PiperTextToSpeech>();
+        provider.GetService<IAudioPlayer>().Should().BeOfType<NAudioPlayer>();
+        provider.GetService<IVoiceOutputCheck>().Should().BeOfType<PiperVoiceOutputCheck>();
+        provider.GetServices<IValidateOptions<PiperOptions>>().Should().ContainSingle(
+            validator => validator is PiperOptionsValidator);
     }
 }
