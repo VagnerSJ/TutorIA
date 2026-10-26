@@ -1,9 +1,9 @@
 # Plano — US-011 O professor fala o `reply` (Piper)
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-26
 Branch: feature/US-011_professor-fala-reply-piper
 Spec: specs/sprints/SPRINT_2.md#us-011--o-professor-fala-o-reply-piper
-Regras: RN-TTS01 (e RN-TTS02 só pelo valor padrão de `Tts:Speed`); ARCHITECTURE §1, §3, §4, §5 (passo 6), §7, §9, §10; ADR-004, ADR-008 (modelo de falha e tempo máximo), ADR-012 (novo, Proposto)
+Regras: RN-TTS01 (e RN-TTS02 só pelo valor padrão de `Tts:Speed`); ARCHITECTURE §1, §3, §4, §5 (passo 6), §7, §9, §10; ADR-004, ADR-008 (modelo de falha e tempo máximo), ADR-012 (novo, Aceito)
 
 ## 1. Objetivo
 
@@ -11,7 +11,7 @@ Com `Voice:Enabled=true`, o console mostra o `reply` e o feedback do turno e só
 
 ## 2. Abordagem
 
-ADR novo: `docs/adr/ADR-012-voz-de-saida-piper-por-processo-e-reply-speaker-no-core.md` (Proposto), com alternativas descartadas.
+ADR novo: `docs/adr/ADR-012-voz-de-saida-piper-por-processo-e-reply-speaker-no-core.md` (Aceito), com alternativas descartadas.
 
 ### 2.1 Quem fala: `ReplySpeaker` no Core, chamado pela interface depois de mostrar o texto
 

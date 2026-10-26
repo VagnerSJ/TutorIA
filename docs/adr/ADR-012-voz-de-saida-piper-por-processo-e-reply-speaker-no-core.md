@@ -1,6 +1,6 @@
 # ADR-012 — Voz de saída: Piper por processo com arquivo temporário e `ReplySpeaker` no Core
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 2026-10-26
 - **US relacionadas:** US-011 (US-012, US-016 e US-017 reutilizam)
 
