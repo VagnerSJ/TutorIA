@@ -39,13 +39,14 @@ Toda funcionalidade é conduzida por `/us US-XXX`:
 - Branches: `main` (só o que já foi testado) ← `develop` (tudo o que já foi desenvolvido) ← `feature/US-XXX_slug` (ex.: `feature/US-001_fundacao-solucao`), criada a partir de `develop`. US pronta → merge `--no-ff` da feature em `develop`. `develop` → `main` só quando o usuário pedir.
 - Código, nomes e mensagens de commit em inglês; documentação e specs em português.
 - Nunca commitar modelos, bancos SQLite, áudios ou `appsettings.*.local.json`.
+- **Economia de contexto (vale para todos os agentes e para o orquestrador):** nunca cole saída bruta de build, testes, cobertura ou execução. Mostre só contagens (aprovados/falhos/ignorados), o nome e a mensagem curta de cada falha e o número de avisos. Em listas longas, mostre as 10 primeiras linhas e a contagem total. Subagentes devolvem resumo curto (tabela da DoD, commits, desvios), sem repetir o que já está em `plan.md`/`review.md`. Releia arquivo só se ele mudou. O resultado completo fica na seção "Evidências" do `plan.md`, resumido.
 
 ## Comandos
 
 ```bash
 dotnet build
-dotnet test --filter "Category!=LiveBrain"
-dotnet test --filter "Category!=LiveBrain" --collect:"XPlat Code Coverage"
+dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice"
+dotnet test --filter "Category!=LiveBrain&Category!=LiveVoice" --collect:"XPlat Code Coverage"
 dotnet run --project src/EnglishTutor.Console
 ```
 

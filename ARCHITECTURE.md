@@ -248,7 +248,8 @@ claude -p
 
 ## 7. Voz
 
-- STT: Whisper.net; runtime **CUDA** (GPU NVIDIA RTX 4070 Ti SUPER, 16 GB), fallback Vulkan e depois CPU. Modelo padrão `large-v3-turbo`, baixado na primeira execução para `models/` (ignorado pelo Git). Confiança por palavra a partir das probabilidades de token.
+- STT: Whisper.net; runtime **CUDA** preferido (GPU NVIDIA RTX 4070 Ti SUPER, 16 GB; CUDA Toolkit 13.4 instalado em 2026-10-26), fallback Vulkan e depois CPU. A US-014 mede CUDA, Vulkan e CPU e fixa o padrão em ADR (sem ganho claro do CUDA, o padrão é o Vulkan). Modelo padrão `large-v3-turbo` (ou menor, se a medição indicar), baixado na primeira execução para `models/` (ignorado pelo Git). Confiança por palavra a partir das probabilidades de token.
+- Entrada de voz: push-to-talk com a tecla **Ctrl** segurada (`Voice:PushToTalkKey`, estado da tecla consultado no Windows atrás de uma porta de teclado; Ctrl+C continua cancelando). `/mic on|off` liga e desliga o microfone para o Whisper não ouvir nada fora de contexto. A interface gráfica estilo ChatGPT Voice (WPF ou Blazor, ROADMAP fase 7b) reaproveita o Core sem mudança (R2).
 - TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável (`Tts:Speed`). Fala apenas o `Reply`.
 - Áudio: NAudio (captura 16 kHz mono para o Whisper; reprodução).
 
@@ -282,14 +283,14 @@ SQLite em `%LOCALAPPDATA%/EnglishTutor/tutor.db`: `Sessions`, `Turns` (fala tran
 | Unidade (TDD) | `EnglishTutor.Core.Tests` | xUnit, FluentAssertions, NSubstitute; fakes de todas as portas |
 | Parser / fixtures | `EnglishTutor.Infrastructure.Tests` | saídas reais gravadas em `Fixtures/` (Claude Code JSON, Ollama JSON) a partir da US-004; até lá (US-002), exemplos da spec em `Fixtures/TutorReply/` |
 | Contrato | `Infrastructure.Tests/Contract/TutorBrainContractTests` (classe abstrata) | uma subclasse por provedor (`ClaudeCodeTutorBrainContractTests`, `OllamaTutorBrainContractTests`), sem testes próprios; fake de processo/HTTP por trás de uma bancada por provedor |
-| Live | classes `*LiveTests` (as de contrato: `<Provedor>ContractLiveTests`, com o `ConversationService` real sobre o adaptador real) com `[Trait("Category","LiveBrain")]` | excluídas por padrão: `dotnet test --filter "Category!=LiveBrain"` |
+| Live | classes `*LiveTests` (as de contrato: `<Provedor>ContractLiveTests`, com o `ConversationService` real sobre o adaptador real) com `[Trait("Category","LiveBrain")]` | excluídas por padrão: `dotnet test --filter "Category!=LiveBrain"`. Testes com microfone, alto-falante, modelo de voz ou GPU usam `[Trait("Category","LiveVoice")]` (Sprint 2) e também ficam fora: `--filter "Category!=LiveBrain&Category!=LiveVoice"` |
 | Avaliação | comando `eval` + `eval/golden-set.json` (lógica em `Core/Evaluation`, testada com fakes e relógio falso; `GoldenSetFileTests` guarda o arquivo) | relatório em `eval/reports/`; nota mínima: ≥ 80% das correções esperadas e ≥ 90% de formato sem retentativa (§6.6) |
 
 Meta: cobertura de linhas do Core ≥ 80% (coverlet).
 
 ### Feedback rápido
 
-- Suíte unitária (tudo exceto `LiveBrain`) em < 30 s; `EnglishTutor.Core.Tests` em < 10 s. Sem rede, GPU, processo real ou relógio real.
+- Suíte unitária (tudo exceto `LiveBrain` e `LiveVoice`) em < 30 s; `EnglishTutor.Core.Tests` em < 10 s. Sem rede, GPU, processo real ou relógio real.
 - Hooks do Claude Code (`.claude/settings.json` e frontmatter do `executor`):
 
   | Hook | Quando | O que faz |

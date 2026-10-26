@@ -6,7 +6,7 @@
 |---|---|---|
 | SO | Windows 11 Pro 10.0.26200 | — |
 | GPU | NVIDIA GeForce RTX 4070 Ti SUPER, 16 GB, driver 610.88 | Usar runtime **CUDA** do Whisper.net |
-| CUDA Toolkit | não instalado (`nvcc` ausente, `CUDA_PATH` vazio) | Necessário para `Whisper.net.Runtime.Cuda` (Fase 4). Alternativa sem instalação: runtime Vulkan |
+| CUDA Toolkit | 13.4 instalado em 2026-10-26 (`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4`; abrir terminal novo para o PATH) | Verificar na US-014 se `Whisper.net.Runtime.Cuda` suporta a versão 13.x; se não, Vulkan. Alternativa sem instalação: runtime Vulkan |
 | .NET SDK | apenas 9.0.200 (runtimes 6, 8, 9) | **Instalar .NET 10 SDK (LTS)** antes do Executor da US-001 |
 | Claude Code CLI | só o binário embutido no app desktop; não está no PATH; `claude auth status` → não autenticado | Instalar o CLI e autenticar com a assinatura |
 | Ollama | 0.40.7 instalado (2026-10-21); modelo `qwen2.5:14b-instruct-q4_K_M` baixado (9,0 GB) | — (US-006) |
