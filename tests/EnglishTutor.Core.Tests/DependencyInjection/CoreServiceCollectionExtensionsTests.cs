@@ -111,4 +111,19 @@ public sealed class CoreServiceCollectionExtensionsTests
             .Which.Failures.Should().ContainSingle(
                 failure => failure.Contains("Stt:LowConfidenceThreshold", StringComparison.Ordinal));
     }
+
+    // US-012 — Cenário: velocidade configurada (registro)
+    [Fact]
+    public void AddEnglishTutorCore_Always_RegistersSpeechSpeedAsSingleton()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<TtsOptions>().Configure(options => options.Speed = 0.8f);
+
+        services.AddEnglishTutorCore();
+
+        using var provider = services.BuildServiceProvider();
+        var first = provider.GetRequiredService<SpeechSpeed>();
+        provider.GetRequiredService<SpeechSpeed>().Should().BeSameAs(first);
+        first.Current.Should().Be(0.8f);
+    }
 }
