@@ -34,7 +34,6 @@ public sealed class ReplySpeakerTests
         new(
             tts,
             player,
-            Options.Create(new TtsOptions { Speed = speed }),
             sessionSpeed ?? new SpeechSpeed(Options.Create(new TtsOptions { Speed = speed })),
             time ?? TimeProvider.System,
             logger ?? NullLogger<ReplySpeaker>.Instance);
