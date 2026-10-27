@@ -10,9 +10,12 @@ public sealed class ReplySpeaker(
     ITextToSpeech tts,
     IAudioPlayer player,
     IOptions<TtsOptions> options,
+    SpeechSpeed speed,
     TimeProvider time,
     ILogger<ReplySpeaker> logger)
 {
+    private readonly SpeechSpeed _speed = speed;
+
     public async Task<SpeakResult> SpeakAsync(TutorReply reply, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(reply);

@@ -29,11 +29,13 @@ public sealed class ReplySpeakerTests
         FakeAudioPlayer player,
         float speed = 1.0f,
         TimeProvider? time = null,
-        ILogger<ReplySpeaker>? logger = null) =>
+        ILogger<ReplySpeaker>? logger = null,
+        SpeechSpeed? sessionSpeed = null) =>
         new(
             tts,
             player,
             Options.Create(new TtsOptions { Speed = speed }),
+            sessionSpeed ?? new SpeechSpeed(Options.Create(new TtsOptions { Speed = speed })),
             time ?? TimeProvider.System,
             logger ?? NullLogger<ReplySpeaker>.Instance);
 
@@ -77,6 +79,21 @@ public sealed class ReplySpeakerTests
         await sut.SpeakAsync(ReplyWithFeedback(), CancellationToken.None);
 
         tts.Requests.Should().ContainSingle().Which.Speed.Should().Be(speed);
+    }
+
+    // US-012 — Cenário: mudar a velocidade durante a sessão (a fala lê a velocidade da sessão a cada vez)
+    [Fact]
+    public async Task SpeakAsync_WhenSessionSpeedChangesBetweenCalls_UsesTheCurrentSpeedEachTime()
+    {
+        var tts = new FakeTextToSpeech().Returns(_clip).Returns(_clip);
+        var sessionSpeed = new SpeechSpeed(Options.Create(new TtsOptions { Speed = 0.8f }));
+        var sut = CreateSut(tts, new FakeAudioPlayer(), 0.8f, sessionSpeed: sessionSpeed);
+
+        await sut.SpeakAsync(ReplyWithFeedback(), CancellationToken.None);
+        sessionSpeed.Change("1.2");
+        await sut.SpeakAsync(ReplyWithFeedback(), CancellationToken.None);
+
+        tts.Requests.Select(request => request.Speed).Should().Equal(0.8f, 1.2f);
     }
 
     // US-011 — Cenário: resposta crua não é falada
