@@ -1,6 +1,6 @@
-﻿# Plano — US-012 Velocidade da fala configurável e ajustável na sessão
+# Plano — US-012 Velocidade da fala configurável e ajustável na sessão
 
-Status: Aguardando aprovação
+Status: Aprovado em 2026-10-27
 Branch: feature/US-012_velocidade-da-fala
 Spec: specs/sprints/SPRINT_2.md#us-012--velocidade-da-fala-configurável-e-ajustável-na-sessão
 Regras: RN-TTS02, RN-CONV06 (comando local nunca vai ao cérebro); ARCHITECTURE §3, §7; ADR-012 (consequência "a velocidade vira valor mutável da sessão na US-012")
@@ -181,6 +181,8 @@ Nenhum pacote novo.
 Persistir a velocidade entre sessões; linha de velocidade no cabeçalho; log da mudança de velocidade (nenhuma US prevista, só se o usuário pedir); atalho de teclado para velocidade; `/mic` e o ciclo de voz (US-013 a US-016; a US-016 só confere que `/speed 1.1` segue funcionando); controle gráfico de velocidade (interface do backlog); mudança no `PiperTextToSpeech` (já converte `1/velocidade` em `length_scale`) ou em `TtsOptionsValidator` (a faixa da configuração continua a mesma); cérebro, prompt e parser (sem `eval`).
 
 ## 9. Perguntas em aberto
+
+Respostas (2026-10-27): o usuário aprovou o plano com S1 a S4 incorporadas; P1 a P7 ficam com as respostas padrão abaixo.
 
 - **P1** — `/speed` com `Voice:Enabled=false` ou Piper ausente. Resposta padrão: funciona igual (mesmas mensagens), pois o `SpeechSpeed` sempre existe e a US-016 espera `/speed` "como no chat por texto"; vira cenário novo "velocidade sem voz" na spec (§2.6, item 5). Teste: `SpeedAppTests.RunAsync_WhenVoiceIsOff_SpeedCommandStillAnswersAndNothingIsSpoken`.
 - **P2** — Valor que não é número, e vírgula decimal (`1,2`). Resposta padrão: só o ponto vale; qualquer outra coisa é `NotANumber` com mensagem de exemplo, sem mudar a velocidade; cenário novo na spec (§2.6, item 4). Teste: `SpeechSpeedTests.Change_WhenTextIsNotANumber_KeepsPreviousSpeedAndReportsNotANumber` (linha `1,2`) e `SpeedCommandTests.RunAsync_WhenUserTypesSpeedThatIsNotANumber_ExplainsAndKeepsPreviousSpeed`.
