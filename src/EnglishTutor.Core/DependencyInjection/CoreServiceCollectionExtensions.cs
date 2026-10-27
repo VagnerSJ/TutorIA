@@ -32,6 +32,9 @@ public static class CoreServiceCollectionExtensions
 
         // Voice output (US-011): speaks the reply after the interface shows it.
         services.TryAddSingleton<ReplySpeaker>();
+
+        // Speaking speed of the session (US-012): Tts:Speed is the initial value, /speed changes it.
+        services.TryAddSingleton<SpeechSpeed>();
         return services;
     }
 }

@@ -1,7 +1,6 @@
 using EnglishTutor.Core.Audio;
 using EnglishTutor.Core.Brain;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace EnglishTutor.Core.Speech;
 
@@ -9,7 +8,7 @@ namespace EnglishTutor.Core.Speech;
 public sealed class ReplySpeaker(
     ITextToSpeech tts,
     IAudioPlayer player,
-    IOptions<TtsOptions> options,
+    SpeechSpeed speed,
     TimeProvider time,
     ILogger<ReplySpeaker> logger)
 {
@@ -33,7 +32,7 @@ public sealed class ReplySpeaker(
         try
         {
             var started = time.GetTimestamp();
-            var clip = await tts.SynthesizeAsync(reply.Reply, options.Value.Speed, ct);
+            var clip = await tts.SynthesizeAsync(reply.Reply, speed.Current, ct);
             var synthesized = time.GetTimestamp();
 
             stage = "playback";

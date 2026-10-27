@@ -1,11 +1,15 @@
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
 
 namespace EnglishTutor.Console.Ui;
 
 // Console shell: shows the state, handles local commands (RN-CONV06) and forwards free text to the input handler.
-public sealed class ChatSession(TextReader input, TextWriter output, IChatInputHandler inputHandler, string provider)
+public sealed class ChatSession(
+    TextReader input, TextWriter output, IChatInputHandler inputHandler, string provider, SpeechSpeed speed)
 {
     private const char _byteOrderMark = '\uFEFF';
+
+    private readonly SpeechSpeed _speed = speed;
 
     public async Task<int> RunAsync(CancellationToken ct)
     {
@@ -54,6 +58,9 @@ public sealed class ChatSession(TextReader input, TextWriter output, IChatInputH
                 case LocalCommandKind.Mode:
                     await ChangeModeAsync(command.Arguments, ct);
                     break;
+                case LocalCommandKind.Speed:
+                    await ChangeSpeedAsync(command.Arguments, ct);
+                    break;
                 default:
                     await WriteLinesAsync(ConsoleText.UnknownCommand(command.Name), ct);
                     break;
@@ -71,6 +78,25 @@ public sealed class ChatSession(TextReader input, TextWriter output, IChatInputH
 
         inputHandler.ChangeMode(mode);
         return WriteLinesAsync([ConsoleText.ModeChanged(mode)], ct);
+    }
+
+    // RN-TTS02, RN-CONV06: nothing goes to the brain; without argument it shows the speed, otherwise it changes it.
+    private Task ChangeSpeedAsync(string argument, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            return WriteLinesAsync([ConsoleText.SpeedCurrent(_speed.Current)], ct);
+        }
+
+        var change = _speed.Change(argument);
+        var message = change.Status switch
+        {
+            SpeedChangeStatus.Applied => ConsoleText.SpeedChanged(change.Current),
+            SpeedChangeStatus.OutOfRange => ConsoleText.SpeedOutOfRange(argument, change.Current),
+            SpeedChangeStatus.NotANumber => ConsoleText.SpeedNotANumber(argument, change.Current),
+            _ => throw new InvalidOperationException($"Unexpected speed change status {change.Status}."),
+        };
+        return WriteLinesAsync([message], ct);
     }
 
     private static string RemoveLeadingByteOrderMark(string line) =>

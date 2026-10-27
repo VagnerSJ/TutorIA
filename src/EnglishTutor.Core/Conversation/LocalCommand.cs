@@ -5,6 +5,7 @@ public enum LocalCommandKind
     Help,
     Quit,
     Mode,
+    Speed,
     Unknown,
 }
 

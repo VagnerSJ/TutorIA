@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | US-010 | Portas de voz e áudio no Core, com configuração validada | 3 | — | Concluída |
 | US-011 | O professor fala o `reply` (Piper) | 3 | US-010 | Concluída |
-| US-012 | Velocidade da fala configurável e ajustável na sessão | 3 | US-011 | A fazer |
+| US-012 | Velocidade da fala configurável e ajustável na sessão | 3 | US-011 | Concluída |
 | US-013 | Gravar a fala com push-to-talk | 4 | US-010 | A fazer |
 | US-014 | Transcrever com Whisper e confiança por palavra | 4 | US-010 | A fazer |
 | US-015 | Palavras de baixa confiança e gravações inválidas no turno | 4 | US-013, US-014 | A fazer |
@@ -161,26 +161,37 @@ Cenário: velocidade configurada
 Cenário: mudar a velocidade durante a sessão
   Dado uma sessão com voz
   Quando digito "/speed 1.2"
-  Então vejo "Speed set to 1.2x" e a próxima resposta é falada a 1.2
+  Então a saída contém "Speed set to 1.2x" e a próxima resposta é falada a 1.2
 
 Cenário: velocidade fora da faixa
   Dado uma sessão com voz
   Quando digito "/speed 2"
-  Então vejo uma mensagem dizendo que a faixa é 0.5 a 1.5
+  Então a saída contém uma mensagem dizendo que a faixa é 0.5 a 1.5
+  E a velocidade anterior continua valendo
+
+Cenário: velocidade que não é número
+  Dado uma sessão com voz e a velocidade 1.2 em vigor
+  Quando digito "/speed fast"
+  Então a saída contém uma mensagem dizendo que o valor deve ser um número de 0.5 a 1.5
   E a velocidade anterior continua valendo
 
 Cenário: velocidade sem argumento
   Quando digito "/speed"
-  Então vejo a velocidade atual e a faixa aceita
+  Então a saída contém a velocidade atual e a faixa aceita
+
+Cenário: velocidade sem voz
+  Dado Voice:Enabled igual a false
+  Quando digito "/speed 1.2"
+  Então a saída contém "Speed set to 1.2x" e nada é falado
 ```
 
 **DoD extra**
 
 | # | Comando | Esperado |
 |---|---|---|
-| D5 | `dotnet test --filter "FullyQualifiedName~Speed"` | verde, incluindo os limites 0.5, 1.5, 0.49 e 1.51 |
+| D5 | `dotnet test --filter "FullyQualifiedName~Speed&Category!=LiveBrain&Category!=LiveVoice"` | verde, incluindo os limites 0.5, 1.5, 0.49 e 1.51; `--list-tests` com o mesmo filtro não lista nenhuma classe `Live*` |
 | D6 | Manual: `/speed 0.7` e `/speed 1.4` em dois turnos | o usuário confirma a diferença audível e registra |
-| D7 | `dotnet test --filter "FullyQualifiedName~ReplySpeakerTests"` | verde: `SpeakAsync_WhenSpeedIsConfigured_PassesItToTts` (US-011) continua verde depois que a velocidade passa a ser valor mutável da sessão; a US-012 só troca a fonte da velocidade, não o contrato `ReplySpeaker` → `ITextToSpeech.SynthesizeAsync(texto, velocidade, ct)` |
+| D7 | `dotnet test --filter "FullyQualifiedName~ReplySpeakerTests&Category!=LiveBrain&Category!=LiveVoice"` | verde: `SpeakAsync_WhenSpeedIsConfigured_PassesItToTts` (US-011) continua verde depois que a velocidade passa a ser valor mutável da sessão; a US-012 só troca a fonte da velocidade, não o contrato `ReplySpeaker` → `ITextToSpeech.SynthesizeAsync(texto, velocidade, ct)` |
 
 ---
 

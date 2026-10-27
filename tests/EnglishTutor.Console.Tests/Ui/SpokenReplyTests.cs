@@ -28,7 +28,7 @@ public sealed class SpokenReplyTests : IDisposable
         var speaker = new ReplySpeaker(
             _tts,
             _player,
-            Options.Create(new TtsOptions()),
+            new SpeechSpeed(Options.Create(new TtsOptions())),
             TimeProvider.System,
             NullLogger<ReplySpeaker>.Instance);
         _sut = new ConversationInputHandler(conversation, _output, _error, NullLogger.Instance, speaker);

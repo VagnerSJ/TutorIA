@@ -1,6 +1,8 @@
 using EnglishTutor.Console.Tests.Support;
 using EnglishTutor.Console.Ui;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
+using Microsoft.Extensions.Options;
 
 namespace EnglishTutor.Console.Tests.Ui;
 
@@ -30,7 +32,7 @@ public sealed class ChatSessionTests : IDisposable
         await sut.RunAsync(TestContext.Current.CancellationToken);
 
         _output.ToString().Should().Contain("Unknown command \"/xyz\".");
-        _output.ToString().Split(Environment.NewLine).Should().Contain("Available commands: /help, /mode, /quit");
+        _output.ToString().Split(Environment.NewLine).Should().Contain("Available commands: /help, /mode, /speed, /quit");
     }
 
     // US-001 — Cenário: comando local desconhecido — RN-CONV06
@@ -167,6 +169,18 @@ public sealed class ChatSessionTests : IDisposable
             .Contain("  /mode - Change the mode: free-conversation, job-interview, listening-practice");
     }
 
+    // US-012 — Cenário: velocidade sem argumento (o /help mostra a faixa) — RN-CONV06
+    [Fact]
+    public async Task RunAsync_WhenUserTypesHelp_ListsSpeedCommandWithRange()
+    {
+        var sut = CreateSession("/help", "/quit");
+
+        await sut.RunAsync(TestContext.Current.CancellationToken);
+
+        _output.ToString().Split(Environment.NewLine).Should()
+            .Contain("  /speed - Show or change the speaking speed (0.5 to 1.5)");
+    }
+
     // US-004 — Cenário: modo desconhecido pelo console — RN-CONV01, RN-CONV06
     [Theory]
     [InlineData("/mode interview", "Unknown mode \"interview\".")]
@@ -191,7 +205,8 @@ public sealed class ChatSessionTests : IDisposable
         new(new StringReader(string.Join('\n', lines) + (lines.Length > 0 ? "\n" : string.Empty)),
             _output,
             _handler,
-            "ClaudeCode");
+            "ClaudeCode",
+            new SpeechSpeed(Options.Create(new TtsOptions())));
 
     private static int CountOccurrences(string text, string value)
     {

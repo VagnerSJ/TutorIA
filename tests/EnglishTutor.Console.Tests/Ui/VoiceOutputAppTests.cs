@@ -35,22 +35,7 @@ public sealed class VoiceOutputAppTests : IDisposable
     private static string Lines(params string[] lines) => string.Concat(lines.Select(line => line + Environment.NewLine));
 
     // Dummy Piper files that exist, so the startup check passes without a real Piper.
-    private Dictionary<string, string?> PiperFilesPresent()
-    {
-        var piper = Path.Combine(_folder, "piper");
-        Directory.CreateDirectory(piper);
-        var executable = Path.Combine(piper, "piper.exe");
-        var model = Path.Combine(piper, "voice.onnx");
-        File.WriteAllText(executable, "x");
-        File.WriteAllText(model, "x");
-        File.WriteAllText(model + ".json", "{}");
-        return new Dictionary<string, string?>
-        {
-            ["Voice:Enabled"] = "true",
-            ["Tts:Piper:ExecutablePath"] = executable,
-            ["Tts:Piper:ModelPath"] = model,
-        };
-    }
+    private Dictionary<string, string?> PiperFilesPresent() => PiperTestFiles.CreateVoiceOnValues(_folder);
 
     private AppRunOptions CreateOptions(IReadOnlyDictionary<string, string?>? extraValues, TextReader input) =>
         new([],

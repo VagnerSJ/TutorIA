@@ -76,4 +76,18 @@ public sealed class LocalCommandParserTests
         recognized.Should().BeTrue();
         command.Should().Be(new LocalCommand(LocalCommandKind.Mode, expectedName, expectedArguments));
     }
+
+    // US-012 — Cenário: mudar a velocidade durante a sessão — RN-TTS02, RN-CONV06
+    [Theory]
+    [InlineData("/speed 1.2", "/speed", "1.2")]
+    [InlineData("  /SPEED   1.2 ", "/SPEED", "1.2")]
+    [InlineData("/speed", "/speed", "")]
+    public void TryParse_WhenInputIsSpeedCommand_ReturnsSpeedWithArguments(
+        string input, string expectedName, string expectedArguments)
+    {
+        var recognized = LocalCommandParser.TryParse(input, out var command);
+
+        recognized.Should().BeTrue();
+        command.Should().Be(new LocalCommand(LocalCommandKind.Speed, expectedName, expectedArguments));
+    }
 }

@@ -60,3 +60,5 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 - Added: `Tts:Piper:ExecutablePath`, `Tts:Piper:ModelPath` e `Tts:Piper:TimeoutSeconds` (padrão 30, faixa 1 a 300), validados na partida (US-011).
 - Added: aviso na saída de erro quando o Piper ou a voz faltam (caminho completo e como baixar) e quando a síntese ou a reprodução falha num turno; a sessão continua por texto. Ctrl+C interrompe o áudio com código 0 (US-011).
 - Added: ADR-012 (voz de saída por processo do Piper e `ReplySpeaker` no Core) (US-011).
+- Added: comando `/speed <0.5 a 1.5>` muda a velocidade da fala durante a sessão (a próxima resposta já usa o novo valor) e `/speed` sozinho mostra a atual e a faixa; valor fora da faixa ou que não é número é recusado sem perder a velocidade anterior; `/help` lista o comando (US-012).
+- Changed: `Tts:Speed` passa a ser só o valor inicial da velocidade da sessão, que mora em `SpeechSpeed` (Core) e é lida pelo `ReplySpeaker` a cada fala (US-012).
