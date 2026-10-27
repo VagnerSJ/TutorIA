@@ -9,6 +9,8 @@ public static class LocalCommands
 
     public const string Mode = "/mode";
 
+    public const string Speed = "/speed";
+
     public static IReadOnlyList<LocalCommandInfo> Available { get; } =
     [
         new(Help, "Show the available commands"),
