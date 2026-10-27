@@ -1,5 +1,6 @@
 using EnglishTutor.Core.Brain;
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
 
 namespace EnglishTutor.Console.Ui;
 
@@ -97,6 +98,24 @@ public static class ConsoleText
         string.IsNullOrWhiteSpace(name) ? $"Choose a mode: {LocalCommands.Mode} <mode>." : $"Unknown mode \"{name}\".",
         $"Available modes: {string.Join(", ", TutorMode.All.Select(mode => mode.Name))}",
     ];
+
+    private static string SpeedRange =>
+        $"{SpeechSpeed.Format(TtsOptions.MinSpeed)} and {SpeechSpeed.Format(TtsOptions.MaxSpeed)}";
+
+    // US-012: messages of /speed; the speed is always shown with a dot, whatever the process culture.
+    public static string SpeedChanged(float current) => $"Speed set to {SpeechSpeed.Format(current)}x";
+
+    public static string SpeedOutOfRange(string typed, float current) =>
+        $"Speed must be between {SpeedRange} (found {typed}). The speed stays at {SpeechSpeed.Format(current)}x.";
+
+    public static string SpeedNotANumber(string typed, float current) =>
+        $"Speed must be a number between {SpeedRange} (found \"{typed}\"). Example: {LocalCommands.Speed} 1.2. "
+        + $"The speed stays at {SpeechSpeed.Format(current)}x.";
+
+    public static string SpeedCurrent(float current) =>
+        $"Current speed: {SpeechSpeed.Format(current)}x (accepted range: "
+        + $"{SpeechSpeed.Format(TtsOptions.MinSpeed)} to {SpeechSpeed.Format(TtsOptions.MaxSpeed)}). "
+        + $"Example: {LocalCommands.Speed} 1.2.";
 
     public static IReadOnlyList<string> UnknownCommand(string name) =>
     [

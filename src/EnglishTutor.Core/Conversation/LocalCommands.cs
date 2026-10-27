@@ -1,3 +1,5 @@
+using EnglishTutor.Core.Speech;
+
 namespace EnglishTutor.Core.Conversation;
 
 // RN-CONV06: commands handled locally; only the ones implemented so far are listed (US-001, P2).
@@ -15,6 +17,9 @@ public static class LocalCommands
     [
         new(Help, "Show the available commands"),
         new(Mode, $"Change the mode: {string.Join(", ", TutorMode.All.Select(mode => mode.Name))}"),
+        new(
+            Speed,
+            $"Show or change the speaking speed ({SpeechSpeed.Format(TtsOptions.MinSpeed)} to {SpeechSpeed.Format(TtsOptions.MaxSpeed)})"),
         new(Quit, "Exit the tutor"),
     ];
 }
