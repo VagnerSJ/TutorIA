@@ -599,3 +599,12 @@ Cada vez que um agente (ou o orquestrador) erra algo de forma recorrente, ou o u
 - **Por que importa:** o comando de DoD falharia fora da máquina do autor (CI), ou, pior, tocaria hardware.
 - **Correção (aplicada):** `.claude/agents/planejador.md` e `.claude/skills/bdd-para-testes/SKILL.md`: "todo filtro de DoD por nome (`FullyQualifiedName~X`) leva `&Category!=LiveBrain&Category!=LiveVoice` e uma prova com `--list-tests` de que nenhuma classe `Live*` entra". Item [O] em `.claude/skills/checklist-revisao/SKILL.md` §0.
 - **Status:** Aplicada (2026-10-26, `planejador.md`, `bdd-para-testes` e `checklist-revisao` §0)
+
+### AP-065 — Esqueleto Red com parâmetro de construtor primário não lido quebra o build (CS9113)
+
+- **Data / US:** 2026-10-27 / US-012 (`review.md`, "Aprendizados para o processo"; `plan.md` §11, T1, T3, T4 e mutação da T3)
+- **Quem errou:** nenhum erro de fato; padrão recorrente que o Executor redescobriu em três tarefas
+- **O que aconteceu:** com `TreatWarningsAsErrors`, um esqueleto cujo construtor primário recebe um parâmetro que ainda não é lido gera CS9113 e o Red não compila. O Executor contornou em T1 (construtor comum no esqueleto, construtor primário no Green), T3 e T4 (guardar o parâmetro num campo privado no esqueleto, lido só no Green). Na mutação da T3, a primeira tentativa (ignorar `speed`) também deu CS9113 e foi trocada por `DefaultSpeed + 0 * speed.Current`.
+- **Por que importa:** cada tarefa gasta uma tentativa descobrindo a técnica; o esqueleto e as mutações que não compilam atrasam o Red.
+- **Correção (proposta, não aplicada; `.claude/` é do orquestrador):** nota em `.claude/skills/tdd-dotnet/SKILL.md`, seção de esqueleto: "construtor primário com parâmetro ainda não lido gera CS9113 com `TreatWarningsAsErrors`; no esqueleto use construtor comum ou guarde o parâmetro num campo privado; em mutações use o parâmetro numa expressão neutra". Verificado: não há menção a CS9113 em `.claude/` nem neste diário.
+- **Status:** Proposta
