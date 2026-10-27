@@ -1,11 +1,15 @@
 using EnglishTutor.Core.Conversation;
+using EnglishTutor.Core.Speech;
 
 namespace EnglishTutor.Console.Ui;
 
 // Console shell: shows the state, handles local commands (RN-CONV06) and forwards free text to the input handler.
-public sealed class ChatSession(TextReader input, TextWriter output, IChatInputHandler inputHandler, string provider)
+public sealed class ChatSession(
+    TextReader input, TextWriter output, IChatInputHandler inputHandler, string provider, SpeechSpeed speed)
 {
     private const char _byteOrderMark = '\uFEFF';
+
+    private readonly SpeechSpeed _speed = speed;
 
     public async Task<int> RunAsync(CancellationToken ct)
     {

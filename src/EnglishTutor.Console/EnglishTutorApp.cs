@@ -115,7 +115,8 @@ public static class EnglishTutorApp
             services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger, speaker);
         logger.ApplicationStarted(provider, handler.Mode.Name);
 
-        var session = new ChatSession(options.Input, options.Output, handler, provider);
+        var session = new ChatSession(
+            options.Input, options.Output, handler, provider, new SpeechSpeed(Options.Create(new TtsOptions())));
         return await session.RunAsync(ct);
     }
 
