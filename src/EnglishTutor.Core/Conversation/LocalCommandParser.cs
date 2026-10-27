@@ -31,6 +31,7 @@ public static class LocalCommandParser
         _ when name.Equals(LocalCommands.Help, StringComparison.OrdinalIgnoreCase) => LocalCommandKind.Help,
         _ when name.Equals(LocalCommands.Quit, StringComparison.OrdinalIgnoreCase) => LocalCommandKind.Quit,
         _ when name.Equals(LocalCommands.Mode, StringComparison.OrdinalIgnoreCase) => LocalCommandKind.Mode,
+        _ when name.Equals(LocalCommands.Speed, StringComparison.OrdinalIgnoreCase) => LocalCommandKind.Speed,
         _ => LocalCommandKind.Unknown,
     };
 }
