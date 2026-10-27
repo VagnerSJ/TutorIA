@@ -115,8 +115,9 @@ public static class EnglishTutorApp
             services.GetRequiredService<ConversationService>(), options.Output, options.Error, logger, speaker);
         logger.ApplicationStarted(provider, handler.Mode.Name);
 
+        // The same singleton the ReplySpeaker reads on every reply (US-012).
         var session = new ChatSession(
-            options.Input, options.Output, handler, provider, new SpeechSpeed(Options.Create(new TtsOptions())));
+            options.Input, options.Output, handler, provider, services.GetRequiredService<SpeechSpeed>());
         return await session.RunAsync(ct);
     }
 
