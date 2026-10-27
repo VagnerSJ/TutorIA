@@ -54,7 +54,7 @@ src/
                        TutorReplyRejection, TutorReplyRejections, TutorReplyValidator, ReplySentences, FeedbackFormatter,
                        BrainException, BrainErrorKind, BrainOptions, BrainOptionsValidator, BrainProviders,
                        BrainFallbackPolicy, BrainSwitchNotice, IBrainSwitchNotifier
-    Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech, VoiceOptions, TtsOptions, TtsOptionsValidator, SttOptions, SttOptionsValidator, ReplySpeaker, SpeakResult, IVoiceOutputCheck, VoiceOutputStatus
+    Speech/            ISpeechToText, Transcript, TranscribedWord, ITextToSpeech, VoiceOptions, TtsOptions, TtsOptionsValidator, SttOptions, SttOptionsValidator, ReplySpeaker, SpeakResult, IVoiceOutputCheck, VoiceOutputStatus, SpeechSpeed, SpeedChange, SpeedChangeStatus
     Audio/             IAudioRecorder, IAudioPlayer, AudioClip
     Evaluation/        GoldenSet, GoldenSentence, ExpectedCorrection, GoldenSetParser, GoldenSetParseResult, EvalText,
                        CorrectionMatcher, EvalRunner, SentenceResult, ProviderEvaluation, ProviderStatus, EvalMetrics,
@@ -251,9 +251,9 @@ claude -p
 
 - STT: Whisper.net; runtime **CUDA** preferido (GPU NVIDIA RTX 4070 Ti SUPER, 16 GB; CUDA Toolkit 13.4 instalado em 2026-10-26), fallback Vulkan e depois CPU. A US-014 mede CUDA, Vulkan e CPU e fixa o padrão em ADR (sem ganho claro do CUDA, o padrão é o Vulkan). Modelo padrão `large-v3-turbo` (ou menor, se a medição indicar), baixado na primeira execução para `models/` (ignorado pelo Git). Confiança por palavra a partir das probabilidades de token.
 - Entrada de voz: push-to-talk com a tecla **Ctrl** segurada (`Voice:PushToTalkKey`, estado da tecla consultado no Windows atrás de uma porta de teclado; Ctrl+C continua cancelando). `/mic on|off` liga e desliga o microfone para o Whisper não ouvir nada fora de contexto. A interface gráfica estilo ChatGPT Voice (WPF ou Blazor, ROADMAP fase 7b) reaproveita o Core sem mudança (R2).
-- TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável (`Tts:Speed`). Fala apenas o `Reply` (`ReplySpeaker`, ADR-012). O `PiperTextToSpeech` roda `piper --model --output_file <wav temporário> --length_scale <1/velocidade>` pelo `IProcessRunner`, lê o WAV PCM16 mono e apaga o arquivo. Com `Voice:Enabled=true` e arquivos ausentes, a partida avisa na saída de erro (caminhos e como baixar) e o chat segue por texto.
+- TTS: Piper (executável, opção inicial — sem Python) e Kokoro (alternativa). Velocidade configurável: `Tts:Speed` é o valor inicial e `/speed <0.5 a 1.5>` o altera durante a sessão (RN-TTS02); o valor vigente mora em `SpeechSpeed` (Core) e o `ReplySpeaker` o lê a cada fala. Fala apenas o `Reply` (`ReplySpeaker`, ADR-012). O `PiperTextToSpeech` roda `piper --model --output_file <wav temporário> --length_scale <1/velocidade>` pelo `IProcessRunner`, lê o WAV PCM16 mono e apaga o arquivo. Com `Voice:Enabled=true` e arquivos ausentes, a partida avisa na saída de erro (caminhos e como baixar) e o chat segue por texto.
 - Áudio: NAudio (captura 16 kHz mono para o Whisper; reprodução).
-- Configuração (Core, validada na partida): Voice:Enabled (padrão false), Tts:Speed (0.5 a 1.5, padrão 1.0), Stt:LowConfidenceThreshold (0 a 1, padrão 0.6); Tts:Piper:ExecutablePath (padrão models/piper/piper.exe), Tts:Piper:ModelPath (padrão models/piper/en_US-lessac-medium.onnx) e Tts:Piper:TimeoutSeconds (1 a 300, padrão 30), validados na Infrastructure. Valor fora da faixa encerra com código 2 e a mensagem diz a faixa.
+- Configuração (Core, validada na partida): Voice:Enabled (padrão false), Tts:Speed (0.5 a 1.5, padrão 1.0; valor inicial da velocidade da sessão), Stt:LowConfidenceThreshold (0 a 1, padrão 0.6); Tts:Piper:ExecutablePath (padrão models/piper/piper.exe), Tts:Piper:ModelPath (padrão models/piper/en_US-lessac-medium.onnx) e Tts:Piper:TimeoutSeconds (1 a 300, padrão 30), validados na Infrastructure. Valor fora da faixa encerra com código 2 e a mensagem diz a faixa.
 
 ### Orçamento de VRAM (alvo, a medir)
 
